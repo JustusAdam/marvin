@@ -1,0 +1,83 @@
+name:                slackbot-framework
+version:             0.1.0.0
+synopsis:            Initial project template from stack
+description:         Please see README.md
+homepage:            https://github.com/JustusAdam/slackbot-framework#readme
+license:             BSD3
+license-file:        LICENSE
+author:              JustusAdam
+maintainer:          dev@justus.science
+copyright:           Copyright: (c) 2016 Justus Adam
+category:            Development
+build-type:          Simple
+-- extra-source-files:
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Framework.SlackBot
+                     , Framework.SlackBot.Prelude
+                     , Framework.SlackBot.Types
+                     , Framework.SlackBot.Server
+  other-modules:       Framework.SlackBot.Internal
+                     , Framework.SlackBot.Logging
+  build-depends:       base >= 4.7 && < 5
+                     , classy-prelude
+                     , wreq
+                     , wai
+                     , warp
+                     , http-types
+                     , Spock
+                     , aeson
+                     , mtl
+                     , lens
+                     , pcre-light
+                     , vector
+                     , optparse-generic
+                     , data-default
+                     , configurator
+                     , template-haskell
+                     , bytestring
+                     , time
+  default-language:    Haskell2010
+  default-extensions:  OverloadedStrings
+                     , TypeFamilies
+                     , MultiParamTypeClasses
+                     , TupleSections
+                     , GADTs
+                     , NoImplicitPrelude
+
+executable slackbot-framework-exe
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , slackbot-framework
+                     , classy-prelude
+  default-language:    Haskell2010
+  default-extensions:  OverloadedStrings
+                     , TypeFamilies
+                     , MultiParamTypeClasses
+                     , TupleSections
+                     , GADTs
+                     , NoImplicitPrelude
+
+-- test-suite slackbot-framework-test
+--   type:                exitcode-stdio-1.0
+--   hs-source-dirs:      test
+--   main-is:             Spec.hs
+--   build-depends:       base
+--                      , slackbot-framework
+--                      , classy-prelude
+--   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+--   default-language:    Haskell2010
+--   default-extensions:  OverloadedStrings
+--                      , TypeFamilies
+--                      , MultiParamTypeClasses
+--                      , TupleSections
+--                      , GADTs
+--                      , NoImplicitPrelude
+
+source-repository head
+  type:     git
+  location: https://github.com/JustusAdam/slackbot-framework
