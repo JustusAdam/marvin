@@ -1,9 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 import           ClassyPrelude
-import Text.Mustache
-import Text.Mustache.Compile
-import System.Directory
-import System.FilePath
+import           System.Directory
+import           System.FilePath
+import           Text.Mustache
+import           Text.Mustache.Compile
 
 
 tpl :: Template
@@ -11,11 +11,11 @@ tpl = $(embedTemplate ["app"] "Main.mustache")
 
 
 main :: IO ()
-main = do 
+main = do
     args <- getArgs
     case args of
         [srcname', srcLoc, out] -> do
-            let srcname = unpack srcname' 
+            let srcname = unpack srcname'
             let dir = takeDirectory srcname
             paths <- filter (not . ((||) <$> isPrefixOf "_" <*> isPrefixOf ".")) <$> getDirectoryContents dir
             files <- filterM (doesFileExist . (dir </>)) paths
@@ -24,5 +24,5 @@ main = do
                                                     , "imports" ~> hsFiles
                                                     ]))
             putStrLn processed
-            writeFile (unpack out) processed  
-        _ -> error "unexpected arguments" 
+            writeFile (unpack out) processed
+        _ -> error "unexpected arguments"

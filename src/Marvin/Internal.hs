@@ -16,8 +16,8 @@ import           Marvin.Types
 import           Network.Wreq
 
 
--- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'. 
--- Alternatively use 'r' to create one with custom options.  
+-- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'.
+-- Alternatively use 'r' to create one with custom options.
 newtype Regex = Regex { unwrapRegex :: Re.Regex }
 
 
@@ -38,7 +38,7 @@ instance IsString ScriptId where
             else error "first character of script id must be a letter, all other characters can be alphanumeric, '-' or '_'"
 
 
--- | A match to a 'Regex'. Index 0 is the full match, all other indexes are match groups. 
+-- | A match to a 'Regex'. Index 0 is the full match, all other indexes are match groups.
 type Match = [Text]
 
 
@@ -55,7 +55,7 @@ newtype BotReacting a = BotReacting { runReaction :: StateT BotAnswerState IO a 
 
 
 -- | An abstract type describing a marvin script.
--- 
+--
 -- This is basically a collection of event handlers.
 data Script = Script
     { scriptReactions :: [(Regex, BotReacting ())]
@@ -85,7 +85,7 @@ instance IsScript BotReacting where
 
 
 -- | Denotes a place from which we may access the configuration.
--- 
+--
 -- During script definition or when handling a request we can obtain the config with 'getConfigVal' or 'requireConfigVal'.
 class (IsScript m, MonadIO m) => HasConfigAccess m where
     getConfigInternal :: m C.Config
@@ -105,22 +105,22 @@ getConfig :: HasConfigAccess m => m C.Config
 getConfig = getScriptId >>= getSubConfFor
 
 
--- | Whenever any message matches the provided regex this handler gets run. 
--- 
+-- | Whenever any message matches the provided regex this handler gets run.
+--
 -- Equivalent to "robot.hear" in hubot
 hear :: Regex -> BotReacting () -> ScriptDefinition ()
 hear re hn = ScriptDefinition $ modify (\s@(Script {scriptReactions=r}) -> s{ scriptReactions = r ++ return (re, hn) })
 
 
--- | Runs the handler only if the bot was directly addressed. 
--- 
+-- | Runs the handler only if the bot was directly addressed.
+--
 -- Equivalent to "robot.respond" in hubot
 respond :: Regex -> BotReacting () -> ScriptDefinition ()
 respond re hn = ScriptDefinition $ modify (\s@(Script {scriptListens=l}) -> s { scriptListens = l ++ return (re, hn) })
 
 
--- | Send a message to the channel the triggering message came from. 
--- 
+-- | Send a message to the channel the triggering message came from.
+--
 -- Equivalent to "robot.send" in hubot
 send :: Text -> BotReacting ()
 send msg = do
@@ -128,8 +128,8 @@ send msg = do
     messageRoom (channel o) msg
 
 
--- | Send a message to the channel the original message came from and address the user that sent the original message. 
--- 
+-- | Send a message to the channel the original message came from and address the user that sent the original message.
+--
 -- Equivalent to "robot.reply" in hubot
 reply :: Text -> BotReacting ()
 reply msg = do
@@ -150,9 +150,9 @@ messageRoom room msg = do
 
 
 -- | Define a new script for marvin
---  
+--
 -- You need to provide a ScriptId (which can simple be written as a non-empty string).
--- This id is used as the key for the section in the bot config belonging to this script and in logging output. 
+-- This id is used as the key for the section in the bot config belonging to this script and in logging output.
 --
 -- Roughly equivalent to "module.exports" in hubot.
 defineScript :: ScriptId -> ScriptDefinition () -> ScriptInit
@@ -164,8 +164,8 @@ runDefinitions :: ScriptId -> ScriptDefinition () -> C.Config -> IO Script
 runDefinitions sid definitions cfg = execStateT (runScript definitions) (Script mempty mempty sid cfg)
 
 
--- | Get the results from matching the regular expression. 
--- 
+-- | Get the results from matching the regular expression.
+--
 -- Equivalent to "msg.match" in hubot.
 getMatch :: BotReacting Match
 getMatch = BotReacting $ gets botAnswerStateMatch
@@ -189,7 +189,7 @@ getConfigVal name = do
 
 
 -- | Get a value out of the config and fail with an error if the specified key is not found.
--- 
+--
 -- This config is the config for this script. Ergo all config vars registered under the config section for the ScriptId of this script.
 --
 -- The 'HasConfigAccess' Constraint means this function can be used both during script definition and when a handler is run.
@@ -217,7 +217,7 @@ requireAppConfigVal name = do
 
 
 -- | Compile a regex with options
--- 
+--
 -- Normally it is sufficient to just write the regex as a plain string and have it be converted automatically, but if you wnat certain match options you can use this function.
 r :: [Re.MatchOption] -> Text -> Regex
 r opts s = Regex $ Re.regex opts s

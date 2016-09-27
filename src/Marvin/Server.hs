@@ -133,12 +133,14 @@ mkApp scripts config = handler
         ]
 
 
+-- | Create a wai compliant application
 application :: [Script] -> C.Config -> Application
 application s config = \request respond -> prepared request >>= respond
   where
     prepared = mkApp s config
 
 
+-- | Parses command line arguments and runs a server with the arguments provided there.
 runServer :: [ScriptInit] -> IO ()
 runServer s' = do
     args <- getRecord "bot server"

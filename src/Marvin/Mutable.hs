@@ -1,7 +1,7 @@
 module Marvin.Mutable where
 
 
-import ClassyPrelude
+import           ClassyPrelude
 
 
 type Mutable = IORef
@@ -20,7 +20,7 @@ writeMutable m = liftIO . writeIORef m
 
 
 modifyMutable :: MonadIO m => Mutable a -> (a -> a) -> m ()
-modifyMutable m = liftIO . modifyIORef m  
+modifyMutable m = liftIO . modifyIORef m
 
 
 -- type Synchronized = MVar
@@ -35,4 +35,4 @@ modifyMutable m = liftIO . modifyIORef m
 
 
 -- writeSynchronized :: MonadIO m => Synchronized a -> m ()
--- writeSynchronized 
+-- writeSynchronized

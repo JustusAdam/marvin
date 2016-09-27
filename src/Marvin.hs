@@ -21,7 +21,7 @@ module Marvin
       -- * Utilities
     , Regex, r, match
     , Match
-    
+
     ) where
 
 

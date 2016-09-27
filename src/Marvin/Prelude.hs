@@ -11,7 +11,7 @@ module Marvin.Prelude
 import           ClassyPrelude
 import           Data.Aeson
 import           Data.Aeson.TH
-import           Data.Text.ICU (MatchOption (..))
+import           Data.Text.ICU  (MatchOption (..))
 import           Marvin
+import           Marvin.Mutable
 import           Marvin.Server
-import Marvin.Mutable
