@@ -38,7 +38,8 @@ script = defineScript "my-script" $ do
 The best way to use Marvin is very much taken from hubot.
 
 Marvin composes of a collection of scripts which are reactions or actions on certain messages posted in slack.
-Each script is a Haskell source file in the end they get compiled into one single static binary, which is a HTTP server that listens for slack's event calls.
+Each script is a Haskell source file. 
+They get compiled into one single static binary, which is a HTTP server that listens for slack's event calls.
 
 ### Defining scripts
 
@@ -86,13 +87,51 @@ There are two main ways (currently) of reacting to events, `hear` and `respond`.
 
 Once a handler has triggered it may perform arbitrary IO actions (using `liftIO`) and send messages using `reply` and `send`.
 
-`reply` addresses the message to the original sender of the message that triggered the handler.
-`send` sends it to the same room the tiggering message weas sent to.
-`messageRoom` sends a message to a room specified by the user.
+- `reply` addresses the message to the original sender of the message that triggered the handler.
+- `send` sends it to the same room the tiggering message weas sent to.
+- `messageRoom` sends a message to a room specified by the user.
 
 ### Configuration
 
+Configuration for marvin is written in the [configurator](https://hackage.haskell.com/package/configurator) syntax.
+
+Configuration pertaining to the bot is stored under the "bot" key.
+
+```
+bot {
+    port = 8080
+    name = "my-bot"
+}
+```
+
+By default each script has access to a configuration stored under its script id.
+And of course these scripts can have nested config groups.
+
+```
+bot {
+    port = 8080
+    name = "my-bot"
+}
+script-1 {
+    some-string = "foo"
+    some-int = 1337
+    bome-bool = true
+}
+script 2 {
+    nested-group {
+        val = false
+    }
+    name = "Trump"
+    capable = false
+}
+``` 
+
 ### Wiring manually
+
+Currently marvin only supports creating a HTTP server.
+You can create the server yourself with the `runServer` function.
+You'll want to collect all `ScriptInit` initializers and hand them to `runServer` which runs a server with the provided scripts.
+In the future it is planned to make the server more modular.
 
 ### Why no prelude?
 
@@ -106,8 +145,16 @@ Therefore you should be able to write your code as usual using the same function
 
 #### Regex
 
+Implemented in `Marvin`, documentation coming soon.
+
 #### Mutable variables
+
+Implemented in `Marvin.Mutable`, documentation coming soon.
 
 #### Format strings
 
+Coming soon.
+
 #### JSON
+
+Exposed in `Marvin` documentation coming soon. Until the refer to [aeson](https://hackage.haskell.org/package/aeson).
