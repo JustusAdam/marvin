@@ -1,14 +1,14 @@
-module Marvin 
+module Marvin
     ( Regex, r
     , Match
     , ScriptId
     , Script, defineScript, ScriptInit
     , ScriptDefinition
     , BotReacting
-    , react, respond, send
+    , hear, respond, send, reply
     , getScriptId, getMessage, getMatch
     , getConfigVal, getConfig
     ) where
 
 
-import Marvin.Internal
+import           Marvin.Internal
