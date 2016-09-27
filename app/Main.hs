@@ -14,10 +14,15 @@ main :: IO ()
 main = do 
     args <- getArgs
     case args of
-        [srcname, srcLoc, out] -> do
-            let dir = takeDirectory (unpack srcname)
+        [srcname', srcLoc, out] -> do
+            let srcname = unpack srcname' 
+            let dir = takeDirectory srcname
             paths <- filter (not . ((||) <$> isPrefixOf "_" <*> isPrefixOf ".")) <$> getDirectoryContents dir
-            files <- filterM doesFileExist paths
-            let hsFiles = filter ((`elem` [".hs", ".lhs"]) . takeExtension) files
-            writeFile (unpack out) (substitute tpl (object ["scripts" ~> hsFiles])) 
+            files <- filterM (doesFileExist . (dir </>)) paths
+            let hsFiles = map dropExtensions $ filter (/= takeFileName srcname) $ filter ((`elem` [".hs", ".lhs"]) . takeExtension) files
+            let processed = (substitute tpl (object [ "scripts" ~> intercalate ", " (map (++ ".script") hsFiles)
+                                                    , "imports" ~> hsFiles
+                                                    ]))
+            putStrLn processed
+            writeFile (unpack out) processed  
         _ -> error "unexpected arguments" 

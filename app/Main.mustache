@@ -1,12 +1,11 @@
 import Marvin.Prelude
 
+{{#imports}}
+import qualified {{.}}
+{{/imports}}
+
 scripts :: [ScriptInit]
-scripts = 
-    [
-    {{#scripts}}
-    {{.}}
-    {{/scripts}}
-    ]
+scripts = [ {{scripts}} ]
 
 main :: IO ()
 main = runServer scripts
