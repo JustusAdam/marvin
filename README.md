@@ -2,6 +2,37 @@
 
 Marvin is an attempt to combine the ease of use of [hubot](https://hubot.github.com) with the typesafety and easy syntax of Haskell as well as the performance gains from compiled languages.
 
+## TLDR
+
+```Haskell
+{-# LANGUAGE NoImplicitPrelude #-}
+module MyScript where
+
+import Marvin.Prelude
+
+script = defineScript "my-script" $ do
+    hear "I|i can't stand this (\w+)" $ do
+        match <- getMatch
+
+        let thing = match `indexEx` 1
+
+        reply $ "I'm sorry to tell you but you'll have to do " ++ thing
+    
+    respond "open the (\w+) door" $ do
+        match <- getMatch
+        let door = match `indexEx` 1
+        openDoor door
+        send $ "Door " ++ door ++ " opened
+    
+    respond "what is in file (\w+)" $ do
+        match <- getMatch 
+        let file = match `indexEx` 1
+
+        liftIO $ readFile file
+
+        send file
+```
+
 ## How to Marvin
 
 The best way to use Marvin is very much taken from hubot.
@@ -45,6 +76,19 @@ When you compile the file marvin will look for any other ".hs" and ".lhs" files 
 If you wish to hide a file from the auto discovery either place it in a different directory or prefix it with "." or "_".
 
 ### Reacting
+
+There are two main ways (currently) of reacting to events, `hear` and `respond`.
+
+`hear` is for matching any incoming message. The provided regex is tried against all incomming messages, if one matches the handler is called.
+
+`repond` only triggers on message which have the bot name, or a case variation thereof as the first word.
+
+
+Once a handler has triggered it may perform arbitrary IO actions (using `liftIO`) and send messages using `reply` and `send`.
+
+`reply` addresses the message to the original sender of the message that triggered the handler.
+`send` sends it to the same room the tiggering message weas sent to.
+`messageRoom` sends a message to a room specified by the user.
 
 ### Configuration
 
