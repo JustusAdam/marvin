@@ -1,13 +1,27 @@
+{-|
+Module      : $Header$
+Description : Marvin the modular bot
+Copyright   : (c) Justus Adam, 2016
+License     : BSD3
+Maintainer  : dev@justus.science
+Stability   : experimental
+Portability : POSIX
+
+-}
 module Marvin
-    ( Regex, r
-    , Match
+    ( -- * Scripts
+      Script, defineScript, ScriptInit
     , ScriptId
-    , Script, defineScript, ScriptInit
     , ScriptDefinition
-    , BotReacting
-    , hear, respond, send, reply
+      -- * Reacting
+    , hear, respond, send, reply, messageRoom
     , getScriptId, getMessage, getMatch
-    , getConfigVal, getConfig
+    , getConfigVal, requireConfigVal
+    , BotReacting
+      -- * Utilities
+    , Regex, r, match
+    , Match
+    
     ) where
 
 

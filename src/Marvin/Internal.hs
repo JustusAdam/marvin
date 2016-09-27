@@ -59,6 +59,7 @@ data Script = Script
 newtype ScriptDefinition a = ScriptDefinition { runScript :: StateT Script IO a } deriving (Monad, MonadIO, Applicative, Functor)
 
 
+-- | Initializer for a script. This gets run by the server during startup
 newtype ScriptInit = ScriptInit (C.Config -> IO Script)
 
 
@@ -73,6 +74,9 @@ instance IsScript BotReacting where
     getScriptId = BotReacting $ gets botAnswerStateScriptId
 
 
+-- | Denotes a place from which we may access the configuration.
+-- 
+-- During script definition or when handling a request we can obtain the config with 'getConfigVal' or 'requireConfigVal'.
 class (IsScript m, MonadIO m) => HasConfigAccess m where
     getConfigInternal :: m C.Config
 
@@ -91,30 +95,39 @@ getConfig :: HasConfigAccess m => m C.Config
 getConfig = getScriptId >>= getSubConfFor
 
 
--- | Equivalent to "robot.hear" in hubot
+-- | Whenever any message matches the provided regex this handler gets run. 
+-- 
+-- Equivalent to "robot.hear" in hubot
 hear :: Regex -> BotReacting () -> ScriptDefinition ()
 hear re hn = ScriptDefinition $ modify (\s@(Script {scriptReactions=r}) -> s{ scriptReactions = r ++ return (re, hn) })
 
 
--- | Equivalent to "robot.respond" in hubot
+-- | Runs the handler only if the bot was directly addressed. 
+-- 
+-- Equivalent to "robot.respond" in hubot
 respond :: Regex -> BotReacting () -> ScriptDefinition ()
 respond re hn = ScriptDefinition $ modify (\s@(Script {scriptListens=l}) -> s { scriptListens = l ++ return (re, hn) })
 
 
--- | Equivalent to "robot.send" in hubot
+-- | Send a message to the channel the triggering message came from. 
+-- 
+-- Equivalent to "robot.send" in hubot
 send :: Text -> BotReacting ()
 send msg = do
     o <- getMessage
     messageRoom (channel o) msg
 
 
--- | Equivalent to "robot.reply" in hubot
+-- | Send a message to the channel the original message came from and address the user that sent the original message. 
+-- 
+-- Equivalent to "robot.reply" in hubot
 reply :: Text -> BotReacting ()
 reply msg = do
     om <- getMessage
     send $ (username $ sender om) ++ " " ++ msg
 
 
+-- | Send a message to a room
 messageRoom :: Room -> Text -> BotReacting ()
 messageRoom room msg = do
     token <- requireAppConfigVal "token"
@@ -126,7 +139,12 @@ messageRoom room msg = do
     return ()
 
 
--- | Equivalent to "module.exports" in hubot
+-- | Define a new script for marvin
+--  
+-- You need to provide a ScriptId (which can simple be written as a non-empty string).
+-- This id is used as the key for the section in the bot config belonging to this script and in logging output. 
+--
+-- Roughly equivalent to "module.exports" in hubot.
 defineScript :: ScriptId -> ScriptDefinition () -> ScriptInit
 defineScript sid definitions =
     ScriptInit $ runDefinitions sid definitions
@@ -136,23 +154,35 @@ runDefinitions :: ScriptId -> ScriptDefinition () -> C.Config -> IO Script
 runDefinitions sid definitions cfg = execStateT (runScript definitions) (Script mempty mempty sid cfg)
 
 
--- | Equivalent to "msg.match" in hubot
+-- | Get the results from matching the regular expression. 
+-- 
+-- Equivalent to "msg.match" in hubot.
 getMatch :: BotReacting Match
 getMatch = BotReacting $ gets botAnswerStateMatch
 
 
 -- | Get the message that triggered this action
+-- Includes sender, target channel, as well as the full, untruncated text of the original message
 getMessage :: BotReacting Message
 getMessage = BotReacting $ gets botAnswerStateMessage
 
 
--- | Get a value out of the config
+-- | Get a value out of the config, returns 'Nothing' if the value didn't exist.
+--
+-- This config is the config for this script. Ergo all config vars registered under the config section for the ScriptId of this script.
+--
+-- The 'HasConfigAccess' Constraint means this function can be used both during script definition and when a handler is run.
 getConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m (Maybe a)
 getConfigVal name = do
     cfg <- getConfig
     liftIO $ C.lookup cfg name
 
 
+-- | Get a value out of the config and fail with an error if the specified key is not found.
+-- 
+-- This config is the config for this script. Ergo all config vars registered under the config section for the ScriptId of this script.
+--
+-- The 'HasConfigAccess' Constraint means this function can be used both during script definition and when a handler is run.
 requireConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m a
 requireConfigVal name = do
     cfg <- getConfig
@@ -177,6 +207,8 @@ requireAppConfigVal name = do
 
 
 -- | Compile a regex with options
+-- 
+-- Normally it is sufficient to just write the regex as a plain string and have it be converted automatically, but if you wnat certain match options you can use this function.
 r :: [Re.MatchOption] -> Text -> Regex
 r opts s = Regex $ Re.regex opts s
 
@@ -185,5 +217,6 @@ instance IsString Regex where
     fromString = r [] . pack
 
 
+-- | Match a regex against a string and return the first match found (if any).
 match :: Regex -> Text -> Maybe Match
 match r = fmap (Re.unfold Re.group) . Re.find (unwrapRegex r)

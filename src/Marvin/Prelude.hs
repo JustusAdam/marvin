@@ -4,8 +4,8 @@ module Marvin.Prelude
     , module ClassyPrelude
     , module Data.Aeson
     , module Data.Aeson.TH
-    , module Text.Printf
     , module Data.Text.ICU
+    , module Marvin.Mutable
     ) where
 
 import           ClassyPrelude
@@ -14,4 +14,4 @@ import           Data.Aeson.TH
 import           Data.Text.ICU (MatchOption (..))
 import           Marvin
 import           Marvin.Server
-import           Text.Printf
+import Marvin.Mutable
