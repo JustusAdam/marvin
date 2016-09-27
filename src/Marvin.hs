@@ -15,7 +15,7 @@ module Marvin
     , ScriptDefinition
       -- * Reacting
     , hear, respond, send, reply, messageRoom
-    , getScriptId, getMessage, getMatch
+    , getMessage, getMatch
     , getConfigVal, requireConfigVal
     , BotReacting
       -- * Utilities

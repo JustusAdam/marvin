@@ -1,7 +1,10 @@
 {-# LANGUAGE DeriveGeneric   #-}
 {-# LANGUAGE NamedFieldPuns  #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Marvin.Server where
+module Marvin.Server
+    ( application
+    , runServer
+    ) where
 
 
 import           ClassyPrelude

@@ -16,9 +16,12 @@ import           Marvin.Types
 import           Network.Wreq
 
 
+-- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'. 
+-- Alternatively use 'r' to create one with custom options.  
 newtype Regex = Regex { unwrapRegex :: Re.Regex }
 
 
+-- | A type, basically a String, which identifies a script to the config and the logging facilities.
 newtype ScriptId = ScriptId { unwrapScriptId :: Text } deriving (Show, Eq)
 
 
@@ -35,7 +38,10 @@ instance IsString ScriptId where
             else error "first character of script id must be a letter, all other characters can be alphanumeric, '-' or '_'"
 
 
+-- | A match to a 'Regex'. Index 0 is the full match, all other indexes are match groups. 
 type Match = [Text]
+
+
 data BotAnswerState = BotAnswerState
     { botAnswerStateMessage  :: Message
     , botAnswerStateScriptId :: ScriptId
@@ -44,9 +50,13 @@ data BotAnswerState = BotAnswerState
     }
 
 
+-- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageRoom' as well as any arbitrary 'IO' action.
 newtype BotReacting a = BotReacting { runReaction :: StateT BotAnswerState IO a } deriving (Monad, MonadIO, Applicative, Functor)
 
 
+-- | An abstract type describing a marvin script.
+-- 
+-- This is basically a collection of event handlers.
 data Script = Script
     { scriptReactions :: [(Regex, BotReacting ())]
     , scriptListens   :: [(Regex, BotReacting ())]
@@ -55,11 +65,11 @@ data Script = Script
     }
 
 
-
+-- | A monad for gradually defining a 'Script' using 'respond' and 'hear' as well as any 'IO' action.
 newtype ScriptDefinition a = ScriptDefinition { runScript :: StateT Script IO a } deriving (Monad, MonadIO, Applicative, Functor)
 
 
--- | Initializer for a script. This gets run by the server during startup
+-- | Initializer for a script. This gets run by the server during startup and creates a 'Script'
 newtype ScriptInit = ScriptInit (C.Config -> IO Script)
 
 
