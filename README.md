@@ -22,7 +22,7 @@ script = defineScript "my-script" $ do
         match <- getMatch
         let door = match `indexEx` 1
         openDoor door
-        send $ "Door " ++ door ++ " opened
+        send $ "Door " ++ door ++ " opened"
     
     respond "what is in file (\w+)" $ do
         match <- getMatch 
