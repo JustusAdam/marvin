@@ -1,8 +1,8 @@
-name:                slackbot-framework
+name:                marvin
 version:             0.1.0.0
-synopsis:            Initial project template from stack
+synopsis:            A modular bot for slack
 description:         Please see README.md
-homepage:            https://github.com/JustusAdam/slackbot-framework#readme
+homepage:            https://github.com/JustusAdam/marvin#readme
 license:             BSD3
 license-file:        LICENSE
 author:              JustusAdam
@@ -15,12 +15,12 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Framework.SlackBot
-                     , Framework.SlackBot.Prelude
-                     , Framework.SlackBot.Types
-                     , Framework.SlackBot.Server
-  other-modules:       Framework.SlackBot.Internal
-                     , Framework.SlackBot.Logging
+  exposed-modules:     Marvin
+                     , Marvin.Prelude
+                     , Marvin.Types
+                     , Marvin.Server
+  other-modules:       Marvin.Internal
+                     , Marvin.Logging
   build-depends:       base >= 4.7 && < 5
                      , classy-prelude
                      , wreq
@@ -31,7 +31,7 @@ library
                      , aeson
                      , mtl
                      , lens
-                     , pcre-light
+                     , text-icu
                      , vector
                      , optparse-generic
                      , data-default
@@ -39,6 +39,7 @@ library
                      , template-haskell
                      , bytestring
                      , time
+                     , async
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies
@@ -47,12 +48,12 @@ library
                      , GADTs
                      , NoImplicitPrelude
 
-executable slackbot-framework-exe
+executable marvin-pp
   hs-source-dirs:      app
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
-                     , slackbot-framework
+                     , marvin
                      , classy-prelude
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
@@ -67,7 +68,7 @@ executable slackbot-framework-exe
 --   hs-source-dirs:      test
 --   main-is:             Spec.hs
 --   build-depends:       base
---                      , slackbot-framework
+--                      , marvin
 --                      , classy-prelude
 --   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
 --   default-language:    Haskell2010
@@ -80,4 +81,4 @@ executable slackbot-framework-exe
 
 source-repository head
   type:     git
-  location: https://github.com/JustusAdam/slackbot-framework
+  location: https://github.com/JustusAdam/marvin

@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NamedFieldPuns #-}
-module Framework.SlackBot.Server where
+module Marvin.Server where
 
 
 import ClassyPrelude
@@ -14,12 +14,15 @@ import Data.Aeson
 import Data.Aeson.TH
 import Data.Aeson.Types
 import Data.Vector (Vector)
-import Framework.SlackBot.Logging
-import Framework.SlackBot.Types
-import Framework.SlackBot.Internal
+import Marvin.Logging
+import Marvin.Types hiding (channel)
+import Marvin.Internal
 import Options.Generic
 import Control.Lens
 import Data.Time
+import Control.Monad.State
+import Data.Char (isSpace)
+import Control.Concurrent.Async (wait)
 
 
 data CmdOptions = CmdOptions
@@ -33,7 +36,7 @@ instance ParseRecord CmdOptions
 data EventType 
     = MessageEvent
         { user :: User
-        , channel :: Text
+        , channel :: Room
         , text :: Text
         , ts :: LocalTime
         }
@@ -70,6 +73,10 @@ deriveJSON
     ''EventCallback
 
 
+defaultBotName :: Text
+defaultBotName = "tempbot"
+
+
 mkApp :: [Script] -> C.Config -> Request -> IO Wai.Response
 mkApp scripts config = handler
   where
@@ -79,10 +86,42 @@ mkApp scripts config = handler
             Left err -> do
                 logMsg err
                 return $ responseLBS ok200 [] "Recieved malformed JSON, check your server log for further information"
-            Right v ->
-                case v of
-                    UrlVerification{challenge} -> return $ responseLBS ok200 [] (fromStrict $ encodeUtf8 challenge)
-                    EventCallback{} -> return $ responseLBS ok200 [] ""
+            Right v -> do
+                tkn <- C.require config "application.token"
+                if (token v == tkn)
+                    then handleApiRequest v
+                    else return $ responseLBS unauthorized401 [] ""
+
+    handleApiRequest UrlVerification{challenge} = 
+        return $ responseLBS ok200 [("Content-Type", "application/x-www-form-urlencoded")] (fromStrict $ encodeUtf8 challenge)
+    handleApiRequest EventCallback{event} = do
+        async $ handleMessage event
+        return $ responseLBS ok200 [] ""
+
+    handleMessage MessageEvent{user, channel, text, ts} = do
+        lDispatches <- doIfMatch allListens text
+        botname <- fromMaybe defaultBotName <$> C.lookup config "application.bot-name"
+        let trimmed = dropWhile isSpace text
+        rDispatches <- case stripPrefix botname trimmed of
+            Nothing -> return []
+            Just remainder ->
+                doIfMatch allReactions remainder
+        void $ mapM wait (lDispatches ++ rDispatches)
+      where
+        doIfMatch things toMatch  =
+            catMaybes <$> for things (\(trigger, action) -> do
+                case match trigger toMatch of
+                        Nothing -> return Nothing
+                        Just m -> Just <$> async (action (Message user channel text ts) m))
+            
+    allReactions = prepareActions scriptReactions
+    allListens = prepareActions scriptListens
+    prepareActions getter = 
+        [ (trigger, \message match -> evalStateT (runReaction action) (BotAnswerState message (scriptScriptId script) match (scriptConfig script))
+          )
+        | script <- scripts
+        , (trigger, action) <- getter script
+        ]
 
 
 application :: [Script] -> C.Config -> Application

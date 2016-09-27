@@ -1,4 +1,4 @@
-module Framework.SlackBot.Logging where
+module Marvin.Logging where
 
 import ClassyPrelude
 

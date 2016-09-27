@@ -2,7 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Framework.SlackBot.Types where
+module Marvin.Types where
 
 
 import ClassyPrelude

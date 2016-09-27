@@ -1,4 +1,4 @@
-module Framework.SlackBot 
+module Marvin 
     ( Regex, r
     , Match
     , ScriptId
@@ -11,4 +11,4 @@ module Framework.SlackBot
     ) where
 
 
-import Framework.SlackBot.Internal
+import Marvin.Internal

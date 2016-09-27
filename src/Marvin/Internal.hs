@@ -3,24 +3,28 @@
 {-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Framework.SlackBot.Internal where
+module Marvin.Internal where
 
 
 import ClassyPrelude
-import Framework.SlackBot.Types
-import qualified Text.Regex.PCRE.Light as PCRE
+import Marvin.Types
 import Data.String
 import qualified Data.Configurator as C
 import qualified Data.Configurator.Types as C
 import Data.Char
 import Control.Monad.State
-import qualified Data.ByteString.Char8 as C
+import qualified Data.Text.ICU as Re
+import Network.Wreq
 
 
-newtype Regex = Regex { unwrapRegex :: PCRE.Regex } 
+newtype Regex = Regex { unwrapRegex :: Re.Regex } 
 
 
-newtype ScriptId = ScriptId Text deriving (Show, Eq)
+newtype ScriptId = ScriptId { unwrapScriptId :: Text } deriving (Show, Eq)
+
+
+applicationScriptId :: ScriptId
+applicationScriptId = ScriptId "application"
 
 
 instance IsString ScriptId where
@@ -45,8 +49,8 @@ newtype BotReacting a = BotReacting { runReaction :: StateT BotAnswerState IO a 
 
 
 data Script = Script 
-    { scriptReactions :: Seq (Regex, BotReacting ())
-    , scriptListens :: Seq (Regex, BotReacting ())
+    { scriptReactions :: [(Regex, BotReacting ())]
+    , scriptListens :: [(Regex, BotReacting ())]
     , scriptScriptId :: ScriptId
     , scriptConfig :: C.Config
     }
@@ -71,19 +75,21 @@ instance IsScript BotReacting where
 
 
 class (IsScript m, MonadIO m) => HasConfigAccess m where
-    getConfig' :: m C.Config
+    getConfigInternal :: m C.Config
 
 instance HasConfigAccess ScriptDefinition where
-    getConfig' = ScriptDefinition $ gets scriptConfig
+    getConfigInternal = ScriptDefinition $ gets scriptConfig
 
 instance HasConfigAccess BotReacting where
-    getConfig' = BotReacting $ gets botAnswerStateConfig
+    getConfigInternal = BotReacting $ gets botAnswerStateConfig
+
+
+getSubConfFor :: HasConfigAccess m => ScriptId -> m C.Config
+getSubConfFor (ScriptId name) = C.subconfig name <$> getConfigInternal 
+
 
 getConfig :: HasConfigAccess m => m C.Config
-getConfig = do
-    (ScriptId sub) <- getScriptId
-    cfg <- getConfig
-    return $ C.subconfig sub cfg
+getConfig = getScriptId >>= getSubConfFor
 
 
 -- | Equivalent to "robot.hear" in hubot
@@ -104,7 +110,14 @@ send msg = do
 
 
 messageRoom :: Room -> Text -> BotReacting ()
-messageRoom room msg = undefined
+messageRoom room msg = do
+    token <- requireAppConfigVal "token"
+    liftIO $ async $ post "https://slack.com/api/chat.postMessage" 
+                        [ "token" := (token :: Text)
+                        , "channel" := roomname room 
+                        , "text" := msg 
+                        ]
+    return ()
 
 
 -- | Equivalent to "module.exports" in hubot
@@ -134,10 +147,37 @@ getConfigVal name = do
     liftIO $ C.lookup cfg name
 
 
+requireConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m a
+requireConfigVal name = do
+    cfg <- getConfig
+    liftIO $ C.require cfg name
+
+
+getAppConfig :: HasConfigAccess m => m C.Config
+getAppConfig = getSubConfFor applicationScriptId 
+
+
+getAppConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m (Maybe a)
+getAppConfigVal name = do
+    cfg <- getAppConfig
+    liftIO $ C.lookup cfg name
+
+
+requireAppConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m a
+requireAppConfigVal name = do
+    cfg <- getAppConfig
+    liftIO $ C.require cfg name
+
+
+
 -- | Compile a regex with options
-r :: ByteString -> [PCRE.PCREOption] -> Regex
-r s opts = Regex $ PCRE.compile s opts
+r :: [Re.MatchOption] -> Text -> Regex
+r opts s = Regex $ Re.regex opts s
 
 
 instance IsString Regex where
-    fromString s = r (C.pack s) []
+    fromString = r [] . pack
+
+
+match :: Regex -> Text -> Maybe Match
+match r = fmap (Re.unfold Re.group) . Re.find (unwrapRegex r)
