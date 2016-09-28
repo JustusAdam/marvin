@@ -9,6 +9,9 @@ import           ClassyPrelude
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Time
+import qualified Data.Configurator       as C
+import qualified Data.Configurator.Types as C
+import Data.Char
 
 
 newtype User = User { username :: Text } deriving (IsString, Eq, Show)
@@ -25,3 +28,32 @@ data Message = Message
     , content   :: Text
     , timestamp :: LocalTime
     }
+
+
+
+-- | A type, basically a String, which identifies a script to the config and the logging facilities.
+newtype ScriptId = ScriptId { unwrapScriptId :: Text } deriving (Show, Eq)
+
+
+applicationScriptId :: ScriptId
+applicationScriptId = ScriptId "bot"
+
+
+instance IsString ScriptId where
+    fromString "" = error "script id must not be empty"
+    fromString "bot" = error "'bot' is a protected name and cannot be used as script id"
+    fromString s@(x:xs) =
+        if isLetter x && all (\c -> isAlphaNum c || c == '-' || c == '_' ) xs
+            then ScriptId $ fromString s
+            else error "first character of script id must be a letter, all other characters can be alphanumeric, '-' or '_'"
+
+
+class IsScript m where
+    getScriptId :: m ScriptId
+
+
+-- | Denotes a place from which we may access the configuration.
+--
+-- During script definition or when handling a request we can obtain the config with 'getConfigVal' or 'requireConfigVal'.
+class (IsScript m, MonadIO m) => HasConfigAccess m where
+    getConfigInternal :: m C.Config

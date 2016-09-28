@@ -4,6 +4,7 @@
 module Marvin.Server
     ( application
     , runServer
+    , runHTTPSServer
     ) where
 
 
@@ -24,7 +25,10 @@ import           Marvin.Types             hiding (channel)
 import           Network.HTTP.Types
 import           Network.Wai              as Wai
 import           Network.Wai.Handler.Warp
+import Network.Wai.Handler.WarpTLS
 import           Options.Generic
+import qualified System.Log.Logger as L
+import Data.Text.ICU (pattern)
 
 
 data CmdOptions = CmdOptions
@@ -94,13 +98,18 @@ mkApp scripts config = handler
         bod <- lazyRequestBody request
         case eitherDecode' bod of
             Left err -> do
-                logMsg err
+                noticeAccept "Recieved malformed JSON"
+                noticeAccept err
                 return $ responseLBS ok200 [] "Recieved malformed JSON, check your server log for further information"
             Right v -> do
                 tkn <- requireFromAppConfig config "token"
                 if (token v == tkn)
                     then handleApiRequest v
-                    else return $ responseLBS unauthorized401 [] ""
+                    else do
+                        noticeAccept "Unathorized request recieved (token invalid)"
+                        return $ responseLBS unauthorized401 [] ""
+    
+    noticeAccept = L.noticeM  "server.accept"
 
     handleApiRequest UrlVerification{challenge} =
         return $ responseLBS ok200 [("Content-Type", "application/x-www-form-urlencoded")] (fromStrict $ encodeUtf8 challenge)
@@ -123,10 +132,20 @@ mkApp scripts config = handler
                         Nothing -> return Nothing
                         Just m -> Just <$> async (action (Message user channel text ts) m))
 
+    onScriptExcept :: ScriptId -> Regex -> SomeException -> IO ()
+    onScriptExcept (ScriptId id) (Regex r) e = do
+        let logger = (unpack $ "script." ++ id)
+        L.errorM logger "Unhandled exception during execution"
+        L.errorM logger $ "Trigger: " ++ unpack (pattern r)
+        L.errorM logger (show e)
+
     allReactions = prepareActions scriptReactions
     allListens = prepareActions scriptListens
     prepareActions getter =
-        [ (trigger, \message match -> evalStateT (runReaction action) (BotAnswerState message (scriptScriptId script) match (scriptConfig script))
+        [ (trigger, \message match ->
+            catch
+                (evalStateT (runReaction action) (BotAnswerState message (scriptScriptId script) match (scriptConfig script)))
+                (onScriptExcept (scriptScriptId script) trigger)
           )
         | script <- scripts
         , (trigger, action) <- getter script
@@ -140,13 +159,42 @@ application s config = \request respond -> prepared request >>= respond
     prepared = mkApp s config
 
 
+prepareServer :: [ScriptInit] -> IO (Int, Application, C.Config)
+prepareServer s' = do
+    args <- getRecord "bot server"
+    cfgLoc <- maybe 
+                (L.noticeM "bot" "Using default config: config.cfg" >> return "config.cfg")
+                return
+                (configPath args)
+    (cfg, cfgTid) <- C.autoReload C.autoConfig [C.Required cfgLoc]
+    L.infoM "bot" "Initializing scripts"
+    s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s cfg) (onInitExcept sid)) s'
+    let app = application s cfg
+    port <- fromMaybe 8000 <$> lookupFromAppConfig cfg "port"
+    L.infoM "bot" $ "Starting server on port " ++ show port
+    return (port, app, cfg)
+  where
+    onInitExcept :: ScriptId -> SomeException -> IO (Maybe a)
+    onInitExcept (ScriptId id) e = do
+        let logger = (unpack $ "script." ++ id)
+        L.errorM logger "Unhandled exception during initialization"
+        L.errorM logger (show e)
+        return Nothing
+
+
 -- | Parses command line arguments and runs a server with the arguments provided there.
 runServer :: [ScriptInit] -> IO ()
-runServer s' = do
-    args <- getRecord "bot server"
-    let cfgLoc = fromMaybe "config.cfg" $ configPath args
-    (cfg, cfgTid) <- C.autoReload C.autoConfig [C.Required cfgLoc]
-    s <- mapM (\(ScriptInit s) -> s cfg) s'
-    let app = application s cfg
-    port <- lookupFromAppConfig cfg "port"
-    run (fromMaybe 8080 port) app
+runServer s = do
+    (port, app, _) <- prepareServer s
+    run port app
+
+
+-- | Parses command line arguments and runs a server protected with TLS with the arguments provided there.
+runHTTPSServer :: [ScriptInit] -> IO ()
+runHTTPSServer s = do
+    (port, app, cfg) <- prepareServer s
+    certfile <- requireFromAppConfig cfg "certfile"
+    keyfile <- requireFromAppConfig cfg "keyfile"
+    let tlsSet = tlsSettings certfile keyfile
+        warpSet = setPort port defaultSettings
+    runTLS tlsSet warpSet app

@@ -27,6 +27,7 @@ library
                      , wreq
                      , wai
                      , warp
+                     , warp-tls
                      , http-types
                      , Spock
                      , aeson
@@ -41,6 +42,7 @@ library
                      , bytestring
                      , time
                      , async
+                     , hslogger
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies

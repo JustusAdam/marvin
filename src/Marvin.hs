@@ -21,8 +21,11 @@ module Marvin
       -- * Utilities
     , Regex, r, match
     , Match
-
+      -- * Logging
+    , debugM, infoM, noticeM, warningM, errorM, criticalM, alertM, emergencyM
     ) where
 
 
 import           Marvin.Internal
+import Marvin.Logging
+import Marvin.Types

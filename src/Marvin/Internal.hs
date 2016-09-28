@@ -8,7 +8,6 @@ module Marvin.Internal where
 
 import           ClassyPrelude
 import           Control.Monad.State
-import           Data.Char
 import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
 import qualified Data.Text.ICU           as Re
@@ -19,23 +18,6 @@ import           Network.Wreq
 -- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'.
 -- Alternatively use 'r' to create one with custom options.
 newtype Regex = Regex { unwrapRegex :: Re.Regex }
-
-
--- | A type, basically a String, which identifies a script to the config and the logging facilities.
-newtype ScriptId = ScriptId { unwrapScriptId :: Text } deriving (Show, Eq)
-
-
-applicationScriptId :: ScriptId
-applicationScriptId = ScriptId "bot"
-
-
-instance IsString ScriptId where
-    fromString "" = error "script id must not be empty"
-    fromString "bot" = error "'bot' is a protected name and cannot be used as script id"
-    fromString s@(x:xs) =
-        if isLetter x && all (\c -> isAlphaNum c || c == '-' || c == '_' ) xs
-            then ScriptId $ fromString s
-            else error "first character of script id must be a letter, all other characters can be alphanumeric, '-' or '_'"
 
 
 -- | A match to a 'Regex'. Index 0 is the full match, all other indexes are match groups.
@@ -70,11 +52,7 @@ newtype ScriptDefinition a = ScriptDefinition { runScript :: StateT Script IO a 
 
 
 -- | Initializer for a script. This gets run by the server during startup and creates a 'Script'
-newtype ScriptInit = ScriptInit (C.Config -> IO Script)
-
-
-class IsScript m where
-    getScriptId :: m ScriptId
+newtype ScriptInit = ScriptInit (ScriptId, C.Config -> IO Script)
 
 
 instance IsScript ScriptDefinition where
@@ -82,13 +60,6 @@ instance IsScript ScriptDefinition where
 
 instance IsScript BotReacting where
     getScriptId = BotReacting $ gets botAnswerStateScriptId
-
-
--- | Denotes a place from which we may access the configuration.
---
--- During script definition or when handling a request we can obtain the config with 'getConfigVal' or 'requireConfigVal'.
-class (IsScript m, MonadIO m) => HasConfigAccess m where
-    getConfigInternal :: m C.Config
 
 instance HasConfigAccess ScriptDefinition where
     getConfigInternal = ScriptDefinition $ gets scriptConfig
@@ -157,7 +128,7 @@ messageRoom room msg = do
 -- Roughly equivalent to "module.exports" in hubot.
 defineScript :: ScriptId -> ScriptDefinition () -> ScriptInit
 defineScript sid definitions =
-    ScriptInit $ runDefinitions sid definitions
+    ScriptInit (sid, runDefinitions sid definitions)
 
 
 runDefinitions :: ScriptId -> ScriptDefinition () -> C.Config -> IO Script
