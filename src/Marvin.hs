@@ -27,5 +27,5 @@ module Marvin
 
 
 import           Marvin.Internal
-import Marvin.Logging
-import Marvin.Types
+import           Marvin.Logging
+import           Marvin.Types

@@ -1,8 +1,8 @@
 module Marvin.Logging where
 
-import ClassyPrelude
+import           ClassyPrelude
+import           Marvin.Types
 import qualified System.Log.Logger as L
-import Marvin.Types
 
 
 scriptLog :: (MonadIO m, HasConfigAccess m) => (String -> String -> IO ()) -> Text -> m ()

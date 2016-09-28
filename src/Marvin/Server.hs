@@ -9,32 +9,32 @@ module Marvin.Server
 
 
 import           ClassyPrelude
-import           Control.Concurrent.Async (wait)
+import           Control.Concurrent.Async    (wait)
 import           Control.Monad.State
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Aeson.Types
-import           Data.Char                (isSpace)
-import qualified Data.Configurator        as C
-import qualified Data.Configurator.Types  as C
+import           Data.Char                   (isSpace)
+import qualified Data.Configurator           as C
+import qualified Data.Configurator.Types     as C
+import           Data.Text.ICU               (pattern)
 import           Data.Time
-import           Data.Vector              (Vector)
+import           Data.Vector                 (Vector)
 import           Marvin.Internal
 import           Marvin.Logging
-import           Marvin.Types             hiding (channel)
+import           Marvin.Types                hiding (channel)
 import           Network.HTTP.Types
-import           Network.Wai              as Wai
+import           Network.Wai                 as Wai
 import           Network.Wai.Handler.Warp
-import Network.Wai.Handler.WarpTLS
+import           Network.Wai.Handler.WarpTLS
 import           Options.Generic
-import qualified System.Log.Logger as L
-import Data.Text.ICU (pattern)
+import qualified System.Log.Logger           as L
 
 
 data CmdOptions = CmdOptions
     { configPath :: Maybe FilePath
-    , verbose :: Bool
-    , debug :: Bool
+    , verbose    :: Bool
+    , debug      :: Bool
     } deriving (Generic)
 
 
@@ -110,7 +110,7 @@ mkApp scripts config = handler
                     else do
                         noticeAccept "Unathorized request recieved (token invalid)"
                         return $ responseLBS unauthorized401 [] ""
-    
+
     noticeAccept = L.noticeM  "server.accept"
 
     handleApiRequest UrlVerification{challenge} =
@@ -137,7 +137,7 @@ mkApp scripts config = handler
     onScriptExcept :: ScriptId -> Regex -> SomeException -> IO ()
     onScriptExcept (ScriptId id) r e = do
         let logger =  "bot.dispatch"
-        L.errorM logger $ "Unhandled exception during execution of script " ++ show id ++ " with trigger " ++ show r 
+        L.errorM logger $ "Unhandled exception during execution of script " ++ show id ++ " with trigger " ++ show r
         L.errorM logger (show e)
 
     allReactions = prepareActions scriptReactions
@@ -163,9 +163,9 @@ application s config = \request respond -> prepared request >>= respond
 prepareServer :: [ScriptInit] -> IO (Int, Application, C.Config)
 prepareServer s' = do
     args <- getRecord "bot server"
-    when (verbose args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.INFO) 
+    when (verbose args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.INFO)
     when (debug args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.DEBUG)
-    cfgLoc <- maybe 
+    cfgLoc <- maybe
                 (L.noticeM "bot" "Using default config: config.cfg" >> return "config.cfg")
                 return
                 (configPath args)

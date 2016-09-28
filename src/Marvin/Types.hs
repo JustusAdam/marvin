@@ -2,17 +2,20 @@
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
-module Marvin.Types where
+module Marvin.Types
+    ( User(..), Room(..), Message(..), ScriptId(..)
+    , applicationScriptId, IsScript, getScriptId
+    ) where
 
 
 import           ClassyPrelude
 import           Data.Aeson
 import           Data.Aeson.TH
-import           Data.Time
+import           Data.Char               (isAlphaNum, isLetter)
 import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
-import Data.Char (isAlphaNum, isLetter)
-import qualified System.Log.Logger as L
+import           Data.Time
+import qualified System.Log.Logger       as L
 
 
 newtype User = User { username :: Text } deriving (IsString, Eq, Show)
