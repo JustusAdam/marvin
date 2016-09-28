@@ -20,6 +20,10 @@ import           Network.Wreq
 newtype Regex = Regex { unwrapRegex :: Re.Regex }
 
 
+instance Show Regex where
+    show (Regex r) = "Regex " ++ show (Re.pattern r)
+
+
 -- | A match to a 'Regex'. Index 0 is the full match, all other indexes are match groups.
 type Match = [Text]
 

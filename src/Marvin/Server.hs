@@ -133,10 +133,9 @@ mkApp scripts config = handler
                         Just m -> Just <$> async (action (Message user channel text ts) m))
 
     onScriptExcept :: ScriptId -> Regex -> SomeException -> IO ()
-    onScriptExcept (ScriptId id) (Regex r) e = do
-        let logger = (unpack $ "script." ++ id)
-        L.errorM logger "Unhandled exception during execution"
-        L.errorM logger $ "Trigger: " ++ unpack (pattern r)
+    onScriptExcept (ScriptId id) r e = do
+        let logger =  "bot.dispatch"
+        L.errorM logger $ "Unhandled exception during execution of script " ++ show id ++ " with trigger " ++ show r 
         L.errorM logger (show e)
 
     allReactions = prepareActions scriptReactions
@@ -176,8 +175,8 @@ prepareServer s' = do
   where
     onInitExcept :: ScriptId -> SomeException -> IO (Maybe a)
     onInitExcept (ScriptId id) e = do
-        let logger = (unpack $ "script." ++ id)
-        L.errorM logger "Unhandled exception during initialization"
+        let logger = "bot.init"
+        L.errorM logger $ "Unhandled exception during initialization of script " ++ show id
         L.errorM logger (show e)
         return Nothing
 
