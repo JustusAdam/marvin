@@ -33,6 +33,8 @@ import Data.Text.ICU (pattern)
 
 data CmdOptions = CmdOptions
     { configPath :: Maybe FilePath
+    , verbose :: Bool
+    , debug :: Bool
     } deriving (Generic)
 
 
@@ -161,11 +163,14 @@ application s config = \request respond -> prepared request >>= respond
 prepareServer :: [ScriptInit] -> IO (Int, Application, C.Config)
 prepareServer s' = do
     args <- getRecord "bot server"
+    when (verbose args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.INFO) 
+    when (debug args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.DEBUG)
     cfgLoc <- maybe 
                 (L.noticeM "bot" "Using default config: config.cfg" >> return "config.cfg")
                 return
                 (configPath args)
     (cfg, cfgTid) <- C.autoReload C.autoConfig [C.Required cfgLoc]
+    unless (verbose args || debug args) $ C.lookup cfg "bot.logging" >>= maybe (return ()) (\l -> L.updateGlobalLogger L.rootLoggerName (L.setLevel l))
     L.infoM "bot" "Initializing scripts"
     s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s cfg) (onInitExcept sid)) s'
     let app = application s cfg

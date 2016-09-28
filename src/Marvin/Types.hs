@@ -11,7 +11,8 @@ import           Data.Aeson.TH
 import           Data.Time
 import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
-import Data.Char
+import Data.Char (isAlphaNum, isLetter)
+import qualified System.Log.Logger as L
 
 
 newtype User = User { username :: Text } deriving (IsString, Eq, Show)
@@ -57,3 +58,11 @@ class IsScript m where
 -- During script definition or when handling a request we can obtain the config with 'getConfigVal' or 'requireConfigVal'.
 class (IsScript m, MonadIO m) => HasConfigAccess m where
     getConfigInternal :: m C.Config
+
+
+prioMapping = map ((pack . show) &&& id) [L.DEBUG, L.INFO, L.NOTICE, L.WARNING, L.ERROR, L.CRITICAL, L.ALERT, L.EMERGENCY]
+
+
+instance C.Configured L.Priority where
+    convert (C.String s) = lookup (toUpper s) prioMapping
+    convert _ = Nothing
