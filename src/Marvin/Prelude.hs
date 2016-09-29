@@ -9,3 +9,4 @@ import           Data.Text.ICU  as X (MatchOption (..))
 import           Marvin         as X
 import           Marvin.Mutable as X
 import           Marvin.Server  as X
+import Text.Format as X

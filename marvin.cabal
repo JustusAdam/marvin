@@ -45,6 +45,7 @@ library
                      , time
                      , async
                      , hslogger
+                     , text-format
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies

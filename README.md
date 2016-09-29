@@ -162,7 +162,11 @@ Implemented in `Marvin.Mutable`, documentation coming soon.
 
 #### Format strings
 
-Coming soon.
+Due to the lack of good format string libraries in haskell which work with efficient strings (`Text`) marvin includes a simple format string library.
+
+Format strings use `{}` as placeholder and can be defined as literals `"Hello {}, have a good {}"`. Substitution is done with `format` which accepts lists, tuples etc as input. Placeholders are replaced by index.
+
+*Note*: The placeholder is literally **only** `{}`, even `{ }` does not work.  
 
 #### JSON
 
