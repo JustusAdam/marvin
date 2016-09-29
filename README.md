@@ -29,7 +29,7 @@ script = defineScript "my-script" $ do
         match <- getMatch
         let door = match `indexEx` 1
         openDoor door
-        send $ "Door " ++ door ++ " opened"
+        send $ format "Door {} opened" [door]
     
     respond "what is in file (\w+)" $ do
         match <- getMatch 
@@ -170,7 +170,7 @@ Format strings use `{}` as placeholder and can be defined as literals `"Hello {}
 
 #### JSON
 
-Exposed in `Marvin` documentation coming soon. Until the refer to [aeson](https://hackage.haskell.org/package/aeson).
+Exposed in `Marvin` documentation coming soon. Until then refer to [aeson](https://hackage.haskell.org/package/aeson).
 
 #### Logging
 
