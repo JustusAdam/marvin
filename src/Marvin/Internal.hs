@@ -3,6 +3,8 @@
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Marvin.Internal where
 
 
@@ -10,45 +12,52 @@ import           ClassyPrelude
 import           Control.Monad.State
 import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
-import qualified Data.Text.ICU           as Re
-import           Marvin.Types
+
+import           Marvin.Internal.Types
 import           Network.Wreq
+import Control.Lens hiding (cons)
+import Marvin.Regex (Match, Regex)
 
 
--- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'.
--- Alternatively use 'r' to create one with custom options.
-newtype Regex = Regex { unwrapRegex :: Re.Regex }
+
+declareFields [d|
+    data BotActionState d = BotActionState
+        { botActionStateScriptId :: ScriptId
+        , botActionStateConfig   :: C.Config
+        , botActionStateVariable :: d
+        }
+    |]
+
+declareFields [d|
+    data MessageReactionData = MessageReactionData
+        { messageReactionDataMessageField :: Message
+        , messageReactionDataMatchField :: Match
+        }
+    |]
 
 
-instance Show Regex where
-    show (Regex r) = "Regex " ++ show (Re.pattern r)
+data ActionData d where
+    Hear :: Regex -> ActionData MessageReactionData
+    Respond :: Regex -> ActionData MessageReactionData
 
 
--- | A match to a 'Regex'. Index 0 is the full match, all other indexes are match groups.
-type Match = [Text]
-
-
-data BotAnswerState = BotAnswerState
-    { botAnswerStateMessage  :: Message
-    , botAnswerStateScriptId :: ScriptId
-    , botAnswerStateMatch    :: Match
-    , botAnswerStateConfig   :: C.Config
-    }
+data WrappedAction = forall d. WrappedAction (ActionData d) (BotReacting d ())
 
 
 -- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageRoom' as well as any arbitrary 'IO' action.
-newtype BotReacting a = BotReacting { runReaction :: StateT BotAnswerState IO a } deriving (Monad, MonadIO, Applicative, Functor)
+newtype BotReacting d a = BotReacting { runReaction :: StateT (BotActionState d) IO a } deriving (Monad, MonadIO, Applicative, Functor)  
 
 
--- | An abstract type describing a marvin script.
---
--- This is basically a collection of event handlers.
-data Script = Script
-    { scriptReactions :: [(Regex, BotReacting ())]
-    , scriptListens   :: [(Regex, BotReacting ())]
-    , scriptScriptId  :: ScriptId
-    , scriptConfig    :: C.Config
-    }
+declareFields [d|
+    -- | An abstract type describing a marvin script.
+    --
+    -- This is basically a collection of event handlers.
+    data Script = Script
+        { scriptActions   :: Seq WrappedAction
+        , scriptScriptId  :: ScriptId
+        , scriptConfig    :: C.Config
+        }
+    |]
 
 
 -- | A monad for gradually defining a 'Script' using 'respond' and 'hear' as well as any 'IO' action.
@@ -58,19 +67,29 @@ newtype ScriptDefinition a = ScriptDefinition { runScript :: StateT Script IO a 
 -- | Initializer for a script. This gets run by the server during startup and creates a 'Script'
 newtype ScriptInit = ScriptInit (ScriptId, C.Config -> IO Script)
 
+class HasMessage m where
+    message :: Lens' m Message
+    
+instance HasMessageField m Message => HasMessage m where
+    message = messageField
 
-instance IsScript ScriptDefinition where
-    getScriptId = ScriptDefinition $ gets scriptScriptId
+class HasMatch m where
+    match :: Lens' m Match
 
-instance IsScript BotReacting where
-    getScriptId = BotReacting $ gets botAnswerStateScriptId
+instance HasMatchField m Match => HasMatch m where
+    match = matchField
 
 instance HasConfigAccess ScriptDefinition where
-    getConfigInternal = ScriptDefinition $ gets scriptConfig
+    getConfigInternal = ScriptDefinition $ use config
 
-instance HasConfigAccess BotReacting where
-    getConfigInternal = BotReacting $ gets botAnswerStateConfig
+instance HasConfigAccess (BotReacting a) where
+    getConfigInternal = BotReacting $ use config
 
+instance IsScript ScriptDefinition where
+    getScriptId = ScriptDefinition $ use scriptId
+
+instance IsScript (BotReacting a) where
+    getScriptId = BotReacting $ use scriptId
 
 getSubConfFor :: HasConfigAccess m => ScriptId -> m C.Config
 getSubConfFor (ScriptId name) = C.subconfig name <$> getConfigInternal
@@ -80,24 +99,28 @@ getConfig :: HasConfigAccess m => m C.Config
 getConfig = getScriptId >>= getSubConfFor
 
 
+addReaction :: ActionData d -> BotReacting d () -> ScriptDefinition ()
+addReaction data_ action = ScriptDefinition $ actions %= (cons (WrappedAction data_ action))
+
+
 -- | Whenever any message matches the provided regex this handler gets run.
 --
 -- Equivalent to "robot.hear" in hubot
-hear :: Regex -> BotReacting () -> ScriptDefinition ()
-hear re hn = ScriptDefinition $ modify (\s@(Script {scriptReactions=r}) -> s{ scriptReactions = r ++ return (re, hn) })
+hear :: Regex -> BotReacting MessageReactionData () -> ScriptDefinition ()
+hear re = addReaction (Hear re)
 
 
 -- | Runs the handler only if the bot was directly addressed.
 --
 -- Equivalent to "robot.respond" in hubot
-respond :: Regex -> BotReacting () -> ScriptDefinition ()
-respond re hn = ScriptDefinition $ modify (\s@(Script {scriptListens=l}) -> s { scriptListens = l ++ return (re, hn) })
+respond :: Regex -> BotReacting MessageReactionData () -> ScriptDefinition ()
+respond re = addReaction (Respond re)
 
 
 -- | Send a message to the channel the triggering message came from.
 --
 -- Equivalent to "robot.send" in hubot
-send :: Text -> BotReacting ()
+send :: HasMessage m => Text -> BotReacting m ()
 send msg = do
     o <- getMessage
     messageRoom (channel o) msg
@@ -106,14 +129,14 @@ send msg = do
 -- | Send a message to the channel the original message came from and address the user that sent the original message.
 --
 -- Equivalent to "robot.reply" in hubot
-reply :: Text -> BotReacting ()
+reply :: HasMessage m => Text -> BotReacting m ()
 reply msg = do
     om <- getMessage
     send $ (username $ sender om) ++ " " ++ msg
 
 
 -- | Send a message to a room
-messageRoom :: Room -> Text -> BotReacting ()
+messageRoom :: Room -> Text -> BotReacting a ()
 messageRoom room msg = do
     token <- requireAppConfigVal "token"
     liftIO $ async $ post "https://slack.com/api/chat.postMessage"
@@ -136,20 +159,24 @@ defineScript sid definitions =
 
 
 runDefinitions :: ScriptId -> ScriptDefinition () -> C.Config -> IO Script
-runDefinitions sid definitions cfg = execStateT (runScript definitions) (Script mempty mempty sid cfg)
+runDefinitions sid definitions cfg = execStateT (runScript definitions) (Script mempty sid cfg)
+
+
+getData :: BotReacting d d
+getData = BotReacting $ use variable
 
 
 -- | Get the results from matching the regular expression.
 --
 -- Equivalent to "msg.match" in hubot.
-getMatch :: BotReacting Match
-getMatch = BotReacting $ gets botAnswerStateMatch
+getMatch :: HasMatch m => BotReacting m Match
+getMatch = BotReacting $ use (variable . match)
 
 
 -- | Get the message that triggered this action
 -- Includes sender, target channel, as well as the full, untruncated text of the original message
-getMessage :: BotReacting Message
-getMessage = BotReacting $ gets botAnswerStateMessage
+getMessage :: HasMessage m => BotReacting m Message
+getMessage = BotReacting $ use (variable . message)
 
 
 -- | Get a value out of the config, returns 'Nothing' if the value didn't exist.
@@ -188,20 +215,3 @@ requireAppConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m a
 requireAppConfigVal name = do
     cfg <- getAppConfig
     liftIO $ C.require cfg name
-
-
-
--- | Compile a regex with options
---
--- Normally it is sufficient to just write the regex as a plain string and have it be converted automatically, but if you wnat certain match options you can use this function.
-r :: [Re.MatchOption] -> Text -> Regex
-r opts s = Regex $ Re.regex opts s
-
-
-instance IsString Regex where
-    fromString = r [] . pack
-
-
--- | Match a regex against a string and return the first match found (if any).
-match :: Regex -> Text -> Maybe Match
-match r = fmap (Re.unfold Re.group) . Re.find (unwrapRegex r)

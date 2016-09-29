@@ -1,6 +1,9 @@
 {-# LANGUAGE DeriveGeneric   #-}
 {-# LANGUAGE NamedFieldPuns  #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Marvin.Server
     ( application
     , runServer
@@ -10,25 +13,26 @@ module Marvin.Server
 
 import           ClassyPrelude
 import           Control.Concurrent.Async    (wait)
-import           Control.Monad.State
+import           Control.Monad.State hiding (mapM_)
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Aeson.Types
 import           Data.Char                   (isSpace)
 import qualified Data.Configurator           as C
 import qualified Data.Configurator.Types     as C
-import           Data.Text.ICU               (pattern)
 import           Data.Time
 import           Data.Vector                 (Vector)
-import           Marvin.Internal
+import           Marvin.Internal hiding (match)
 import           Marvin.Logging
-import           Marvin.Types                hiding (channel)
+import           Marvin.Internal.Types                hiding (channel)
 import           Network.HTTP.Types
 import           Network.Wai                 as Wai
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Handler.WarpTLS
 import           Options.Generic
 import qualified System.Log.Logger           as L
+import Control.Lens hiding (cons)
+import Marvin.Regex
 
 
 data CmdOptions = CmdOptions
@@ -81,6 +85,15 @@ deriveJSON
     ''EventCallback
 
 
+declareFields [d|
+    data Handlers = Handlers
+        { handlersResponds :: Seq (Regex, Message -> Match -> IO ())
+        , handlersHears :: Seq (Regex, Message -> Match -> IO ())
+        }
+    |]
+
+
+
 defaultBotName :: Text
 defaultBotName = "marvin"
 
@@ -94,7 +107,7 @@ lookupFromAppConfig cfg = C.lookup (C.subconfig (unwrapScriptId applicationScrip
 
 
 mkApp :: [Script] -> C.Config -> Request -> IO Wai.Response
-mkApp scripts config = handler
+mkApp scripts cfg = handler
   where
     handler request = do
         bod <- lazyRequestBody request
@@ -104,8 +117,8 @@ mkApp scripts config = handler
                 noticeAccept err
                 return $ responseLBS ok200 [] "Recieved malformed JSON, check your server log for further information"
             Right v -> do
-                tkn <- requireFromAppConfig config "token"
-                if (token v == tkn)
+                tkn <- requireFromAppConfig cfg "token"
+                if token v == tkn
                     then handleApiRequest v
                     else do
                         noticeAccept "Unathorized request recieved (token invalid)"
@@ -121,15 +134,15 @@ mkApp scripts config = handler
 
     handleMessage MessageEvent{user, channel, text, ts} = do
         lDispatches <- doIfMatch allListens text
-        botname <- fromMaybe defaultBotName <$> lookupFromAppConfig config "name"
+        botname <- fromMaybe defaultBotName <$> lookupFromAppConfig cfg "name"
         let (trimmed, remainder) = splitAt (length botname) $ dropWhile isSpace text
         rDispatches <- if toLower trimmed == toLower botname
                             then doIfMatch allReactions remainder
-                            else return []
-        void $ mapM wait (lDispatches ++ rDispatches)
+                            else return mempty
+        mapM_ wait (lDispatches ++ rDispatches)
       where
         doIfMatch things toMatch  =
-            catMaybes <$> for things (\(trigger, action) -> do
+            catMaybes <$> for things (\(trigger, action) ->
                 case match trigger toMatch of
                         Nothing -> return Nothing
                         Just m -> Just <$> async (action (Message user channel text ts) m))
@@ -139,18 +152,27 @@ mkApp scripts config = handler
         let logger =  "bot.dispatch"
         L.errorM logger $ "Unhandled exception during execution of script " ++ show id ++ " with trigger " ++ show r
         L.errorM logger (show e)
+    
+    flattenActions = 
+        for_ scripts $ \script -> 
+            for_ (script^.actions) $ addAction script
 
-    allReactions = prepareActions scriptReactions
-    allListens = prepareActions scriptListens
-    prepareActions getter =
-        [ (trigger, \message match ->
-            catch
-                (evalStateT (runReaction action) (BotAnswerState message (scriptScriptId script) match (scriptConfig script)))
-                (onScriptExcept (scriptScriptId script) trigger)
-          )
-        | script <- scripts
-        , (trigger, action) <- getter script
-        ]
+    addAction :: MonadState Handlers m => Script -> WrappedAction -> m ()
+    addAction script (WrappedAction (Hear re) ac) = hears %= cons (re, runAc)
+      where
+        runAc message match = catch
+                    (evalStateT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) (MessageReactionData message match)))
+                    (onScriptExcept (script^.scriptId) re)
+    addAction script (WrappedAction (Respond re) ac) = responds %= cons (re, runAc)
+      where
+        runAc message match = catch
+                    (evalStateT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) (MessageReactionData message match)))
+                    (onScriptExcept (script^.scriptId) re)
+
+    allActions = execState flattenActions (Handlers mempty mempty) 
+
+    allReactions = allActions^.responds
+    allListens = allActions^.hears
 
 
 -- | Create a wai compliant application
@@ -170,7 +192,7 @@ prepareServer s' = do
                 return
                 (configPath args)
     (cfg, cfgTid) <- C.autoReload C.autoConfig [C.Required cfgLoc]
-    unless (verbose args || debug args) $ C.lookup cfg "bot.logging" >>= maybe (return ()) (\l -> L.updateGlobalLogger L.rootLoggerName (L.setLevel l))
+    unless (verbose args || debug args) $ C.lookup cfg "bot.logging" >>= maybe (return ()) (L.updateGlobalLogger L.rootLoggerName . L.setLevel)
     L.infoM "bot" "Initializing scripts"
     s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s cfg) (onInitExcept sid)) s'
     let app = application s cfg

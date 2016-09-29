@@ -26,6 +26,7 @@ module Marvin
     ) where
 
 
-import           Marvin.Internal
+import           Marvin.Internal hiding (match)
 import           Marvin.Logging
 import           Marvin.Types
+import Marvin.Regex

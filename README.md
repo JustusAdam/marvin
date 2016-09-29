@@ -1,6 +1,13 @@
 # Marvin, the paranoid bot (⍺ stage)
 
-Marvin is an attempt to combine the ease of use of [hubot](https://hubot.github.com) with the typesafety and easy syntax of Haskell as well as the performance gains from compiled languages.
+Marvin is an attempt to combine the ease of use of [hubot](https://hubot.github.com) with the typesafety and easy syntax of Haskell and the performance gains from compiled languages.
+
+## Installation
+
+Marvin is not on Hackage yet, so to get it you can use [stack](https://docs.haskellstack.org) and add this repository to your `stack.yaml` file.
+Stack will take care of downloading and building it for you then.
+
+For the regex module marvin further requires the `-dev` version of the `icu` library.
 
 ## TLDR
 
@@ -46,7 +53,7 @@ They get compiled into one single static binary, which is a HTTP server that lis
 Defining scripts is very easy.
 
 Create a new Haskell source file like "MyScript.hs" and import marvins prelude `Marvin.Prelude`.
-This provides you with all teh tools you need to interact with marvin.
+This provides you with all the tools you need to interact with marvin.
 Since marvins prelude overwrites functions from the Haskell prelude you should hide the Haskell Prelude with either `{-# LANGUAGE NoImplicitPrelude #-}` at the top of the file or by using `import Prelude ()`.
 For more information why this is necessary see section [Why no prelude?](#why-no-prelude).
 
@@ -101,6 +108,7 @@ Configuration pertaining to the bot is stored under the "bot" key.
 bot {
     port = 8080
     name = "my-bot"
+    logging = "INFO"
 }
 ```
 
@@ -111,6 +119,7 @@ And of course these scripts can have nested config groups.
 bot {
     port = 8080
     name = "my-bot"
+
 }
 script-1 {
     some-string = "foo"
@@ -158,3 +167,13 @@ Coming soon.
 #### JSON
 
 Exposed in `Marvin` documentation coming soon. Until the refer to [aeson](https://hackage.haskell.org/package/aeson).
+
+#### Logging
+
+Marvin comes with a logging facility built in. 
+`Marvin.Logging` (and `Marvin.Prelude`) expose the logging facility. 
+Several functions are available, depending on the urgency of your message, like `errorM`, `infoM` and `criticalM`.
+Logging messages made this way are automatically formatted and tagged with the scripts that reported them.
+
+By default all logging messages with higher priority `NOTICE` or higher are shown. Using the command line parameter `verbose` also adds `INFO` messages and `debug` adds `DEBUG` messages. You can select the exact logging level in your config file (see also [configuration](#configuration)).
+ 

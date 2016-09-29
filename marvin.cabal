@@ -20,7 +20,9 @@ library
                      , Marvin.Types
                      , Marvin.Server
                      , Marvin.Mutable
+                     , Marvin.Regex
   other-modules:       Marvin.Internal
+                     , Marvin.Internal.Types
                      , Marvin.Logging
   build-depends:       base >= 4.7 && < 5
                      , classy-prelude
