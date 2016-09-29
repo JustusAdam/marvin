@@ -25,4 +25,4 @@ emergencyM = scriptLog L.emergencyM
 
 
 logM :: (MonadIO m, IsScript m) => L.Priority -> Text -> m ()
-logM prio = scriptLog (flip L.logM prio)
+logM prio = scriptLog (`L.logM` prio)

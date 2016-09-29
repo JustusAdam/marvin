@@ -45,6 +45,9 @@ data WrappedAction = forall d. WrappedAction (ActionData d) (BotReacting d ())
 
 
 -- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageRoom' as well as any arbitrary 'IO' action.
+-- 
+-- The type parameter @d@ is the accessible data provided by the trigger for this action.
+-- For message handlers like 'hear' and 'respond' this would be a regex 'Match' and a 'Message' for instance.
 newtype BotReacting d a = BotReacting { runReaction :: StateT (BotActionState d) IO a } deriving (Monad, MonadIO, Applicative, Functor)
 
 
@@ -100,7 +103,7 @@ getConfig = getScriptId >>= getSubConfFor
 
 
 addReaction :: ActionData d -> BotReacting d () -> ScriptDefinition ()
-addReaction data_ action = ScriptDefinition $ actions %= (cons (WrappedAction data_ action))
+addReaction data_ action = ScriptDefinition $ actions %= cons (WrappedAction data_ action)
 
 
 -- | Whenever any message matches the provided regex this handler gets run.
@@ -132,7 +135,7 @@ send msg = do
 reply :: HasMessage m => Text -> BotReacting m ()
 reply msg = do
     om <- getMessage
-    send $ (username $ sender om) ++ " " ++ msg
+    send $ username (sender om) ++ " " ++ msg
 
 
 -- | Send a message to a room
