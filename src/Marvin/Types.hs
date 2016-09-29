@@ -5,4 +5,4 @@ module Marvin.Types
     ) where
 
 
-import Marvin.Internal.Types
+import           Marvin.Internal.Types

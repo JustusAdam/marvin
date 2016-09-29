@@ -6,6 +6,7 @@ module Marvin.Internal.Types where
 
 
 import           ClassyPrelude
+import           Control.Lens
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Char               (isAlphaNum, isLetter)
@@ -13,7 +14,6 @@ import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
 import           Data.Time
 import qualified System.Log.Logger       as L
-import Control.Lens
 
 
 newtype User = User { username :: Text } deriving (IsString, Eq, Show)

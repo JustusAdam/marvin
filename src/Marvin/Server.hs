@@ -1,9 +1,9 @@
-{-# LANGUAGE DeriveGeneric   #-}
-{-# LANGUAGE NamedFieldPuns  #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE FlexibleContexts       #-}
+{-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NamedFieldPuns         #-}
+{-# LANGUAGE TemplateHaskell        #-}
 module Marvin.Server
     ( application
     , runServer
@@ -13,7 +13,8 @@ module Marvin.Server
 
 import           ClassyPrelude
 import           Control.Concurrent.Async    (wait)
-import           Control.Monad.State hiding (mapM_)
+import           Control.Lens                hiding (cons)
+import           Control.Monad.State         hiding (mapM_)
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Aeson.Types
@@ -22,17 +23,16 @@ import qualified Data.Configurator           as C
 import qualified Data.Configurator.Types     as C
 import           Data.Time
 import           Data.Vector                 (Vector)
-import           Marvin.Internal hiding (match)
+import           Marvin.Internal             hiding (match)
+import           Marvin.Internal.Types       hiding (channel)
 import           Marvin.Logging
-import           Marvin.Internal.Types                hiding (channel)
+import           Marvin.Regex
 import           Network.HTTP.Types
 import           Network.Wai                 as Wai
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Handler.WarpTLS
 import           Options.Generic
 import qualified System.Log.Logger           as L
-import Control.Lens hiding (cons)
-import Marvin.Regex
 
 
 data CmdOptions = CmdOptions
@@ -152,9 +152,9 @@ mkApp scripts cfg = handler
         let logger =  "bot.dispatch"
         L.errorM logger $ "Unhandled exception during execution of script " ++ show id ++ " with trigger " ++ show r
         L.errorM logger (show e)
-    
-    flattenActions = 
-        for_ scripts $ \script -> 
+
+    flattenActions =
+        for_ scripts $ \script ->
             for_ (script^.actions) $ addAction script
 
     addAction :: MonadState Handlers m => Script -> WrappedAction -> m ()
@@ -169,7 +169,7 @@ mkApp scripts cfg = handler
                     (evalStateT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) (MessageReactionData message match)))
                     (onScriptExcept (script^.scriptId) re)
 
-    allActions = execState flattenActions (Handlers mempty mempty) 
+    allActions = execState flattenActions (Handlers mempty mempty)
 
     allReactions = allActions^.responds
     allListens = allActions^.hears

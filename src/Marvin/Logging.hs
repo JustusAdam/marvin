@@ -1,4 +1,4 @@
-module Marvin.Logging 
+module Marvin.Logging
     ( debugM, infoM, noticeM, warningM, errorM, criticalM, alertM, emergencyM, logM
     ) where
 

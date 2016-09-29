@@ -1,10 +1,10 @@
 {-# LANGUAGE ExplicitForAll             #-}
+{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances       #-}
 module Marvin.Internal where
 
 
@@ -13,10 +13,10 @@ import           Control.Monad.State
 import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
 
+import           Control.Lens            hiding (cons)
 import           Marvin.Internal.Types
+import           Marvin.Regex            (Match, Regex)
 import           Network.Wreq
-import Control.Lens hiding (cons)
-import Marvin.Regex (Match, Regex)
 
 
 
@@ -45,7 +45,7 @@ data WrappedAction = forall d. WrappedAction (ActionData d) (BotReacting d ())
 
 
 -- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageRoom' as well as any arbitrary 'IO' action.
-newtype BotReacting d a = BotReacting { runReaction :: StateT (BotActionState d) IO a } deriving (Monad, MonadIO, Applicative, Functor)  
+newtype BotReacting d a = BotReacting { runReaction :: StateT (BotActionState d) IO a } deriving (Monad, MonadIO, Applicative, Functor)
 
 
 declareFields [d|
@@ -69,7 +69,7 @@ newtype ScriptInit = ScriptInit (ScriptId, C.Config -> IO Script)
 
 class HasMessage m where
     message :: Lens' m Message
-    
+
 instance HasMessageField m Message => HasMessage m where
     message = messageField
 

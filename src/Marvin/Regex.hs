@@ -1,8 +1,8 @@
 module Marvin.Regex where
 
 
-import ClassyPrelude
-import qualified Data.Text.ICU           as Re
+import           ClassyPrelude
+import qualified Data.Text.ICU as Re
 
 
 -- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'.

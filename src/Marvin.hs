@@ -28,5 +28,5 @@ module Marvin
 
 import           Marvin.Internal hiding (match)
 import           Marvin.Logging
+import           Marvin.Regex
 import           Marvin.Types
-import Marvin.Regex
