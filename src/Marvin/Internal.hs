@@ -60,7 +60,7 @@ newtype BotReacting d a = BotReacting { runReaction :: StateT (BotActionState d)
     -- This is basically a collection of event handlers.
 declareFields [d|
     data Script = Script
-        { scriptActions   :: Seq WrappedAction
+        { scriptActions   :: [WrappedAction]
         , scriptScriptId  :: ScriptId
         , scriptConfig    :: C.Config
         }

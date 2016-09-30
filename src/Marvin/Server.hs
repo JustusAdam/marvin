@@ -96,8 +96,8 @@ deriveJSON
 
 declareFields [d|
     data Handlers = Handlers
-        { handlersResponds :: Seq (Regex, Message -> Match -> IO ())
-        , handlersHears :: Seq (Regex, Message -> Match -> IO ())
+        { handlersResponds :: [(Regex, Message -> Match -> IO ())]
+        , handlersHears :: [(Regex, Message -> Match -> IO ())]
         }
     |]
 
@@ -156,19 +156,19 @@ mkApp scripts cfg = handler
                         Nothing -> return Nothing
                         Just m -> Just <$> async (action (Message user channel text ts) m))
 
-    flattenActions =
-        for_ scripts $ \script ->
-            for_ (script^.actions) $ addAction script
+    flattenActions = foldr $ \script -> flip (foldr (addAction script)) (script^.actions)
 
-    allActions = execState flattenActions (Handlers mempty mempty)
+    allActions = flattenActions (Handlers mempty mempty) scripts
 
-    allReactions = allActions^.responds
-    allListens = allActions^.hears
+    allReactions :: Vector (Regex, Message -> Match -> IO ())
+    allReactions = fromList $! allActions^.responds
+    allListens :: Vector (Regex, Message -> Match -> IO ())
+    allListens = fromList $! allActions^.hears
 
 
-addAction :: MonadState Handlers m => Script -> WrappedAction -> m ()
-addAction script (WrappedAction (Hear re) ac) = hears %= cons (re, runMessageAction script re ac)
-addAction script (WrappedAction (Respond re) ac) = responds %= cons (re, runMessageAction script re ac)
+addAction :: Script -> WrappedAction -> Handlers -> Handlers
+addAction script (WrappedAction (Hear re) ac) = hears %~ cons (re, runMessageAction script re ac)
+addAction script (WrappedAction (Respond re) ac) = responds %~ cons (re, runMessageAction script re ac)
 
 
 runMessageAction :: Script -> Regex -> BotReacting MessageReactionData () -> Message -> Match -> IO ()
@@ -180,9 +180,10 @@ runMessageAction script re ac msg mtch =
 
 onScriptExcept :: ScriptId -> Regex -> SomeException -> IO ()
 onScriptExcept (ScriptId id) r e = do
-    let logger =  "bot.dispatch"
-    L.errorM logger $ "Unhandled exception during execution of script " ++ show id ++ " with trigger " ++ show r
-    L.errorM logger (show e)
+    err $ "Unhandled exception during execution of script " ++ show id ++ " with trigger " ++ show r
+    err $ show e
+  where
+    err = L.errorM "bot.dispatch"
 
 
 -- | Create a wai compliant application
