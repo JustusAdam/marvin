@@ -3,3 +3,4 @@ dist/
 *.js
 *.css
 .DS_Store
+/test/integration/config.cfg
