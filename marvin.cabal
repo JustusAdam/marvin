@@ -18,9 +18,10 @@ library
   exposed-modules:     Marvin
                      , Marvin.Prelude
                      , Marvin.Types
-                     , Marvin.Server
+                     , Marvin.Run
                      , Marvin.Mutable
                      , Marvin.Regex
+                     , Marvin.Adapter
   other-modules:       Marvin.Internal
                      , Marvin.Internal.Types
                      , Marvin.Logging

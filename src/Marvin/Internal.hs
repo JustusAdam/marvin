@@ -16,7 +16,8 @@ import qualified Data.Configurator.Types as C
 import           Control.Lens            hiding (cons)
 import           Marvin.Internal.Types
 import           Marvin.Regex            (Match, Regex)
-import           Network.Wreq
+import Marvin.Adapter hiding (messageRoom)
+import qualified Marvin.Adapter as A
 
 
 
@@ -24,6 +25,7 @@ declareFields [d|
     data BotActionState d = BotActionState
         { botActionStateScriptId :: ScriptId
         , botActionStateConfig   :: C.Config
+        , botActionStateOutputProvider :: OutputProvider
         , botActionStateVariable :: d
         }
     |]
@@ -102,7 +104,7 @@ instance IsScript (BotReacting a) where
     getScriptId = BotReacting $ use scriptId
 
 getSubConfFor :: HasConfigAccess m => ScriptId -> m C.Config
-getSubConfFor (ScriptId name) = C.subconfig name <$> getConfigInternal
+getSubConfFor (ScriptId name) = C.subconfig ("script." ++ name) <$> getConfigInternal
 
 
 getConfig :: HasConfigAccess m => m C.Config
@@ -148,13 +150,17 @@ reply msg = do
 -- | Send a message to a room
 messageRoom :: Room -> Text -> BotReacting a ()
 messageRoom room msg = do
-    token <- requireAppConfigVal "token"
-    liftIO $ async $ post "https://slack.com/api/chat.postMessage"
-                        [ "token" := (token :: Text)
-                        , "channel" := roomname room
-                        , "text" := msg
-                        ]
-    return ()
+    f <- BotReacting $ use $ outputProvider . A.messageRoom
+    liftIO $ f room msg
+
+
+    -- token <- requireAppConfigVal "token"
+    -- liftIO $ async $ post "https://slack.com/api/chat.postMessage"
+    --                     [ "token" := (token :: Text)
+    --                     , "channel" := roomname room
+    --                     , "text" := msg
+    --                     ]
+    -- return ()
 
 
 -- | Define a new script for marvin

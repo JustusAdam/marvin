@@ -23,8 +23,8 @@ module Marvin.Prelude
     , module Marvin
     -- | Mutable references in marvin scripts 
     , module Marvin.Mutable
-    -- | A warp server for deploying marvin  
-    , module Marvin.Server
+    -- | Running marvin  
+    , module Marvin.Run
     -- | Format strings which resolve to efficient Strings, aka 'Text'
     , module Data.Text.Format
     ) where
@@ -35,5 +35,5 @@ import           Data.Aeson.TH
 import           Data.Text.ICU   (MatchOption (..))
 import           Marvin         
 import           Marvin.Mutable 
-import           Marvin.Server  
+import           Marvin.Run  
 import           Data.Text.Format (format)

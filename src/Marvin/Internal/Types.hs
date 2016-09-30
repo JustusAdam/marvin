@@ -37,17 +37,26 @@ data Message = Message
 newtype ScriptId = ScriptId { unwrapScriptId :: Text } deriving (Show, Eq)
 
 
+newtype AdapterId = AdapterId { unwrapAdapterId :: Text } deriving (Show, Eq)
+
+
 applicationScriptId :: ScriptId
 applicationScriptId = ScriptId "bot"
 
 
+verifyIdString :: String -> (String -> a) -> String -> a
+verifyIdString name _ "" = error $ name ++ " must not be empty"
+verifyIdString name f s@(x:xs)
+    | isLetter x && all (\c -> isAlphaNum c || c == '-' || c == '_' ) xs = f s
+    | otherwise = error $ "first character of " ++ name ++ " must be a letter, all other characters can be alphanumeric, '-' or '_'"
+
+
 instance IsString ScriptId where
-    fromString "" = error "script id must not be empty"
-    fromString "bot" = error "'bot' is a protected name and cannot be used as script id"
-    fromString s@(x:xs) =
-        if isLetter x && all (\c -> isAlphaNum c || c == '-' || c == '_' ) xs
-            then ScriptId $ fromString s
-            else error "first character of script id must be a letter, all other characters can be alphanumeric, '-' or '_'"
+    fromString = verifyIdString "script id" (ScriptId . fromString)
+
+
+instance IsString AdapterId where
+    fromString = verifyIdString "adapter id" (AdapterId . fromString)
 
 
 class HasScriptId s a | s -> a where
@@ -71,3 +80,4 @@ prioMapping = map ((pack . show) &&& id) [L.DEBUG, L.INFO, L.NOTICE, L.WARNING, 
 instance C.Configured L.Priority where
     convert (C.String s) = lookup (toUpper s) prioMapping
     convert _ = Nothing
+
