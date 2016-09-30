@@ -1,12 +1,39 @@
+{-|
+Module      : $Header$
+Description : A collection of all modules useful for using marvin.
+Copyright   : (c) Justus Adam, 2016
+License     : BSD3
+Maintainer  : dev@justus.science
+Stability   : experimental
+Portability : POSIX
+-}
 module Marvin.Prelude
-    ( module X
+    ( 
+    -- | For exposing parameterised and generalised versions of prelude functions
+    module ClassyPrelude
+    -- | The best JSON library for Haskell     
+    , module Data.Aeson
+    -- | For automatically generating JSON conversions  
+    , module Data.Aeson.TH
+    -- | For Regular expressions which work with 'Text'
+    , module Data.Text.ICU
+    -- | Marvin :3   
+    -- 
+    -- Common functions and Types         
+    , module Marvin
+    -- | Mutable references in marvin scripts 
+    , module Marvin.Mutable
+    -- | A warp server for deploying marvin  
+    , module Marvin.Server
+    -- | Format strings which resolve to efficient Strings, aka 'Text'
+    , module Data.Text.Format
     ) where
 
-import           ClassyPrelude  as X
-import           Data.Aeson     as X
-import           Data.Aeson.TH  as X
-import           Data.Text.ICU  as X (MatchOption (..))
-import           Marvin         as X
-import           Marvin.Mutable as X
-import           Marvin.Server  as X
-import Text.Format as X
+import           ClassyPrelude  
+import           Data.Aeson     
+import           Data.Aeson.TH  
+import           Data.Text.ICU   (MatchOption (..))
+import           Marvin         
+import           Marvin.Mutable 
+import           Marvin.Server  
+import           Data.Text.Format (format)

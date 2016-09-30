@@ -1,3 +1,12 @@
+{-|
+Module      : $Header$
+Description : Marvins server.
+Copyright   : (c) Justus Adam, 2016
+License     : BSD3
+Maintainer  : dev@justus.science
+Stability   : experimental
+Portability : POSIX
+-}
 {-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
@@ -147,32 +156,33 @@ mkApp scripts cfg = handler
                         Nothing -> return Nothing
                         Just m -> Just <$> async (action (Message user channel text ts) m))
 
-    onScriptExcept :: ScriptId -> Regex -> SomeException -> IO ()
-    onScriptExcept (ScriptId id) r e = do
-        let logger =  "bot.dispatch"
-        L.errorM logger $ "Unhandled exception during execution of script " ++ show id ++ " with trigger " ++ show r
-        L.errorM logger (show e)
-
     flattenActions =
         for_ scripts $ \script ->
             for_ (script^.actions) $ addAction script
-
-    addAction :: MonadState Handlers m => Script -> WrappedAction -> m ()
-    addAction script (WrappedAction (Hear re) ac) = hears %= cons (re, runAc)
-      where
-        runAc message match = catch
-                    (evalStateT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) (MessageReactionData message match)))
-                    (onScriptExcept (script^.scriptId) re)
-    addAction script (WrappedAction (Respond re) ac) = responds %= cons (re, runAc)
-      where
-        runAc message match = catch
-                    (evalStateT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) (MessageReactionData message match)))
-                    (onScriptExcept (script^.scriptId) re)
 
     allActions = execState flattenActions (Handlers mempty mempty)
 
     allReactions = allActions^.responds
     allListens = allActions^.hears
+
+
+addAction :: MonadState Handlers m => Script -> WrappedAction -> m ()
+addAction script (WrappedAction (Hear re) ac) = hears %= cons (re, runMessageAction script re ac)
+addAction script (WrappedAction (Respond re) ac) = responds %= cons (re, runMessageAction script re ac)
+
+
+runMessageAction :: Script -> Regex -> BotReacting MessageReactionData () -> Message -> Match -> IO ()
+runMessageAction script re ac msg mtch = 
+    catch
+        (evalStateT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) (MessageReactionData msg mtch)))
+        (onScriptExcept (script^.scriptId) re) 
+
+
+onScriptExcept :: ScriptId -> Regex -> SomeException -> IO ()
+onScriptExcept (ScriptId id) r e = do
+    let logger =  "bot.dispatch"
+    L.errorM logger $ "Unhandled exception during execution of script " ++ show id ++ " with trigger " ++ show r
+    L.errorM logger (show e)
 
 
 -- | Create a wai compliant application

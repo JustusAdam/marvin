@@ -1,3 +1,12 @@
+{-|
+Module      : $Header$
+Description : Logging facilities for marvin scripts.
+Copyright   : (c) Justus Adam, 2016
+License     : BSD3
+Maintainer  : dev@justus.science
+Stability   : experimental
+Portability : POSIX
+-}
 module Marvin.Logging
     ( debugM, infoM, noticeM, warningM, errorM, criticalM, alertM, emergencyM, logM
     ) where

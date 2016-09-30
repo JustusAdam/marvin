@@ -1,3 +1,12 @@
+{-|
+Module      : $Header$
+Description : Common types in marvin.
+Copyright   : (c) Justus Adam, 2016
+License     : BSD3
+Maintainer  : dev@justus.science
+Stability   : experimental
+Portability : POSIX
+-}
 module Marvin.Types
     ( User(..), Room(..), Message(..), ScriptId(..)
     , applicationScriptId, IsScript, getScriptId

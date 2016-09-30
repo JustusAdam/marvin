@@ -18,6 +18,7 @@ module Marvin
     , getMessage, getMatch
     , getConfigVal, requireConfigVal
     , BotReacting
+    , MessageReactionData, messageField, matchField
       -- * Utilities
     , Regex, r, match
     , Match

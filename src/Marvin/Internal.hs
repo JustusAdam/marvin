@@ -28,6 +28,11 @@ declareFields [d|
         }
     |]
 
+-- | Payload in the reaction Monad when triggered by a message. 
+--  Contains a field for the 'Message' and a field for the 'Match' from the 'Regex'.
+-- 
+-- Both fields are accessible directly via the 'getMessage' and 'getMatch' functions
+-- or this data via 'getData'.
 declareFields [d|
     data MessageReactionData = MessageReactionData
         { messageReactionDataMessageField :: Message
@@ -50,11 +55,10 @@ data WrappedAction = forall d. WrappedAction (ActionData d) (BotReacting d ())
 -- For message handlers like 'hear' and 'respond' this would be a regex 'Match' and a 'Message' for instance.
 newtype BotReacting d a = BotReacting { runReaction :: StateT (BotActionState d) IO a } deriving (Monad, MonadIO, Applicative, Functor)
 
-
-declareFields [d|
-    -- | An abstract type describing a marvin script.
+-- | An abstract type describing a marvin script.
     --
     -- This is basically a collection of event handlers.
+declareFields [d|
     data Script = Script
         { scriptActions   :: Seq WrappedAction
         , scriptScriptId  :: ScriptId
@@ -70,12 +74,15 @@ newtype ScriptDefinition a = ScriptDefinition { runScript :: StateT Script IO a 
 -- | Initializer for a script. This gets run by the server during startup and creates a 'Script'
 newtype ScriptInit = ScriptInit (ScriptId, C.Config -> IO Script)
 
+
+-- | Class which says that there is a way to get to a 'Message' from this type @m@.
 class HasMessage m where
     message :: Lens' m Message
 
 instance HasMessageField m Message => HasMessage m where
     message = messageField
 
+-- | Class which says that there is a way to get to a 'Match' from this type @m@.
 class HasMatch m where
     match :: Lens' m Match
 
@@ -165,6 +172,7 @@ runDefinitions :: ScriptId -> ScriptDefinition () -> C.Config -> IO Script
 runDefinitions sid definitions cfg = execStateT (runScript definitions) (Script mempty sid cfg)
 
 
+-- | Obtain the reaction dependent data from the bot.
 getData :: BotReacting d d
 getData = BotReacting $ use variable
 
