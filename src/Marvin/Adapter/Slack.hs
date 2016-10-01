@@ -1,37 +1,37 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Marvin.Adapter.Slack (SlackRTMAdapter) where
 
-import ClassyPrelude
-import Data.Aeson hiding (Error)
-import Data.Aeson.Types hiding (Error)
-import Data.Aeson.TH
-import Marvin.Adapter
-import Control.Monad
-import Network.Wreq
-import qualified Data.Configurator.Types as C
-import qualified Data.Configurator as C
-import Data.Time
-import System.Log.Logger
-import Network.WebSockets
-import Marvin.Types
-import Control.Lens hiding ((.=))
-import Data.Aeson.Parser
-import Network.URI
-import Wuss
+import           ClassyPrelude
+import           Control.Lens               hiding ((.=))
+import           Control.Monad
+import           Data.Aeson                 hiding (Error)
+import           Data.Aeson.Parser
+import           Data.Aeson.TH
+import           Data.Aeson.Types           hiding (Error)
 import qualified Data.ByteString.Lazy.Char8 as BS
+import qualified Data.Configurator          as C
+import qualified Data.Configurator.Types    as C
+import           Data.Time
+import           Marvin.Adapter
+import           Marvin.Types
+import           Network.URI
+import           Network.WebSockets
+import           Network.Wreq
+import           System.Log.Logger
+import           Wuss
 
 
-data InternalType 
+data InternalType
     = Error
         { code :: Int
-        , msg :: Text
+        , msg  :: Text
         }
     | Unhandeled Text
     | Ignored
 
 
 instance FromJSON URI where
-    parseJSON (String t) = maybe mzero return $ parseURI $ unpack t  
+    parseJSON (String t) = maybe mzero return $ parseURI $ unpack t
     parseJSON _ = mzero
 
 
@@ -40,7 +40,7 @@ instance ToJSON URI where
 
 
 
--- data BotData = BotData 
+-- data BotData = BotData
 --     { botId :: Text
 --     , notName :: Text
 --     , botCreated :: UTCTime
@@ -83,15 +83,15 @@ instance ToJSON URI where
 
 --     "bots": [ … ],
 -- }
-data RTMData = RTMData 
-    { ok :: Bool
+data RTMData = RTMData
+    { ok  :: Bool
     , url :: URI
     -- , self :: BotData
     }
 
 data APIResponse a = APIResponse
-    { responseOk :: Bool 
-    , payload :: a
+    { responseOk :: Bool
+    , payload    :: a
     }
 
 
@@ -103,14 +103,14 @@ data APIResponse a = APIResponse
 
 eventParser :: Value -> Parser (Either InternalType Event)
 eventParser (Object o) = isErrParser <|> hasTypeParser
-  where 
+  where
     isErrParser = do
         e <- o .: "error"
         case e of
             (Object eo) -> do
                 ev <- Error <$> eo .: "code" <*> eo .: "msg"
                 return $ Left ev
-    hasTypeParser = do 
+    hasTypeParser = do
         t <- o .: "type"
 
         case t of
@@ -119,7 +119,7 @@ eventParser (Object o) = isErrParser <|> hasTypeParser
                 return $ Left ev
             "message" -> do
                 ev <- Message
-                        <$> o .: "user" 
+                        <$> o .: "user"
                         <*> o .: "channel"
                         <*> o .: "text"
                         <*> o .: "ts"
@@ -153,7 +153,7 @@ apiResponseParser :: (Value -> Parser a) -> Value -> Parser (APIResponse a)
 apiResponseParser f v@(Object o) = APIResponse <$> o .: "ok" <*> f v
 
 
-runnerImpl :: RunWithAdapter SlackRTMAdapter 
+runnerImpl :: RunWithAdapter SlackRTMAdapter
 runnerImpl cfg handler = do
     token <- C.require cfg "token"
     debugM "adapter.slack" "initializing socket"
@@ -163,10 +163,10 @@ runnerImpl cfg handler = do
         Right js -> do
             let uri = url js
                 authority = fromMaybe (error "URI lacks authority") (uriAuthority uri)
-                host = uriUserInfo authority ++ uriRegName authority 
+                host = uriUserInfo authority ++ uriRegName authority
                 path = uriPath uri
-                portOnErr v = do 
-                    debugM "adapter.slack" $ "Unreadable port '" ++ v ++ "'"  
+                portOnErr v = do
+                    debugM "adapter.slack" $ "Unreadable port '" ++ v ++ "'"
                     return 443
             port <- case uriPort authority of
                         v@(':':r) -> maybe (portOnErr v) return $ readMay r
@@ -186,20 +186,20 @@ runnerImpl cfg handler = do
             d <- receiveData conn
             case eitherDecode d >>= parseEither eventParser of
                 Left err -> errorM "adapter.slack" $ "Error parsing json: " ++ err ++ " original data: " ++ rawBS d
-                Right v -> 
-                    case v of 
+                Right v ->
+                    case v of
                         Right event -> handlerImpl event
                         Left internalEvent ->
                             case internalEvent of
-                                Unhandeled type_ -> 
+                                Unhandeled type_ ->
                                     debugM "adapter.slack" $ "Unhandeled event type " ++ unpack type_ ++ " payload " ++ rawBS d
-                                Error code msg -> 
+                                Error code msg ->
                                     errorM "adapter.slack" $ "Error from remote code: " ++ show code ++ " msg: " ++ unpack msg
                                 Ignored -> return ()
       where
         adapter = SlackRTMAdapter mids conn cfg
         handlerImpl = handler adapter
-    
+
 
 execAPIMethod :: (Value -> Parser a) -> SlackRTMAdapter -> String -> [FormParam] -> IO (Either String (APIResponse a))
 execAPIMethod innerParser adapter method params = do
@@ -223,12 +223,12 @@ newMid adapter = do
 messageRoomImpl :: SlackRTMAdapter -> Room -> Text -> IO ()
 messageRoomImpl adapter (Room room) msg = do
     mid <- newMid adapter
-    sendTextData (rtmConnection adapter) $ encode $ 
-        object [ "id" .= mid 
+    sendTextData (rtmConnection adapter) $ encode $
+        object [ "id" .= mid
                 , "type" .= ("message" :: Text)
                 , "channel" .= room
-                , "text" .= msg  
-                ]  
+                , "text" .= msg
+                ]
 
 
 getUserInfoImpl :: SlackRTMAdapter -> User -> IO (Maybe UserInfo)
@@ -242,8 +242,8 @@ getUserInfoImpl adapter (User user) = do
 
 data SlackRTMAdapter = SlackRTMAdapter
     { messageIDCounter :: MVar Int
-    , rtmConnection :: Connection
-    , userConfig :: C.Config
+    , rtmConnection    :: Connection
+    , userConfig       :: C.Config
     }
 
 

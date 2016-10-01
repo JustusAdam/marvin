@@ -23,9 +23,9 @@ deriveJSON defaultOptions { unwrapUnaryRecords = True } ''User
 deriveJSON defaultOptions { unwrapUnaryRecords = True } ''Room
 
 
-data UserInfo = UserInfo 
+data UserInfo = UserInfo
     { username :: Text
-    , userID :: User
+    , userID   :: User
     }
 
 
@@ -45,7 +45,7 @@ instance FromJSON TimeStamp where
     parseJSON _ = mzero
 
 instance ToJSON TimeStamp where
-    toJSON = toJSON . show . unwrapTimeStamp 
+    toJSON = toJSON . show . unwrapTimeStamp
 
 
 -- | A type, basically a String, which identifies a script to the config and the logging facilities.

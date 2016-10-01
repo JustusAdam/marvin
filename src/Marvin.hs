@@ -29,8 +29,8 @@ module Marvin
     ) where
 
 
+import           Marvin.Adapter  (IsAdapter)
 import           Marvin.Internal hiding (match)
 import           Marvin.Logging
 import           Marvin.Regex
 import           Marvin.Types
-import Marvin.Adapter (IsAdapter)

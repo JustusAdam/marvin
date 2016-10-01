@@ -3,9 +3,9 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE UndecidableInstances       #-}
-{-# LANGUAGE Rank2Types #-}
 module Marvin.Internal where
 
 
@@ -15,11 +15,11 @@ import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
 
 import           Control.Lens            hiding (cons)
+import           Marvin.Adapter          hiding (getUserInfo, messageRoom)
+import qualified Marvin.Adapter          as A
 import           Marvin.Internal.Types
+import           Marvin.Logging
 import           Marvin.Regex            (Match, Regex)
-import Marvin.Adapter hiding (messageRoom, getUserInfo)
-import qualified Marvin.Adapter as A
-import Marvin.Logging
 
 
 
@@ -32,9 +32,9 @@ declareFields [d|
         }
     |]
 
--- | Payload in the reaction Monad when triggered by a message. 
+-- | Payload in the reaction Monad when triggered by a message.
 --  Contains a field for the 'Message' and a field for the 'Match' from the 'Regex'.
--- 
+--
 -- Both fields are accessible directly via the 'getMessage' and 'getMatch' functions
 -- or this data via 'getData'.
 declareFields [d|
@@ -54,7 +54,7 @@ data WrappedAction a = forall d. WrappedAction (ActionData d) (BotReacting a d (
 
 
 -- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageRoom' as well as any arbitrary 'IO' action.
--- 
+--
 -- The type parameter @d@ is the accessible data provided by the trigger for this action.
 -- For message handlers like 'hear' and 'respond' this would be a regex 'Match' and a 'Message' for instance.
 newtype BotReacting a d r = BotReacting { runReaction :: StateT (BotActionState a d) IO r } deriving (Monad, MonadIO, Applicative, Functor)

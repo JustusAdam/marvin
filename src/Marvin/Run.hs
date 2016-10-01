@@ -8,32 +8,33 @@ Stability   : experimental
 Portability : POSIX
 -}
 {-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE ExplicitForAll         #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE NamedFieldPuns         #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE TemplateHaskell        #-}
-{-# LANGUAGE ExplicitForAll, ScopedTypeVariables #-}
 module Marvin.Run where
 
 
 import           ClassyPrelude
-import           Control.Concurrent.Async    (wait)
-import           Control.Lens                hiding (cons)
-import           Control.Monad.State         hiding (mapM_)
-import           Data.Char                   (isSpace)
-import qualified Data.Configurator           as C
-import qualified Data.Configurator.Types     as C
-import           Data.Vector                 (Vector)
-import           Marvin.Internal             hiding (match)
-import           Marvin.Internal.Types       hiding (channel)
+import           Control.Concurrent.Async  (wait)
+import           Control.Lens              hiding (cons)
+import           Control.Monad.State       hiding (mapM_)
+import           Data.Char                 (isSpace)
+import qualified Data.Configurator         as C
+import qualified Data.Configurator.Types   as C
+import           Data.Vector               (Vector)
+import           Marvin.Adapter
+import           Marvin.Internal           hiding (match)
+import           Marvin.Internal.Types     hiding (channel)
 import           Marvin.Regex
 import           Options.Generic
-import qualified System.Log.Logger           as L
-import qualified System.Log.Formatter as L
+import qualified Prelude                   as P
+import qualified System.Log.Formatter      as L
 import qualified System.Log.Handler.Simple as L
-import qualified Prelude as P
-import Marvin.Adapter
+import qualified System.Log.Logger         as L
 
 
 
@@ -131,10 +132,10 @@ addAction script adapter wa =
 
 
 runMessageAction :: Script a -> a -> Regex -> BotReacting a MessageReactionData () -> Message -> Match -> IO ()
-runMessageAction script adapter re ac msg mtch = 
+runMessageAction script adapter re ac msg mtch =
     catch
         (evalStateT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) adapter (MessageReactionData msg mtch)))
-        (onScriptExcept (script^.scriptId) re) 
+        (onScriptExcept (script^.scriptId) re)
 
 
 onScriptExcept :: ScriptId -> Regex -> SomeException -> IO ()
@@ -156,9 +157,9 @@ prepareLogger :: IO ()
 prepareLogger =
     L.updateGlobalLogger L.rootLoggerName (L.setHandlers [handler])
   where
-    handler = L.GenericHandler { L.priority = L.DEBUG 
+    handler = L.GenericHandler { L.priority = L.DEBUG
                                , L.formatter = L.simpleLogFormatter "$time [$prio:$loggername] $msg"
-                               , L.privData = () 
+                               , L.privData = ()
                                , L.writeFunc = const P.putStrLn
                                , L.closeFunc = const $ return ()
                                }
@@ -179,7 +180,7 @@ runMarvin s' = do
     unless (verbose args || debug args) $ C.lookup cfg "bot.logging" >>= maybe (return ()) (L.updateGlobalLogger L.rootLoggerName . L.setLevel)
     L.infoM "bot" "Initializing scripts"
     s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s cfg) (onInitExcept sid)) s'
-    runWithAdapter 
+    runWithAdapter
         (C.subconfig ("adapter." ++ unwrapAdapterId (adapterId :: AdapterId a)) cfg)
         $ application s cfg
   where
@@ -205,7 +206,7 @@ runMarvin s' = do
 -- -- | Starts a HTTP server on the provided port with the application
 -- runHTTPServer :: Int -> Application -> C.Config -> IO ()
 -- runHTTPServer port app cfg = do
---     L.noticeM "server.start" $ "Starting HTTP server on port " ++ show port 
+--     L.noticeM "server.start" $ "Starting HTTP server on port " ++ show port
 --     run port app
 
 

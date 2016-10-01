@@ -3,7 +3,7 @@ module Script1 (
     ) where
 
 
-import Marvin.Prelude
+import           Marvin.Prelude
 
 
 script :: IsAdapter a => ScriptInit a

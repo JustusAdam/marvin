@@ -1,12 +1,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Marvin.Adapter where
 
-import ClassyPrelude
-import Marvin.Internal.Types
-import Control.Lens
+import           ClassyPrelude
+import           Control.Lens
 import qualified Data.Configurator.Types as C
+import           Marvin.Internal.Types
 
-data Event 
+data Event
     = MessageEvent Message
 
 type EventHandler a = a -> Event -> IO ()
