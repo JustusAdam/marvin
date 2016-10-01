@@ -52,7 +52,7 @@ instance ToJSON TimeStamp where
 newtype ScriptId = ScriptId { unwrapScriptId :: Text } deriving (Show, Eq)
 
 
-newtype AdapterId = AdapterId { unwrapAdapterId :: Text } deriving (Show, Eq)
+newtype AdapterId a = AdapterId { unwrapAdapterId :: Text } deriving (Show, Eq)
 
 
 applicationScriptId :: ScriptId
@@ -70,7 +70,7 @@ instance IsString ScriptId where
     fromString = verifyIdString "script id" (ScriptId . fromString)
 
 
-instance IsString AdapterId where
+instance IsString (AdapterId a) where
     fromString = verifyIdString "adapter id" (AdapterId . fromString)
 
 

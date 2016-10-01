@@ -5,6 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE UndecidableInstances       #-}
+{-# LANGUAGE Rank2Types #-}
 module Marvin.Internal where
 
 
@@ -23,10 +24,10 @@ import Marvin.Logging
 
 
 declareFields [d|
-    data BotActionState d = BotActionState
+    data BotActionState a d = BotActionState
         { botActionStateScriptId :: ScriptId
         , botActionStateConfig   :: C.Config
-        , botActionStateOutputProvider :: OutputProvider
+        , botActionStateAdapter :: a
         , botActionStateVariable :: d
         }
     |]
@@ -49,21 +50,21 @@ data ActionData d where
     Respond :: Regex -> ActionData MessageReactionData
 
 
-data WrappedAction = forall d. WrappedAction (ActionData d) (BotReacting d ())
+data WrappedAction a = forall d. WrappedAction (ActionData d) (BotReacting a d ())
 
 
 -- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageRoom' as well as any arbitrary 'IO' action.
 -- 
 -- The type parameter @d@ is the accessible data provided by the trigger for this action.
 -- For message handlers like 'hear' and 'respond' this would be a regex 'Match' and a 'Message' for instance.
-newtype BotReacting d a = BotReacting { runReaction :: StateT (BotActionState d) IO a } deriving (Monad, MonadIO, Applicative, Functor)
+newtype BotReacting a d r = BotReacting { runReaction :: StateT (BotActionState a d) IO r } deriving (Monad, MonadIO, Applicative, Functor)
 
 -- | An abstract type describing a marvin script.
-    --
-    -- This is basically a collection of event handlers.
+--
+-- This is basically a collection of event handlers.
 declareFields [d|
-    data Script = Script
-        { scriptActions   :: [WrappedAction]
+    data Script a = Script
+        { scriptActions   :: [WrappedAction a]
         , scriptScriptId  :: ScriptId
         , scriptConfig    :: C.Config
         }
@@ -71,11 +72,11 @@ declareFields [d|
 
 
 -- | A monad for gradually defining a 'Script' using 'respond' and 'hear' as well as any 'IO' action.
-newtype ScriptDefinition a = ScriptDefinition { runScript :: StateT Script IO a } deriving (Monad, MonadIO, Applicative, Functor)
+newtype ScriptDefinition a r = ScriptDefinition { runScript :: StateT (Script a) IO r } deriving (Monad, MonadIO, Applicative, Functor)
 
 
 -- | Initializer for a script. This gets run by the server during startup and creates a 'Script'
-newtype ScriptInit = ScriptInit (ScriptId, C.Config -> IO Script)
+newtype ScriptInit a = ScriptInit (ScriptId, C.Config -> IO (Script a))
 
 
 -- | Class which says that there is a way to get to a 'Message' from this type @m@.
@@ -92,16 +93,16 @@ class HasMatch m where
 instance HasMatchField m Match => HasMatch m where
     match = matchField
 
-instance HasConfigAccess ScriptDefinition where
+instance HasConfigAccess (ScriptDefinition a) where
     getConfigInternal = ScriptDefinition $ use config
 
-instance HasConfigAccess (BotReacting a) where
+instance HasConfigAccess (BotReacting a b) where
     getConfigInternal = BotReacting $ use config
 
-instance IsScript ScriptDefinition where
+instance IsScript (ScriptDefinition a) where
     getScriptId = ScriptDefinition $ use scriptId
 
-instance IsScript (BotReacting a) where
+instance IsScript (BotReacting a b) where
     getScriptId = BotReacting $ use scriptId
 
 getSubConfFor :: HasConfigAccess m => ScriptId -> m C.Config
@@ -112,43 +113,43 @@ getConfig :: HasConfigAccess m => m C.Config
 getConfig = getScriptId >>= getSubConfFor
 
 
-addReaction :: ActionData d -> BotReacting d () -> ScriptDefinition ()
+addReaction :: ActionData d -> BotReacting a d () -> ScriptDefinition a ()
 addReaction data_ action = ScriptDefinition $ actions %= cons (WrappedAction data_ action)
 
 
 -- | Whenever any message matches the provided regex this handler gets run.
 --
 -- Equivalent to "robot.hear" in hubot
-hear :: Regex -> BotReacting MessageReactionData () -> ScriptDefinition ()
+hear :: Regex -> BotReacting a MessageReactionData () -> ScriptDefinition a ()
 hear re = addReaction (Hear re)
 
 
 -- | Runs the handler only if the bot was directly addressed.
 --
 -- Equivalent to "robot.respond" in hubot
-respond :: Regex -> BotReacting MessageReactionData () -> ScriptDefinition ()
+respond :: Regex -> BotReacting a MessageReactionData () -> ScriptDefinition a ()
 respond re = addReaction (Respond re)
 
 
 -- | Send a message to the channel the triggering message came from.
 --
 -- Equivalent to "robot.send" in hubot
-send :: HasMessage m => Text -> BotReacting m ()
+send :: (IsAdapter a, HasMessage m) => Text -> BotReacting a m ()
 send msg = do
     o <- getMessage
     messageRoom (channel o) msg
 
 
-getUserInfo :: User -> BotReacting m (Maybe UserInfo)
+getUserInfo :: IsAdapter a => User -> BotReacting a m (Maybe UserInfo)
 getUserInfo u = do
-    f <- BotReacting $ use $ outputProvider . A.getUserInfo
-    liftIO $ f u
+    a <- BotReacting $ use adapter
+    liftIO $ A.getUserInfo a u
 
 
 -- | Send a message to the channel the original message came from and address the user that sent the original message.
 --
 -- Equivalent to "robot.reply" in hubot
-reply :: HasMessage m => Text -> BotReacting m ()
+reply :: (IsAdapter a, HasMessage m) => Text -> BotReacting a m ()
 reply msg = do
     om <- getMessage
     user <- getUserInfo $ sender om
@@ -158,10 +159,10 @@ reply msg = do
 
 
 -- | Send a message to a room
-messageRoom :: Room -> Text -> BotReacting a ()
+messageRoom :: IsAdapter a => Room -> Text -> BotReacting a s ()
 messageRoom room msg = do
-    f <- BotReacting $ use $ outputProvider . A.messageRoom
-    liftIO $ f room msg
+    a <- BotReacting $ use adapter
+    liftIO $ A.messageRoom a room msg
 
 
     -- token <- requireAppConfigVal "token"
@@ -179,30 +180,30 @@ messageRoom room msg = do
 -- This id is used as the key for the section in the bot config belonging to this script and in logging output.
 --
 -- Roughly equivalent to "module.exports" in hubot.
-defineScript :: ScriptId -> ScriptDefinition () -> ScriptInit
+defineScript :: ScriptId -> ScriptDefinition a () -> ScriptInit a
 defineScript sid definitions =
     ScriptInit (sid, runDefinitions sid definitions)
 
 
-runDefinitions :: ScriptId -> ScriptDefinition () -> C.Config -> IO Script
+runDefinitions :: ScriptId -> ScriptDefinition a () -> C.Config -> IO (Script a)
 runDefinitions sid definitions cfg = execStateT (runScript definitions) (Script mempty sid cfg)
 
 
 -- | Obtain the reaction dependent data from the bot.
-getData :: BotReacting d d
+getData :: BotReacting a d d
 getData = BotReacting $ use variable
 
 
 -- | Get the results from matching the regular expression.
 --
 -- Equivalent to "msg.match" in hubot.
-getMatch :: HasMatch m => BotReacting m Match
+getMatch :: HasMatch m => BotReacting a m Match
 getMatch = BotReacting $ use (variable . match)
 
 
 -- | Get the message that triggered this action
 -- Includes sender, target channel, as well as the full, untruncated text of the original message
-getMessage :: HasMessage m => BotReacting m Message
+getMessage :: HasMessage m => BotReacting a m Message
 getMessage = BotReacting $ use (variable . message)
 
 

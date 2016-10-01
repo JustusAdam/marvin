@@ -13,6 +13,7 @@ Portability : POSIX
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE NamedFieldPuns         #-}
 {-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE ExplicitForAll, ScopedTypeVariables #-}
 module Marvin.Run where
 
 
@@ -91,7 +92,7 @@ declareFields [d|
     |]
 
 
-mkApp :: [Script] -> C.Config -> EventHandler
+mkApp :: [Script a] -> C.Config -> EventHandler a
 mkApp scripts cfg op = handler
   where
     handler (MessageEvent msg) = handleMessage msg
@@ -122,17 +123,17 @@ mkApp scripts cfg op = handler
     allListens = fromList $! allActions^.hears
 
 
-addAction :: Script -> OutputProvider -> WrappedAction -> Handlers -> Handlers
-addAction script provider wa =
+addAction :: Script a -> a -> WrappedAction a -> Handlers -> Handlers
+addAction script adapter wa =
     case wa of
-        (WrappedAction (Hear re) ac) -> hears %~ cons (re, runMessageAction script provider re ac)
-        (WrappedAction (Respond re) ac) -> responds %~ cons (re, runMessageAction script provider re ac)
+        (WrappedAction (Hear re) ac) -> hears %~ cons (re, runMessageAction script adapter re ac)
+        (WrappedAction (Respond re) ac) -> responds %~ cons (re, runMessageAction script adapter re ac)
 
 
-runMessageAction :: Script -> OutputProvider -> Regex -> BotReacting MessageReactionData () -> Message -> Match -> IO ()
-runMessageAction script provider re ac msg mtch = 
+runMessageAction :: Script a -> a -> Regex -> BotReacting a MessageReactionData () -> Message -> Match -> IO ()
+runMessageAction script adapter re ac msg mtch = 
     catch
-        (evalStateT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) provider (MessageReactionData msg mtch)))
+        (evalStateT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) adapter (MessageReactionData msg mtch)))
         (onScriptExcept (script^.scriptId) re) 
 
 
@@ -145,7 +146,7 @@ onScriptExcept (ScriptId id) r e = do
 
 
 -- | Create a wai compliant application
-application :: [Script] -> C.Config -> EventHandler
+application :: [Script a] -> C.Config -> EventHandler a
 application s config o = prepared
   where
     prepared = mkApp s config o
@@ -164,8 +165,8 @@ prepareLogger =
 
 
 
-runMarvin :: [ScriptInit] -> BuildAdapter -> IO ()
-runMarvin s' builder = do
+runMarvin :: forall a. IsAdapter a => [ScriptInit a] -> IO ()
+runMarvin s' = do
     prepareLogger
     args <- getRecord "bot server"
     when (verbose args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.INFO)
@@ -178,10 +179,11 @@ runMarvin s' builder = do
     unless (verbose args || debug args) $ C.lookup cfg "bot.logging" >>= maybe (return ()) (L.updateGlobalLogger L.rootLoggerName . L.setLevel)
     L.infoM "bot" "Initializing scripts"
     s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s cfg) (onInitExcept sid)) s'
-    ada <- builder^.buildFunction $ C.subconfig ("adapter." ++ unwrapAdapterId (builder^.adapterId)) cfg
-    adapterRunner ada $ application s cfg
+    runWithAdapter 
+        (C.subconfig ("adapter." ++ unwrapAdapterId (adapterId :: AdapterId a)) cfg)
+        $ application s cfg
   where
-    onInitExcept :: ScriptId -> SomeException -> IO (Maybe a)
+    onInitExcept :: ScriptId -> SomeException -> IO (Maybe a')
     onInitExcept (ScriptId id) e = do
         err $ "Unhandled exception during initialization of script " ++ show id
         err $ show e

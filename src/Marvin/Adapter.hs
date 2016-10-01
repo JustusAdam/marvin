@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Marvin.Adapter where
 
@@ -11,22 +9,14 @@ import qualified Data.Configurator.Types as C
 data Event 
     = MessageEvent Message
 
-declareFields [d|
-    data OutputProvider = OutputProvider
-        { outputProviderMessageRoom :: Room -> Text -> IO ()
-        , outputProviderJoinRoom :: Room -> IO ()  
-        , outputProviderGetUserInfo :: User -> IO (Maybe UserInfo)
-        }
-    |]
-
-type EventHandler = OutputProvider -> Event -> IO ()
-
-newtype Adapter = Adapter { adapterRunner :: EventHandler -> IO () }
+type EventHandler a = a -> Event -> IO ()
 
 
-declareFields [d|
-    data BuildAdapter = BuildAdapter
-        { buildAdapterAdapterId :: AdapterId 
-        , buildAdapterBuildFunction :: C.Config -> IO Adapter 
-        }
-    |]
+class IsAdapter a where
+    adapterId :: AdapterId a
+    messageRoom :: a -> Room -> Text -> IO ()
+    getUserInfo :: a -> User -> IO (Maybe UserInfo)
+    runWithAdapter :: RunWithAdapter a
+
+
+type RunWithAdapter a = C.Config -> EventHandler a -> IO ()

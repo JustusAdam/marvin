@@ -1,11 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Marvin.Adapter.Slack (buildAdapter) where
+module Marvin.Adapter.Slack (SlackRTMAdapter) where
 
 import ClassyPrelude
 import Data.Aeson hiding (Error)
 import Data.Aeson.Types hiding (Error)
 import Data.Aeson.TH
-import Marvin.Adapter hiding (messageRoom, joinRoom, getUserInfo)
+import Marvin.Adapter
 import Control.Monad
 import Network.Wreq
 import qualified Data.Configurator.Types as C
@@ -153,7 +153,7 @@ apiResponseParser :: (Value -> Parser a) -> Value -> Parser (APIResponse a)
 apiResponseParser f v@(Object o) = APIResponse <$> o .: "ok" <*> f v
 
 
-runnerImpl :: C.Config -> EventHandler -> IO ()
+runnerImpl :: RunWithAdapter SlackRTMAdapter 
 runnerImpl cfg handler = do
     token <- C.require cfg "token"
     debugM "adapter.slack" "initializing socket"
@@ -173,49 +173,57 @@ runnerImpl cfg handler = do
                         v -> portOnErr v
             mids <- newMVar 0
             debugM "adapter.slack" $ "connecting to socket '" ++ show uri ++ "'"
-            runSecureClient host port path $ \conn -> do
-                debugM "adapter.slack" "Connection established"
-                d <- receiveData conn
-                case eitherDecode d >>= parseEither helloParser of
-                    Right True -> debugM "adapter.slack" "Recieved hello packet"
-                    Left _ -> error $ "Hello packet not readable: " ++ rawBS d
-                    _ -> error $  "First packet was not hello packet: " ++ rawBS d
-                forever $ do
-                    let handlerImpl = handler (outputProviderImpl cfg conn mids)
-                    d <- receiveData conn
-                    case eitherDecode d >>= parseEither eventParser of
-                        Left err -> errorM "adapter.slack" $ "Error parsing json: " ++ err ++ " original data: " ++ rawBS d
-                        Right v -> 
-                            case v of 
-                                Right event -> handlerImpl event
-                                Left internalEvent ->
-                                    case internalEvent of
-                                        Unhandeled type_ -> 
-                                            debugM "adapter.slack" $ "Unhandeled event type " ++ unpack type_ ++ " payload " ++ rawBS d
-                                        Error code msg -> 
-                                            errorM "adapter.slack" $ "Error from remote code: " ++ show code ++ " msg: " ++ unpack msg
-                                        Ignored -> return ()
+            runSecureClient host port path $ runInSocket mids
+  where
+    runInSocket mids conn = do
+        debugM "adapter.slack" "Connection established"
+        d <- receiveData conn
+        case eitherDecode d >>= parseEither helloParser of
+            Right True -> debugM "adapter.slack" "Recieved hello packet"
+            Left _ -> error $ "Hello packet not readable: " ++ rawBS d
+            _ -> error $  "First packet was not hello packet: " ++ rawBS d
+        forever $ do
+            d <- receiveData conn
+            case eitherDecode d >>= parseEither eventParser of
+                Left err -> errorM "adapter.slack" $ "Error parsing json: " ++ err ++ " original data: " ++ rawBS d
+                Right v -> 
+                    case v of 
+                        Right event -> handlerImpl event
+                        Left internalEvent ->
+                            case internalEvent of
+                                Unhandeled type_ -> 
+                                    debugM "adapter.slack" $ "Unhandeled event type " ++ unpack type_ ++ " payload " ++ rawBS d
+                                Error code msg -> 
+                                    errorM "adapter.slack" $ "Error from remote code: " ++ show code ++ " msg: " ++ unpack msg
+                                Ignored -> return ()
+      where
+        adapter = SlackRTMAdapter mids conn cfg
+        handlerImpl = handler adapter
     
 
-execAPIMethod :: (Value -> Parser a) -> C.Config -> String -> [FormParam] -> IO (Either String (APIResponse a))
-execAPIMethod innerParser cfg method params = do
+execAPIMethod :: (Value -> Parser a) -> SlackRTMAdapter -> String -> [FormParam] -> IO (Either String (APIResponse a))
+execAPIMethod innerParser adapter method params = do
     token <- C.require cfg "token"
     response <- post ("https://slack.com/api/" ++ method) (("token" := (token :: Text)):params)
     debugM "adapter.slack" (BS.unpack $ response^.responseBody)
     return $ eitherDecode (response^.responseBody) >>= parseEither (apiResponseParser innerParser)
+  where
+    cfg = userConfig adapter
 
 
-newMid :: MVar Int -> IO Int
-newMid mids = do
+newMid :: SlackRTMAdapter -> IO Int
+newMid adapter = do
     id <- takeMVar mids
     putMVar mids  (id + 1)
     return id
+  where
+    mids = messageIDCounter adapter
 
 
-messageRoom :: MVar Int -> Connection -> Room -> Text -> IO ()
-messageRoom mids conn (Room room) msg = do
-    mid <- newMid mids
-    sendTextData conn $ encode $ 
+messageRoomImpl :: SlackRTMAdapter -> Room -> Text -> IO ()
+messageRoomImpl adapter (Room room) msg = do
+    mid <- newMid adapter
+    sendTextData (rtmConnection adapter) $ encode $ 
         object [ "id" .= mid 
                 , "type" .= ("message" :: Text)
                 , "channel" .= room
@@ -223,32 +231,24 @@ messageRoom mids conn (Room room) msg = do
                 ]  
 
 
-getUserInfo :: C.Config -> User -> IO (Maybe UserInfo)
-getUserInfo cfg (User user) = do
-    usr <- execAPIMethod userInfoParser cfg "users.info" ["user" := user]
+getUserInfoImpl :: SlackRTMAdapter -> User -> IO (Maybe UserInfo)
+getUserInfoImpl adapter (User user) = do
+    usr <- execAPIMethod userInfoParser adapter "users.info" ["user" := user]
     case usr of
         Left err -> errorM "adapter.slack" ("Parse error when getting user data " ++ err) >> return Nothing
         Right (APIResponse True v) -> return (Just v)
         Right (APIResponse False _) -> errorM "adapter.slack" "Server denied getting user info request" >> return Nothing
 
 
-
-joinRoom :: C.Config -> Room -> IO ()
-joinRoom config (Room room) = do
-    response <- execAPIMethod (const $ return ()) config "channels.join" [ "name" := room ]
-    case response of
-        Left err -> errorM "adapter.slack" $ "Invalid json: " ++ err
-        Right (APIResponse True ()) -> infoM "adapter.slack" $ "Successfully joined channel " ++ unpack room
-        Right (APIResponse False ()) -> errorM "adapter.slack" $ "Failed to join channel " ++ unpack room
+data SlackRTMAdapter = SlackRTMAdapter
+    { messageIDCounter :: MVar Int
+    , rtmConnection :: Connection
+    , userConfig :: C.Config
+    }
 
 
-
-outputProviderImpl :: C.Config -> Connection -> MVar Int -> OutputProvider
-outputProviderImpl cfg conn mids =
-    OutputProvider (messageRoom mids conn) (joinRoom cfg) (getUserInfo cfg)
-
-
-
-buildAdapter :: BuildAdapter
-buildAdapter = BuildAdapter "slack-rtm" $ \cfg ->
-    return $ Adapter (runnerImpl cfg)
+instance IsAdapter SlackRTMAdapter where
+    adapterId = "slack-rtm"
+    messageRoom = messageRoomImpl
+    getUserInfo = getUserInfoImpl
+    runWithAdapter = runnerImpl

@@ -13,6 +13,7 @@ module Marvin
       Script, defineScript, ScriptInit
     , ScriptId
     , ScriptDefinition
+    , IsAdapter
       -- * Reacting
     , hear, respond, send, reply, messageRoom
     , getMessage, getMatch
@@ -32,3 +33,4 @@ import           Marvin.Internal hiding (match)
 import           Marvin.Logging
 import           Marvin.Regex
 import           Marvin.Types
+import Marvin.Adapter (IsAdapter)

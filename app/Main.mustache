@@ -5,8 +5,8 @@ import Marvin.Adapter.Slack
 import qualified {{.}}
 {{/imports}}
 
-scripts :: [ScriptInit]
+scripts :: [ScriptInit SlackRTMAdapter]
 scripts = [ {{scripts}} ]
 
 main :: IO ()
-main = runMarvin scripts buildAdapter
+main = runMarvin scripts
