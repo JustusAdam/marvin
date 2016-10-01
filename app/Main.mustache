@@ -1,4 +1,5 @@
 import Marvin.Prelude
+import Marvin.Adapter.Slack
 
 {{#imports}}
 import qualified {{.}}
@@ -8,4 +9,4 @@ scripts :: [ScriptInit]
 scripts = [ {{scripts}} ]
 
 main :: IO ()
-main = runServer scripts
+main = runMarvin scripts buildAdapter

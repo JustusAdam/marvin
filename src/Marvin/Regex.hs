@@ -34,7 +34,8 @@ r opts s = Regex $ Re.regex opts s
 
 
 instance IsString Regex where
-    fromString = r [] . pack
+    fromString "" = error "Empty regex is not permitted, use '.*' or similar instead"
+    fromString s = r [] $ pack s
 
 
 -- | Match a regex against a string and return the first match found (if any).

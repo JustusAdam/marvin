@@ -8,7 +8,7 @@ Stability   : experimental
 Portability : POSIX
 -}
 module Marvin.Types
-    ( User(..), Room(..), Message(..), ScriptId(..)
+    ( User(..), UserInfo(..), Room(..), Message(..), ScriptId(..)
     , applicationScriptId, IsScript, getScriptId
     , HasConfigAccess
     ) where

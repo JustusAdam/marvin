@@ -15,18 +15,13 @@ declareFields [d|
     data OutputProvider = OutputProvider
         { outputProviderMessageRoom :: Room -> Text -> IO ()
         , outputProviderJoinRoom :: Room -> IO ()  
+        , outputProviderGetUserInfo :: User -> IO (Maybe UserInfo)
         }
     |]
 
-type EventHandler = Event -> IO ()
+type EventHandler = OutputProvider -> Event -> IO ()
 
-
-declareFields [d|
-    data Adapter = Adapter
-        { adapterRunner :: EventHandler -> IO () 
-        , adapterOutputProvider :: OutputProvider
-        }
-    |]
+newtype Adapter = Adapter { adapterRunner :: EventHandler -> IO () }
 
 
 declareFields [d|

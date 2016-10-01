@@ -22,6 +22,7 @@ library
                      , Marvin.Mutable
                      , Marvin.Regex
                      , Marvin.Adapter
+                     , Marvin.Adapter.Slack
   other-modules:       Marvin.Internal
                      , Marvin.Internal.Types
                      , Marvin.Logging
@@ -47,6 +48,9 @@ library
                      , async
                      , hslogger
                      , text-format
+                     , websockets
+                     , network-uri
+                     , wuss
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies

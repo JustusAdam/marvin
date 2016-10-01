@@ -7,6 +7,7 @@ import Marvin.Prelude
 
 
 script = defineScript "test" $
-    hear "" $ do
+    hear ".*" $ do
         msg <- getMessage
         infoM (content msg)
+        reply $ "I heard \"" ++ content msg ++ "\""

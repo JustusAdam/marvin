@@ -16,8 +16,9 @@ import qualified Data.Configurator.Types as C
 import           Control.Lens            hiding (cons)
 import           Marvin.Internal.Types
 import           Marvin.Regex            (Match, Regex)
-import Marvin.Adapter hiding (messageRoom)
+import Marvin.Adapter hiding (messageRoom, getUserInfo)
 import qualified Marvin.Adapter as A
+import Marvin.Logging
 
 
 
@@ -138,13 +139,22 @@ send msg = do
     messageRoom (channel o) msg
 
 
+getUserInfo :: User -> BotReacting m (Maybe UserInfo)
+getUserInfo u = do
+    f <- BotReacting $ use $ outputProvider . A.getUserInfo
+    liftIO $ f u
+
+
 -- | Send a message to the channel the original message came from and address the user that sent the original message.
 --
 -- Equivalent to "robot.reply" in hubot
 reply :: HasMessage m => Text -> BotReacting m ()
 reply msg = do
     om <- getMessage
-    send $ username (sender om) ++ " " ++ msg
+    user <- getUserInfo $ sender om
+    case user of
+        Nothing -> errorM "Message sender has no info, message was not sent"
+        Just user -> send $ username user ++ " " ++ msg
 
 
 -- | Send a message to a room

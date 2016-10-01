@@ -12,25 +12,40 @@ import           Data.Aeson.TH
 import           Data.Char               (isAlphaNum, isLetter)
 import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
-import           Data.Time
 import qualified System.Log.Logger       as L
 
 
-newtype User = User { username :: Text } deriving (IsString, Eq, Show)
-newtype Room = Room { roomname :: Text } deriving (IsString, Eq, Show)
+newtype User = User Text deriving (IsString, Eq)
+newtype Room = Room Text deriving (IsString, Eq, Show)
 
 
 deriveJSON defaultOptions { unwrapUnaryRecords = True } ''User
 deriveJSON defaultOptions { unwrapUnaryRecords = True } ''Room
 
 
+data UserInfo = UserInfo 
+    { username :: Text
+    , userID :: User
+    }
+
+
+newtype TimeStamp = TimeStamp { unwrapTimeStamp :: Double } deriving Show
+
+
 data Message = Message
     { sender    :: User
     , channel   :: Room
     , content   :: Text
-    , timestamp :: LocalTime
+    , timestamp :: TimeStamp
     }
 
+
+instance FromJSON TimeStamp where
+    parseJSON (String s) = maybe mzero (return . TimeStamp) $ readMay s
+    parseJSON _ = mzero
+
+instance ToJSON TimeStamp where
+    toJSON = toJSON . show . unwrapTimeStamp 
 
 
 -- | A type, basically a String, which identifies a script to the config and the logging facilities.

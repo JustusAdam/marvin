@@ -20,27 +20,17 @@ import           ClassyPrelude
 import           Control.Concurrent.Async    (wait)
 import           Control.Lens                hiding (cons)
 import           Control.Monad.State         hiding (mapM_)
-import           Data.Aeson
-import           Data.Aeson.TH
-import           Data.Aeson.Types
 import           Data.Char                   (isSpace)
 import qualified Data.Configurator           as C
 import qualified Data.Configurator.Types     as C
-import           Data.Time
 import           Data.Vector                 (Vector)
 import           Marvin.Internal             hiding (match)
 import           Marvin.Internal.Types       hiding (channel)
-import           Marvin.Logging
 import           Marvin.Regex
-import           Network.HTTP.Types
-import           Network.Wai                 as Wai
-import           Network.Wai.Handler.Warp
-import           Network.Wai.Handler.WarpTLS
 import           Options.Generic
 import qualified System.Log.Logger           as L
 import qualified System.Log.Formatter as L
 import qualified System.Log.Handler.Simple as L
-import qualified System.Log.Handler as L hiding (setLevel)
 import qualified Prelude as P
 import Marvin.Adapter
 
@@ -101,7 +91,7 @@ declareFields [d|
     |]
 
 
-mkApp :: [Script] -> C.Config -> OutputProvider -> EventHandler
+mkApp :: [Script] -> C.Config -> EventHandler
 mkApp scripts cfg op = handler
   where
     handler (MessageEvent msg) = handleMessage msg
@@ -155,7 +145,7 @@ onScriptExcept (ScriptId id) r e = do
 
 
 -- | Create a wai compliant application
-application :: [Script] -> C.Config -> OutputProvider -> EventHandler
+application :: [Script] -> C.Config -> EventHandler
 application s config o = prepared
   where
     prepared = mkApp s config o
@@ -189,7 +179,7 @@ runMarvin s' builder = do
     L.infoM "bot" "Initializing scripts"
     s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s cfg) (onInitExcept sid)) s'
     ada <- builder^.buildFunction $ C.subconfig ("adapter." ++ unwrapAdapterId (builder^.adapterId)) cfg
-    ada^.runner $ application s cfg (ada^.outputProvider)
+    adapterRunner ada $ application s cfg
   where
     onInitExcept :: ScriptId -> SomeException -> IO (Maybe a)
     onInitExcept (ScriptId id) e = do
