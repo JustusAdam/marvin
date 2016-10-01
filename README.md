@@ -106,32 +106,46 @@ Configuration pertaining to the bot is stored under the "bot" key.
 
 ```
 bot {
-    port = 8080
     name = "my-bot"
     logging = "INFO"
 }
 ```
 
-By default each script has access to a configuration stored under its script id.
+By default each script has access to a configuration stored under `script.<script-id>`.
 And of course these scripts can have nested config groups.
 
 ```
 bot {
-    port = 8080
     name = "my-bot"
+}
 
-}
-script-1 {
-    some-string = "foo"
-    some-int = 1337
-    bome-bool = true
-}
-script 2 {
-    nested-group {
-        val = false
+script {
+    script-1 {
+        some-string = "foo"
+        some-int = 1337
+        bome-bool = true
     }
-    name = "Trump"
-    capable = false
+    script 2 {
+        nested-group {
+            val = false
+        }
+        name = "Trump"
+        capable = false
+    }
+}
+```
+
+Configuration pertaining to the adapter is stored under `adapter.<adapter-name>`
+
+```
+bot {
+    name = "my-bot"
+    logging = "INFO"
+}
+adapter {
+    slack-rtm {
+        token = "eofk"
+    }
 }
 ``` 
 
@@ -181,3 +195,7 @@ Logging messages made this way are automatically formatted and tagged with the s
 
 By default all logging messages with higher priority `NOTICE` or higher are shown. Using the command line parameter `verbose` also adds `INFO` messages and `debug` adds `DEBUG` messages. You can select the exact logging level in your config file (see also [configuration](#configuration)).
  
+
+#### Random
+
+TODO
