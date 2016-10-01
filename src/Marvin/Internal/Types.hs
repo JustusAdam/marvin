@@ -52,6 +52,7 @@ instance ToJSON TimeStamp where
 newtype ScriptId = ScriptId { unwrapScriptId :: Text } deriving (Show, Eq)
 
 
+-- | A type, basically a String, which identifies an adapter to the config and the logging facilities.
 newtype AdapterId a = AdapterId { unwrapAdapterId :: Text } deriving (Show, Eq)
 
 

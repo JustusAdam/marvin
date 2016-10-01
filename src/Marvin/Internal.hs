@@ -15,7 +15,7 @@ import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
 
 import           Control.Lens            hiding (cons)
-import           Marvin.Adapter          hiding (getUserInfo, messageRoom)
+import           Marvin.Adapter          (IsAdapter)
 import qualified Marvin.Adapter          as A
 import           Marvin.Internal.Types
 import           Marvin.Logging

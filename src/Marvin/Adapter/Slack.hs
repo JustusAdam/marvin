@@ -3,21 +3,17 @@ module Marvin.Adapter.Slack (SlackRTMAdapter) where
 
 import           ClassyPrelude
 import           Control.Lens               hiding ((.=))
-import           Control.Monad
 import           Data.Aeson                 hiding (Error)
-import           Data.Aeson.Parser
 import           Data.Aeson.TH
 import           Data.Aeson.Types           hiding (Error)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.Configurator          as C
 import qualified Data.Configurator.Types    as C
-import           Data.Time
 import           Marvin.Adapter
 import           Marvin.Types
 import           Network.URI
 import           Network.WebSockets
 import           Network.Wreq
-import           System.Log.Logger
 import           Wuss
 
 
@@ -110,6 +106,7 @@ eventParser (Object o) = isErrParser <|> hasTypeParser
             (Object eo) -> do
                 ev <- Error <$> eo .: "code" <*> eo .: "msg"
                 return $ Left ev
+            _ -> mzero
     hasTypeParser = do
         t <- o .: "type"
 
@@ -129,8 +126,12 @@ eventParser (Object o) = isErrParser <|> hasTypeParser
 eventParser _ = mzero
 
 
-rawBS :: BS.ByteString -> String
-rawBS bs = "\"" ++ BS.unpack bs ++ "\""
+rawBS :: BS.ByteString -> Text
+rawBS bs = "\"" ++ toStrict (decodeUtf8 bs) ++ "\""
+
+
+showt :: Show a => a -> Text
+showt = pack . show
 
 
 helloParser :: Value -> Parser Bool
@@ -151,50 +152,52 @@ userInfoParser _ = mzero
 
 apiResponseParser :: (Value -> Parser a) -> Value -> Parser (APIResponse a)
 apiResponseParser f v@(Object o) = APIResponse <$> o .: "ok" <*> f v
+apiResponseParser _ _ = mzero
 
 
 runnerImpl :: RunWithAdapter SlackRTMAdapter
 runnerImpl cfg handler = do
     token <- C.require cfg "token"
-    debugM "adapter.slack" "initializing socket"
+    debugM pa "initializing socket"
     r <- post "https://slack.com/api/rtm.start" [ "token" := (token :: Text) ]
     case eitherDecode (r^.responseBody) of
-        Left err -> errorM "adapter.slack" $ "Error decoding rtm json: " ++ err
+        Left err -> errorM pa $ "Error decoding rtm json: " ++ pack err
         Right js -> do
             let uri = url js
                 authority = fromMaybe (error "URI lacks authority") (uriAuthority uri)
                 host = uriUserInfo authority ++ uriRegName authority
                 path = uriPath uri
                 portOnErr v = do
-                    debugM "adapter.slack" $ "Unreadable port '" ++ v ++ "'"
+                    debugM pa $ "Unreadable port '" ++ pack v ++ "'"
                     return 443
             port <- case uriPort authority of
                         v@(':':r) -> maybe (portOnErr v) return $ readMay r
                         v -> portOnErr v
             mids <- newMVar 0
-            debugM "adapter.slack" $ "connecting to socket '" ++ show uri ++ "'"
+            debugM pa $ "connecting to socket '" ++ showt uri ++ "'"
             runSecureClient host port path $ runInSocket mids
   where
+    pa = error "Phantom value" :: SlackRTMAdapter
     runInSocket mids conn = do
-        debugM "adapter.slack" "Connection established"
+        debugM adapter "Connection established"
         d <- receiveData conn
         case eitherDecode d >>= parseEither helloParser of
-            Right True -> debugM "adapter.slack" "Recieved hello packet"
-            Left _ -> error $ "Hello packet not readable: " ++ rawBS d
-            _ -> error $  "First packet was not hello packet: " ++ rawBS d
+            Right True -> debugM adapter "Recieved hello packet"
+            Left _ -> error $ "Hello packet not readable: " ++ BS.unpack d
+            _ -> error $  "First packet was not hello packet: " ++ BS.unpack d
         forever $ do
             d <- receiveData conn
             case eitherDecode d >>= parseEither eventParser of
-                Left err -> errorM "adapter.slack" $ "Error parsing json: " ++ err ++ " original data: " ++ rawBS d
+                Left err -> errorM adapter $ "Error parsing json: " ++ pack err ++ " original data: " ++ rawBS d
                 Right v ->
                     case v of
                         Right event -> handlerImpl event
                         Left internalEvent ->
                             case internalEvent of
                                 Unhandeled type_ ->
-                                    debugM "adapter.slack" $ "Unhandeled event type " ++ unpack type_ ++ " payload " ++ rawBS d
+                                    debugM adapter $ "Unhandeled event type " ++ type_ ++ " payload " ++ rawBS d
                                 Error code msg ->
-                                    errorM "adapter.slack" $ "Error from remote code: " ++ show code ++ " msg: " ++ unpack msg
+                                    errorM adapter $ "Error from remote code: " ++ showt code ++ " msg: " ++ msg
                                 Ignored -> return ()
       where
         adapter = SlackRTMAdapter mids conn cfg
@@ -205,7 +208,7 @@ execAPIMethod :: (Value -> Parser a) -> SlackRTMAdapter -> String -> [FormParam]
 execAPIMethod innerParser adapter method params = do
     token <- C.require cfg "token"
     response <- post ("https://slack.com/api/" ++ method) (("token" := (token :: Text)):params)
-    debugM "adapter.slack" (BS.unpack $ response^.responseBody)
+    debugM adapter (toStrict $ decodeUtf8 $ response^.responseBody)
     return $ eitherDecode (response^.responseBody) >>= parseEither (apiResponseParser innerParser)
   where
     cfg = userConfig adapter
@@ -235,9 +238,9 @@ getUserInfoImpl :: SlackRTMAdapter -> User -> IO (Maybe UserInfo)
 getUserInfoImpl adapter (User user) = do
     usr <- execAPIMethod userInfoParser adapter "users.info" ["user" := user]
     case usr of
-        Left err -> errorM "adapter.slack" ("Parse error when getting user data " ++ err) >> return Nothing
+        Left err -> errorM adapter ("Parse error when getting user data " ++ pack err) >> return Nothing
         Right (APIResponse True v) -> return (Just v)
-        Right (APIResponse False _) -> errorM "adapter.slack" "Server denied getting user info request" >> return Nothing
+        Right (APIResponse False _) -> errorM adapter "Server denied getting user info request" >> return Nothing
 
 
 data SlackRTMAdapter = SlackRTMAdapter
