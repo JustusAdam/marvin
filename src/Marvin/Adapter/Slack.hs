@@ -1,5 +1,5 @@
+{-# LANGUAGE NamedFieldPuns  #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NamedFieldPuns #-}
 module Marvin.Adapter.Slack (SlackRTMAdapter) where
 
 import           ClassyPrelude
@@ -13,7 +13,7 @@ import qualified Data.Configurator.Types    as C
 import           Marvin.Adapter
 import           Marvin.Types
 import           Network.URI
-import           Network.WebSockets hiding (sendMessage)
+import           Network.WebSockets         hiding (sendMessage)
 import           Network.Wreq
 import           Wuss
 
@@ -174,7 +174,7 @@ runConnectionLoop cfg messageChan connTracker = forever $ do
             mids <- newMVar 0
             debugM pa $ "connecting to socket '" ++ showt uri ++ "'"
             catch
-                (runSecureClient host port path $ \conn -> do 
+                (runSecureClient host port path $ \conn -> do
                     debugM pa "Connection established"
                     d <- receiveData conn
                     case eitherDecode d >>= parseEither helloParser of
@@ -219,7 +219,7 @@ runnerImpl cfg handler = do
     messageChan <- newEmptyMVar
     let send d = do
             conn <- readMVar connTracker
-            sendTextData conn d 
+            sendTextData conn d
         adapter = SlackRTMAdapter send cfg midTracker
     async $ runConnectionLoop cfg messageChan connTracker
     runHandlerLoop adapter messageChan handler
@@ -264,8 +264,8 @@ getUserInfoImpl adapter (User user) = do
 
 data SlackRTMAdapter = SlackRTMAdapter
     { sendMessage :: BS.ByteString -> IO ()
-    , userConfig       :: C.Config
-    , midTracker :: MVar Int
+    , userConfig  :: C.Config
+    , midTracker  :: MVar Int
     }
 
 
