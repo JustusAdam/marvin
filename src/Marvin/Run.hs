@@ -59,31 +59,6 @@ requireFromAppConfig cfg = C.require (C.subconfig (unwrapScriptId applicationScr
 lookupFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO (Maybe a)
 lookupFromAppConfig cfg = C.lookup (C.subconfig (unwrapScriptId applicationScriptId) cfg)
 
--- mkApp scripts cfg = handler
---   where
---     handler request = do
---         bod <- lazyRequestBody request
---         case eitherDecode' bod of
---             Left err -> do
---                 noticeAccept "Recieved malformed JSON"
---                 noticeAccept err
---                 return $ responseLBS ok200 [] "Recieved malformed JSON, check your server log for further information"
---             Right v -> do
---                 tkn <- requireFromAppConfig cfg "token"
---                 if token v == tkn
---                     then handleApiRequest v
---                     else do
---                         noticeAccept "Unathorized request recieved (token invalid)"
---                         return $ responseLBS unauthorized401 [] ""
-
---     noticeAccept = L.noticeM  "server.accept"
-
---     handleApiRequest UrlVerification{challenge} =
---         return $ responseLBS ok200 [("Content-Type", "application/x-www-form-urlencoded")] (fromStrict $ encodeUtf8 challenge)
---     handleApiRequest EventCallback{event} = do
---         async $ handleMessage event
---         return $ responseLBS ok200 [] ""
-
 
 declareFields [d|
     data Handlers = Handlers
@@ -190,32 +165,3 @@ runMarvin s' = do
         err $ show e
         return Nothing
       where err = L.errorM "bot.init"
-
-
--- -- | Parses command line arguments and runs a server with the arguments provided there.
--- runServer :: [ScriptInit] -> IO ()
--- runServer s = do
---     (port, app, cfg) <- prepareServer s
---     isHttps <- lookupFromAppConfig cfg "tls"
---     let runner = case isHttps of
---                     Just True -> runHTTPSServer
---                     _ -> runHTTPServer
---     runner port app cfg
-
-
--- -- | Starts a HTTP server on the provided port with the application
--- runHTTPServer :: Int -> Application -> C.Config -> IO ()
--- runHTTPServer port app cfg = do
---     L.noticeM "server.start" $ "Starting HTTP server on port " ++ show port
---     run port app
-
-
--- -- | Starts a TLS protected HTTP server on the provided port with the application
--- runHTTPSServer :: Int -> Application -> C.Config -> IO ()
--- runHTTPSServer port app cfg = do
---     certfile <- requireFromAppConfig cfg "certfile"
---     keyfile <- requireFromAppConfig cfg "keyfile"
---     let tlsSet = tlsSettings certfile keyfile
---         warpSet = setPort port defaultSettings
---     L.noticeM "server.start" $ "Starting TLS protected HTTP server on port " ++ show port
---     runTLS tlsSet warpSet app
