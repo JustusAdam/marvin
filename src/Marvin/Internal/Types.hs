@@ -10,7 +10,6 @@ import           Control.Lens
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Char               (isAlphaNum, isLetter)
-import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
 import qualified System.Log.Logger       as L
 
@@ -90,6 +89,7 @@ class IsScript m where
     getScriptId :: m ScriptId
 
 
+prioMapping :: [(Text, L.Priority)]
 prioMapping = map ((pack . show) &&& id) [L.DEBUG, L.INFO, L.NOTICE, L.WARNING, L.ERROR, L.CRITICAL, L.ALERT, L.EMERGENCY]
 
 

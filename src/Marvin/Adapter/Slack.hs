@@ -13,7 +13,7 @@ import qualified Data.Configurator.Types    as C
 import           Marvin.Adapter
 import           Marvin.Types
 import           Network.URI
-import           Network.WebSockets         hiding (sendMessage)
+import           Network.WebSockets
 import           Network.Wreq
 import           Wuss
 
@@ -171,7 +171,6 @@ runConnectionLoop cfg messageChan connTracker = forever $ do
             port <- case uriPort authority of
                         v@(':':r) -> maybe (portOnErr v) return $ readMay r
                         v -> portOnErr v
-            mids <- newMVar 0
             debugM pa $ "connecting to socket '" ++ showt uri ++ "'"
             catch
                 (runSecureClient host port path $ \conn -> do
@@ -186,7 +185,7 @@ runConnectionLoop cfg messageChan connTracker = forever $ do
                         d <- receiveData conn
                         putMVar messageChan d)
                 $ \e -> do
-                    takeMVar connTracker
+                    void $ takeMVar connTracker
                     errorM pa (pack $ show (e :: ConnectionException))
   where
     pa = error "Phantom value" :: SlackRTMAdapter
@@ -221,7 +220,7 @@ runnerImpl cfg handler = do
             conn <- readMVar connTracker
             sendTextData conn d
         adapter = SlackRTMAdapter send cfg midTracker
-    async $ runConnectionLoop cfg messageChan connTracker
+    void $ async $ runConnectionLoop cfg messageChan connTracker
     runHandlerLoop adapter messageChan handler
 
 

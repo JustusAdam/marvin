@@ -4,7 +4,6 @@
 module Marvin.Adapter where
 
 import           ClassyPrelude
-import           Control.Lens
 import qualified Data.Configurator.Types as C
 import           Marvin.Internal.Types
 import qualified System.Log.Logger       as L
