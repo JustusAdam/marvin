@@ -6,6 +6,7 @@
 {-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE UndecidableInstances       #-}
+{-# LANGUAGE BangPatterns #-}
 module Marvin.Internal where
 
 
@@ -121,14 +122,14 @@ addReaction data_ action = ScriptDefinition $ actions %= cons (WrappedAction dat
 --
 -- Equivalent to "robot.hear" in hubot
 hear :: Regex -> BotReacting a MessageReactionData () -> ScriptDefinition a ()
-hear re = addReaction (Hear re)
+hear !re = addReaction (Hear re)
 
 
 -- | Runs the handler only if the bot was directly addressed.
 --
 -- Equivalent to "robot.respond" in hubot
 respond :: Regex -> BotReacting a MessageReactionData () -> ScriptDefinition a ()
-respond re = addReaction (Respond re)
+respond !re = addReaction (Respond re)
 
 
 -- | Send a message to the channel the triggering message came from.

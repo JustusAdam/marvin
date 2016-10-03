@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NamedFieldPuns #-}
 module Marvin.Adapter.Slack (SlackRTMAdapter) where
 
 import           ClassyPrelude
@@ -12,7 +13,7 @@ import qualified Data.Configurator.Types    as C
 import           Marvin.Adapter
 import           Marvin.Types
 import           Network.URI
-import           Network.WebSockets
+import           Network.WebSockets hiding (sendMessage)
 import           Network.Wreq
 import           Wuss
 
@@ -91,10 +92,7 @@ data APIResponse a = APIResponse
     }
 
 
-
-(let opts = defaultOptions { fieldLabelModifier = camelTo2 '_' }
- in
-     deriveJSON opts ''RTMData)
+deriveJSON defaultOptions { fieldLabelModifier = camelTo2 '_' } ''RTMData
 
 
 eventParser :: Value -> Parser (Either InternalType Event)
@@ -155,8 +153,8 @@ apiResponseParser f v@(Object o) = APIResponse <$> o .: "ok" <*> f v
 apiResponseParser _ _ = mzero
 
 
-runnerImpl :: RunWithAdapter SlackRTMAdapter
-runnerImpl cfg handler = do
+runConnectionLoop :: C.Config -> MVar BS.ByteString -> MVar Connection -> IO ()
+runConnectionLoop cfg messageChan connTracker = forever $ do
     token <- C.require cfg "token"
     debugM pa "initializing socket"
     r <- post "https://slack.com/api/rtm.start" [ "token" := (token :: Text) ]
@@ -175,33 +173,56 @@ runnerImpl cfg handler = do
                         v -> portOnErr v
             mids <- newMVar 0
             debugM pa $ "connecting to socket '" ++ showt uri ++ "'"
-            runSecureClient host port path $ runInSocket mids
+            catch
+                (runSecureClient host port path $ \conn -> do 
+                    debugM pa "Connection established"
+                    d <- receiveData conn
+                    case eitherDecode d >>= parseEither helloParser of
+                        Right True -> debugM pa "Recieved hello packet"
+                        Left _ -> error $ "Hello packet not readable: " ++ BS.unpack d
+                        _ -> error $ "First packet was not hello packet: " ++ BS.unpack d
+                    putMVar connTracker conn
+                    forever $ do
+                        d <- receiveData conn
+                        putMVar messageChan d)
+                $ \e -> do
+                    takeMVar connTracker
+                    errorM pa (pack $ show (e :: ConnectionException))
   where
     pa = error "Phantom value" :: SlackRTMAdapter
-    runInSocket mids conn = do
-        debugM adapter "Connection established"
-        d <- receiveData conn
-        case eitherDecode d >>= parseEither helloParser of
-            Right True -> debugM adapter "Recieved hello packet"
-            Left _ -> error $ "Hello packet not readable: " ++ BS.unpack d
-            _ -> error $  "First packet was not hello packet: " ++ BS.unpack d
-        forever $ do
-            d <- receiveData conn
-            case eitherDecode d >>= parseEither eventParser of
-                Left err -> errorM adapter $ "Error parsing json: " ++ pack err ++ " original data: " ++ rawBS d
-                Right v ->
-                    case v of
-                        Right event -> handlerImpl event
-                        Left internalEvent ->
-                            case internalEvent of
-                                Unhandeled type_ ->
-                                    debugM adapter $ "Unhandeled event type " ++ type_ ++ " payload " ++ rawBS d
-                                Error code msg ->
-                                    errorM adapter $ "Error from remote code: " ++ showt code ++ " msg: " ++ msg
-                                Ignored -> return ()
-      where
-        adapter = SlackRTMAdapter mids conn cfg
-        handlerImpl = handler adapter
+
+
+runHandlerLoop :: SlackRTMAdapter -> MVar BS.ByteString -> EventHandler SlackRTMAdapter -> IO ()
+runHandlerLoop adapter messageChan handler =
+    forever $ do
+        d <- takeMVar messageChan
+        case eitherDecode d >>= parseEither eventParser of
+            Left err -> errorM adapter $ "Error parsing json: " ++ pack err ++ " original data: " ++ rawBS d
+            Right v ->
+                case v of
+                    Right event -> handlerImpl event
+                    Left internalEvent ->
+                        case internalEvent of
+                            Unhandeled type_ ->
+                                debugM adapter $ "Unhandeled event type " ++ type_ ++ " payload " ++ rawBS d
+                            Error code msg ->
+                                errorM adapter $ "Error from remote code: " ++ showt code ++ " msg: " ++ msg
+                            Ignored -> return ()
+  where
+    handlerImpl = handler adapter
+
+
+runnerImpl :: RunWithAdapter SlackRTMAdapter
+runnerImpl cfg handler = do
+    midTracker <- newMVar 0
+    connTracker <- newEmptyMVar
+    messageChan <- newEmptyMVar
+    let send d = do
+            conn <- readMVar connTracker
+            sendTextData conn d 
+        adapter = SlackRTMAdapter send cfg midTracker
+    async $ runConnectionLoop cfg messageChan connTracker
+    runHandlerLoop adapter messageChan handler
 
 
 execAPIMethod :: (Value -> Parser a) -> SlackRTMAdapter -> String -> [FormParam] -> IO (Either String (APIResponse a))
@@ -215,18 +236,16 @@ execAPIMethod innerParser adapter method params = do
 
 
 newMid :: SlackRTMAdapter -> IO Int
-newMid adapter = do
-    id <- takeMVar mids
-    putMVar mids  (id + 1)
+newMid SlackRTMAdapter{midTracker} = do
+    id <- takeMVar midTracker
+    putMVar midTracker  (id + 1)
     return id
-  where
-    mids = messageIDCounter adapter
 
 
 messageRoomImpl :: SlackRTMAdapter -> Room -> Text -> IO ()
 messageRoomImpl adapter (Room room) msg = do
     mid <- newMid adapter
-    sendTextData (rtmConnection adapter) $ encode $
+    sendMessage adapter $ encode $
         object [ "id" .= mid
                 , "type" .= ("message" :: Text)
                 , "channel" .= room
@@ -244,9 +263,9 @@ getUserInfoImpl adapter (User user) = do
 
 
 data SlackRTMAdapter = SlackRTMAdapter
-    { messageIDCounter :: MVar Int
-    , rtmConnection    :: Connection
+    { sendMessage :: BS.ByteString -> IO ()
     , userConfig       :: C.Config
+    , midTracker :: MVar Int
     }
 
 
