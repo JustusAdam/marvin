@@ -10,7 +10,7 @@ maintainer:          dev@justus.science
 copyright:           Copyright: (c) 2016 Justus Adam
 category:            Development
 build-type:          Simple
--- extra-source-files:
+extra-source-files:  app/Main.mustache
 cabal-version:       >=1.10
 
 library
@@ -29,22 +29,15 @@ library
   build-depends:       base >= 4.7 && < 5
                      , classy-prelude
                      , wreq
-                     , wai
-                     , warp
-                     , warp-tls
-                     , http-types
-                     , Spock
                      , aeson
                      , mtl
                      , lens
                      , text-icu
                      , vector
                      , optparse-generic
-                     , data-default
                      , configurator
                      , template-haskell
                      , bytestring
-                     , time
                      , async
                      , hslogger
                      , text-format
@@ -65,7 +58,23 @@ executable marvin-pp
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:       base
-                     , marvin
+                     , classy-prelude
+                     , mustache
+                     , directory
+                     , filepath
+  default-language:    Haskell2010
+  default-extensions:  OverloadedStrings
+                     , TypeFamilies
+                     , MultiParamTypeClasses
+                     , TupleSections
+                     , GADTs
+                     , NoImplicitPrelude
+
+executable marvin-init
+  hs-source-dirs:      initializer
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
+  build-depends:       base
                      , classy-prelude
                      , mustache
                      , directory
