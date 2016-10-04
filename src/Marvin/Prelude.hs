@@ -23,6 +23,8 @@ module Marvin.Prelude
     , module Marvin.Util.Random
     -- | Marvins regex type and how to work with it
     , module Marvin.Util.Regex
+    -- | Dealing with JSON
+    , module Marvin.Util.JSON 
     -- | Format strings which resolve to efficient Strings, aka 'Text'
     , module Data.Text.Format
     ) where

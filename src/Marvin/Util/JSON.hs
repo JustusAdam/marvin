@@ -13,3 +13,7 @@ module Marvin.Util.JSON
     ( module Data.Aeson
     , module Data.Aeson.TH
     ) where
+
+
+import Data.Aeson
+import Data.Aeson.TH
