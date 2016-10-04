@@ -19,7 +19,7 @@ module Marvin
     , getMessage, getMatch
     , Message(..), User(..), Room(..)
     , getConfigVal, requireConfigVal
-    , BotReacting
+    , BotReacting, HasMessage, HasMatch
     , MessageReactionData, messageField, matchField
     ) where
 

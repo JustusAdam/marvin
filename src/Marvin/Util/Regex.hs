@@ -8,7 +8,7 @@ Stability   : experimental
 Portability : POSIX
 -}
 module Marvin.Util.Regex
-    ( Regex, Match, r, match, Re.MatchOption(..)
+    ( Regex, Match, r, match, MatchOption(..)
     -- ** Unstable
     , unwrapRegex
     ) where
@@ -16,6 +16,7 @@ module Marvin.Util.Regex
 
 import           ClassyPrelude
 import qualified Data.Text.ICU as Re
+import Data.Text.ICU (MatchOption(..))
 
 
 -- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'.
