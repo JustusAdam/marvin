@@ -1,11 +1,14 @@
-import Marvin.Prelude
-import Marvin.Adapter.Slack
+import Marvin.Run
+import Prelude (IO)
+{{# adapter-import }}
+import {{ adapter-import }}
+{{/ adapter-import }}
 
 {{#imports}}
 import qualified {{.}}
 {{/imports}}
 
-scripts :: [ScriptInit SlackRTMAdapter]
+scripts :: [ScriptInit {{ adapter-type }}]
 scripts = [ {{scripts}} ]
 
 main :: IO ()

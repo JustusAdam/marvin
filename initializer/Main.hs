@@ -25,10 +25,12 @@ fromEither (Left e) = error $ "Was left: " ++ show e
 fromEither (Right v) = v
 
 
+wantDirectories :: [FilePath]
 wantDirectories = 
     [ "bot" ]
 
 
+wantFiles :: [(FilePath, Template)]
 wantFiles = map (second $ fromEither . compileTemplate "")
     [ ("Main.hs.mustache", "bot/Main.hs") 
     , ("MyScript.hs.mustache", "bot/MyScript.hs")

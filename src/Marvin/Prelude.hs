@@ -11,29 +11,26 @@ module Marvin.Prelude
     (
     -- | For exposing parameterised and generalised versions of prelude functions
     module ClassyPrelude
-    -- | The best JSON library for Haskell
-    , module Data.Aeson
-    -- | For automatically generating JSON conversions
-    , module Data.Aeson.TH
-    -- | For Regular expressions which work with 'Text'
-    , module Data.Text.ICU
     -- | Marvin :3
     --
-    -- Common functions and Types
+    -- Common functions and Types for scripts
     , module Marvin
     -- | Mutable references in marvin scripts
-    , module Marvin.Mutable
-    -- | Running marvin
-    , module Marvin.Run
+    , module Marvin.Util.Mutable
+    -- | Logging in Scripts
+    , module Marvin.Util.Logging
+    -- | Random numbers and convenience functions
+    , module Marvin.Util.Random
+    -- | Marvins regex type and how to work with it
+    , module Marvin.Util.Regex
     -- | Format strings which resolve to efficient Strings, aka 'Text'
     , module Data.Text.Format
     ) where
 
 import           ClassyPrelude
-import           Data.Aeson
-import           Data.Aeson.TH
 import           Data.Text.Format (format)
-import           Data.Text.ICU    (MatchOption (..))
 import           Marvin
-import           Marvin.Mutable
-import           Marvin.Run
+import           Marvin.Util.Mutable
+import Marvin.Util.Regex
+import Marvin.Util.Random
+import Marvin.Util.Logging

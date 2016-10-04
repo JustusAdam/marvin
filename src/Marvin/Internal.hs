@@ -19,8 +19,8 @@ import           Control.Lens            hiding (cons)
 import           Marvin.Adapter          (IsAdapter)
 import qualified Marvin.Adapter          as A
 import           Marvin.Internal.Types
-import           Marvin.Logging
-import           Marvin.Regex            (Match, Regex)
+import           Marvin.Util.Logging
+import           Marvin.Util.Regex            (Match, Regex)
 
 
 

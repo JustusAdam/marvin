@@ -21,16 +21,9 @@ module Marvin
     , getConfigVal, requireConfigVal
     , BotReacting
     , MessageReactionData, messageField, matchField
-      -- * Utilities
-    , Regex, r, match
-    , Match
-      -- * Logging
-    , debugM, infoM, noticeM, warningM, errorM, criticalM, alertM, emergencyM
     ) where
 
 
 import           Marvin.Adapter  (IsAdapter)
-import           Marvin.Internal hiding (match)
-import           Marvin.Logging
-import           Marvin.Regex
+import           Marvin.Internal
 import           Marvin.Types

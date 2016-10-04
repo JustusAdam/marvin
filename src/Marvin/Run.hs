@@ -15,7 +15,9 @@ Portability : POSIX
 {-# LANGUAGE NamedFieldPuns         #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE TemplateHaskell        #-}
-module Marvin.Run where
+module Marvin.Run 
+    ( runMarvin, ScriptInit, IsAdapter
+    ) where
 
 
 import           ClassyPrelude
@@ -29,7 +31,7 @@ import           Data.Vector               (Vector)
 import           Marvin.Adapter
 import           Marvin.Internal           hiding (match)
 import           Marvin.Internal.Types     hiding (channel)
-import           Marvin.Regex
+import           Marvin.Util.Regex
 import           Options.Generic
 import qualified Prelude                   as P
 import qualified System.Log.Formatter      as L

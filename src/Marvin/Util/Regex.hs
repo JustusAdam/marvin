@@ -7,7 +7,11 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
-module Marvin.Regex where
+module Marvin.Util.Regex
+    ( Regex, Match, r, match, Re.MatchOption(..)
+    -- ** Unstable
+    , unwrapRegex
+    ) where
 
 
 import           ClassyPrelude
@@ -16,11 +20,15 @@ import qualified Data.Text.ICU as Re
 
 -- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'.
 -- Alternatively use 'r' to create one with custom options.
-newtype Regex = Regex { unwrapRegex :: Re.Regex }
+newtype Regex = Regex Re.Regex
+
+-- Warning: This exposes the underlying repreentation of a 'Regex' and under no curcumstances should be considered stable.
+unwrapRegex :: Regex -> Re.Regex
+unwrapRegex (Regex r) = r
 
 
 instance Show Regex where
-    show (Regex r) = "Regex " ++ show (Re.pattern r)
+    show = show . unwrapRegex
 
 
 -- | A match to a 'Regex'. Index 0 is the full match, all other indexes are match groups.

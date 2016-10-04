@@ -1,3 +1,12 @@
+{-|
+Module      : $Header$
+Description : The adapter interface
+Copyright   : (c) Justus Adam, 2016
+License     : BSD3
+Maintainer  : dev@justus.science
+Stability   : experimental
+Portability : POSIX
+-}
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}

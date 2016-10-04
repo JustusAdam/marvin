@@ -7,7 +7,7 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
-module Marvin.Logging
+module Marvin.Util.Logging
     ( debugM, infoM, noticeM, warningM, errorM, criticalM, alertM, emergencyM, logM
     ) where
 

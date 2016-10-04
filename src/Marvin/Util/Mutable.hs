@@ -7,7 +7,7 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
-module Marvin.Mutable where
+module Marvin.Util.Mutable where
 
 
 import           ClassyPrelude

@@ -23,13 +23,14 @@ library
                      , Marvin.Prelude
                      , Marvin.Types
                      , Marvin.Run
-                     , Marvin.Mutable
-                     , Marvin.Regex
+                     , Marvin.Util.Mutable
+                     , Marvin.Util.Regex
+                     , Marvin.Util.Random
+                     , Marvin.Util.Logging
                      , Marvin.Adapter
                      , Marvin.Adapter.Slack
   other-modules:       Marvin.Internal
                      , Marvin.Internal.Types
-                     , Marvin.Logging
   build-depends:       base >= 4.7 && < 5
                      , classy-prelude
                      , wreq
@@ -48,6 +49,7 @@ library
                      , websockets
                      , network-uri
                      , wuss
+                     , random
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies
