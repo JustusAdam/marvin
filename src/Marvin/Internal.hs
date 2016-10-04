@@ -68,6 +68,7 @@ declareFields [d|
         { scriptActions   :: [WrappedAction a]
         , scriptScriptId  :: ScriptId
         , scriptConfig    :: C.Config
+        , scriptAdapter :: a
         }
     |]
 
@@ -77,7 +78,7 @@ newtype ScriptDefinition a r = ScriptDefinition { runScript :: StateT (Script a)
 
 
 -- | Initializer for a script. This gets run by the server during startup and creates a 'Script'
-newtype ScriptInit a = ScriptInit (ScriptId, C.Config -> IO (Script a))
+newtype ScriptInit a = ScriptInit (ScriptId, a -> C.Config -> IO (Script a))
 
 
 -- | Class which says that there is a way to get to a 'Message' from this type @m@.
@@ -186,8 +187,8 @@ defineScript sid definitions =
     ScriptInit (sid, runDefinitions sid definitions)
 
 
-runDefinitions :: ScriptId -> ScriptDefinition a () -> C.Config -> IO (Script a)
-runDefinitions sid definitions cfg = execStateT (runScript definitions) (Script mempty sid cfg)
+runDefinitions :: ScriptId -> ScriptDefinition a () -> a -> C.Config -> IO (Script a)
+runDefinitions sid definitions ada cfg = execStateT (runScript definitions) (Script mempty sid cfg ada)
 
 
 -- | Obtain the reaction dependent data from the bot.
@@ -244,3 +245,17 @@ requireAppConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m a
 requireAppConfigVal name = do
     cfg <- getAppConfig
     liftIO $ C.require cfg name
+
+
+extractReaction :: BotReacting a s o -> BotReacting a s (IO o)
+extractReaction reac = BotReacting $ do 
+    s <- get
+    return $ evalStateT (runReaction reac) s
+
+
+extractAction :: BotReacting a () o -> ScriptDefinition a (IO o)
+extractAction ac = ScriptDefinition $ do
+    a <- use adapter
+    sid <- use scriptId
+    cfg <- use config
+    return $ evalStateT (runReaction ac) (BotActionState sid cfg a ())

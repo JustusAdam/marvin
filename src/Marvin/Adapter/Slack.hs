@@ -199,7 +199,7 @@ runHandlerLoop adapter messageChan handler =
             Left err -> errorM adapter $ "Error parsing json: " ++ pack err ++ " original data: " ++ rawBS d
             Right v ->
                 case v of
-                    Right event -> handlerImpl event
+                    Right event -> handler event
                     Left internalEvent ->
                         case internalEvent of
                             Unhandeled type_ ->
@@ -207,12 +207,10 @@ runHandlerLoop adapter messageChan handler =
                             Error code msg ->
                                 errorM adapter $ "Error from remote code: " ++ showt code ++ " msg: " ++ msg
                             Ignored -> return ()
-  where
-    handlerImpl = handler adapter
 
 
 runnerImpl :: RunWithAdapter SlackRTMAdapter
-runnerImpl cfg handler = do
+runnerImpl cfg handlerInit = do
     midTracker <- newMVar 0
     connTracker <- newEmptyMVar
     messageChan <- newEmptyMVar
@@ -220,6 +218,7 @@ runnerImpl cfg handler = do
             conn <- readMVar connTracker
             sendTextData conn d
         adapter = SlackRTMAdapter send cfg midTracker
+    handler <- handlerInit adapter
     void $ async $ runConnectionLoop cfg messageChan connTracker
     runHandlerLoop adapter messageChan handler
 

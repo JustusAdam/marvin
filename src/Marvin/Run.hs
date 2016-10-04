@@ -70,8 +70,8 @@ declareFields [d|
     |]
 
 
-mkApp :: [Script a] -> C.Config -> EventHandler a
-mkApp scripts cfg op = handler
+mkApp :: [Script a] -> C.Config -> a -> EventHandler a
+mkApp scripts cfg adapter = handler
   where
     handler (MessageEvent msg) = handleMessage msg
 
@@ -91,7 +91,7 @@ mkApp scripts cfg op = handler
                         Nothing -> return Nothing
                         Just m -> Just <$> async (action msg m))
 
-    flattenActions = foldr $ \script -> flip (foldr (addAction script op)) (script^.actions)
+    flattenActions = foldr $ \script -> flip (foldr (addAction script adapter)) (script^.actions)
 
     allActions = flattenActions (Handlers mempty mempty) scripts
 
@@ -124,10 +124,18 @@ onScriptExcept (ScriptId id) r e = do
 
 
 -- | Create a wai compliant application
-application :: [Script a] -> C.Config -> EventHandler a
-application s config o = prepared
-  where
-    prepared = mkApp s config o
+application :: [ScriptInit a] -> C.Config -> InitEventHandler a
+application inits config ada = do
+    L.infoM "bot" "Initializing scripts"
+    s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada config) (onInitExcept sid)) inits
+    return $ mkApp s config ada
+  where 
+    onInitExcept :: ScriptId -> SomeException -> IO (Maybe a')
+    onInitExcept (ScriptId id) e = do
+        err $ "Unhandled exception during initialization of script " ++ show id
+        err $ show e
+        return Nothing
+      where err = L.errorM "bot.init"
 
 
 prepareLogger :: IO ()
@@ -155,15 +163,8 @@ runMarvin s' = do
                 (configPath args)
     (cfg, cfgTid) <- C.autoReload C.autoConfig [C.Required cfgLoc]
     unless (verbose args || debug args) $ C.lookup cfg "bot.logging" >>= maybe (return ()) (L.updateGlobalLogger L.rootLoggerName . L.setLevel)
-    L.infoM "bot" "Initializing scripts"
-    s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s cfg) (onInitExcept sid)) s'
+    
     runWithAdapter
         (C.subconfig ("adapter." ++ unwrapAdapterId (adapterId :: AdapterId a)) cfg)
-        $ application s cfg
-  where
-    onInitExcept :: ScriptId -> SomeException -> IO (Maybe a')
-    onInitExcept (ScriptId id) e = do
-        err $ "Unhandled exception during initialization of script " ++ show id
-        err $ show e
-        return Nothing
-      where err = L.errorM "bot.init"
+        $ application s' cfg
+  

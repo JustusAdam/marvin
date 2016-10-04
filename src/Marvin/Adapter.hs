@@ -20,7 +20,9 @@ import qualified System.Log.Logger       as L
 data Event
     = MessageEvent Message
 
-type EventHandler a = a -> Event -> IO ()
+
+type EventHandler a = Event -> IO ()
+type InitEventHandler a = a -> IO (EventHandler a)
 
 
 class IsAdapter a where
@@ -30,7 +32,7 @@ class IsAdapter a where
     runWithAdapter :: RunWithAdapter a
 
 
-type RunWithAdapter a = C.Config -> EventHandler a -> IO ()
+type RunWithAdapter a = C.Config -> InitEventHandler a -> IO ()
 
 
 
