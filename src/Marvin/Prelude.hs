@@ -24,15 +24,16 @@ module Marvin.Prelude
     -- | Marvins regex type and how to work with it
     , module Marvin.Util.Regex
     -- | Dealing with JSON
-    , module Marvin.Util.JSON 
+    , module Marvin.Util.JSON
     -- | Format strings which resolve to efficient Strings, aka 'Text'
     , module Data.Text.Format
     ) where
 
 import           ClassyPrelude
-import           Data.Text.Format (format)
+import           Data.Text.Format    (format)
 import           Marvin
+import           Marvin.Util.JSON
+import           Marvin.Util.Logging
 import           Marvin.Util.Mutable
-import Marvin.Util.Regex
-import Marvin.Util.Random
-import Marvin.Util.Logging
+import           Marvin.Util.Random
+import           Marvin.Util.Regex

@@ -15,7 +15,7 @@ Portability : POSIX
 {-# LANGUAGE NamedFieldPuns         #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE TemplateHaskell        #-}
-module Marvin.Run 
+module Marvin.Run
     ( runMarvin, ScriptInit, IsAdapter
     ) where
 
@@ -129,7 +129,7 @@ application inits config ada = do
     L.infoM "bot" "Initializing scripts"
     s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada config) (onInitExcept sid)) inits
     return $ mkApp s config ada
-  where 
+  where
     onInitExcept :: ScriptId -> SomeException -> IO (Maybe a')
     onInitExcept (ScriptId id) e = do
         err $ "Unhandled exception during initialization of script " ++ show id
@@ -163,8 +163,8 @@ runMarvin s' = do
                 (configPath args)
     (cfg, cfgTid) <- C.autoReload C.autoConfig [C.Required cfgLoc]
     unless (verbose args || debug args) $ C.lookup cfg "bot.logging" >>= maybe (return ()) (L.updateGlobalLogger L.rootLoggerName . L.setLevel)
-    
+
     runWithAdapter
         (C.subconfig ("adapter." ++ unwrapAdapterId (adapterId :: AdapterId a)) cfg)
         $ application s' cfg
-  
+

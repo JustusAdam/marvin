@@ -10,11 +10,11 @@ Portability : POSIX
 module Marvin.Util.Random
     ( randomVal, randomValFromRange, randomFrom
     , module System.Random
-    ) where 
+    ) where
 
 
-import ClassyPrelude
-import System.Random
+import           ClassyPrelude
+import           System.Random
 
 
 -- | Generate a random value. For more information see 'random'
@@ -31,9 +31,9 @@ randomValFromRange = liftIO . randomRIO
 -- This uses the sequences 'length' and therefore does not terminate for infinite sequences.
 --
 -- Uses the global random number generator.
--- 
+--
 -- Usable in all IO capable monads, such as 'BotReacting' and 'ScriptDefinition'.
-randomFrom :: (IsSequence s, Index s ~ Int, MonadIO m) => s -> m (Element s) 
+randomFrom :: (IsSequence s, Index s ~ Int, MonadIO m) => s -> m (Element s)
 randomFrom list = do
   n <- randomValFromRange (0, pred $ length list)
   return $ list `indexEx` n

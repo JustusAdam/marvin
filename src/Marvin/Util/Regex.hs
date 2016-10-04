@@ -15,8 +15,8 @@ module Marvin.Util.Regex
 
 
 import           ClassyPrelude
+import           Data.Text.ICU (MatchOption (..))
 import qualified Data.Text.ICU as Re
-import Data.Text.ICU (MatchOption(..))
 
 
 -- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'.

@@ -7,7 +7,7 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 
-This is provisionary, this might get properly wrapped at some point. 
+This is provisionary, this might get properly wrapped at some point.
 -}
 module Marvin.Util.JSON
     ( module Data.Aeson
@@ -15,5 +15,5 @@ module Marvin.Util.JSON
     ) where
 
 
-import Data.Aeson
-import Data.Aeson.TH
+import           Data.Aeson
+import           Data.Aeson.TH

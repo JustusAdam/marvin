@@ -20,7 +20,7 @@ import           Marvin.Adapter          (IsAdapter)
 import qualified Marvin.Adapter          as A
 import           Marvin.Internal.Types
 import           Marvin.Util.Logging
-import           Marvin.Util.Regex            (Match, Regex)
+import           Marvin.Util.Regex       (Match, Regex)
 
 
 
@@ -248,7 +248,7 @@ requireAppConfigVal name = do
 
 
 extractReaction :: BotReacting a s o -> BotReacting a s (IO o)
-extractReaction reac = BotReacting $ do 
+extractReaction reac = BotReacting $ do
     s <- get
     return $ evalStateT (runReaction reac) s
 
