@@ -21,6 +21,8 @@ module Marvin
     , getConfigVal, requireConfigVal
     , BotReacting, HasMessage, HasMatch
     , MessageReactionData, messageField, matchField
+    -- ** Advanced actions
+    , extractAction, extractReaction
     ) where
 
 
