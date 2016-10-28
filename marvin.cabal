@@ -1,5 +1,5 @@
 name:                marvin
-version:             0.1
+version:             0.0.1
 synopsis:            A modular bot for slack
 description:         Please see README.md
 homepage:            https://github.com/JustusAdam/marvin#readme
@@ -10,7 +10,7 @@ maintainer:          dev@justus.science
 copyright:           Copyright: (c) 2016 Justus Adam
 category:            Development
 build-type:          Simple
-extra-source-files:  app/Main.mustache
+extra-source-files:  preprocessor/Main.mustache
 data-dir:            resources
 data-files:          initializer/*.hs.mustache
                      initializer/config.cfg.mustache
@@ -61,7 +61,7 @@ library
                      , NoImplicitPrelude
 
 executable marvin-pp
-  hs-source-dirs:      app
+  hs-source-dirs:      preprocessor
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
