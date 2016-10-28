@@ -1,5 +1,8 @@
 # Marvin, the paranoid bot (⍺ stage)
 
+[![Travis](https://travis-ci.org/JustusAdam/marvin.svg?branch=master)]()
+[![Hackage](https://img.shields.io/hackage/v/marvin.svg)]()
+
 Marvin is an attempt to combine the ease of use of [hubot](https://hubot.github.com) with the typesafety and easy syntax of Haskell and the performance gains from compiled languages.
 
 ## Installation
