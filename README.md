@@ -20,6 +20,7 @@ module MyScript where
 
 import Marvin.Prelude
 
+script :: IsAdapter a => ScriptInit a
 script = defineScript "my-script" $ do
     hear "I|i can't stand this (\w+)" $ do
         match <- getMatch
@@ -69,6 +70,7 @@ module MyScript where
 
 import Marvin.Prelude
 
+script :: IsAdapter a => ScriptInit a
 script = defineScript "my-script" $ do
     ...
 ```
@@ -169,13 +171,15 @@ Therefore you should be able to write your code as usual using the same function
 
 ### Utilities
 
+All these utilities are directly available to you if you import `Marvin.Prelude`.
+
 #### Regex
 
-Implemented in `Marvin`, documentation coming soon.
+Implemented in `Marvin.Util.Regex`, documentation coming soon.
 
 #### Mutable variables
 
-Implemented in `Marvin.Mutable`, documentation coming soon.
+Implementation started in `Marvin.Util.Mutable`, documentation coming soon.
 
 #### Format strings
 
@@ -187,12 +191,12 @@ Format strings use `{}` as placeholder and can be defined as literals `"Hello {}
 
 #### JSON
 
-Exposed in `Marvin` documentation coming soon. Until then refer to [aeson](https://hackage.haskell.org/package/aeson).
+Exposed in `Marvin.Util.JSON` documentation coming soon. Until then refer to [aeson](https://hackage.haskell.org/package/aeson).
 
 #### Logging
 
 Marvin comes with a logging facility built in. 
-`Marvin.Logging` (and `Marvin.Prelude`) expose the logging facility. 
+`Marvin.Util.Logging` expose the logging facility. 
 Several functions are available, depending on the urgency of your message, like `errorM`, `infoM` and `criticalM`.
 Logging messages made this way are automatically formatted and tagged with the scripts that reported them.
 
@@ -201,4 +205,8 @@ By default all logging messages with higher priority `NOTICE` or higher are show
 
 #### Random
 
-TODO
+Implemented in `Marvin.Util.Random`, documentation coming soon.
+
+#### HTTP
+
+Coarsely implemented in `Marvin.Util.HTTP`, documentation coming soon.
