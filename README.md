@@ -48,7 +48,7 @@ script = defineScript "my-script" $ do
 
 The best way to use Marvin is very much taken from hubot.
 
-Marvin composes of a collection of scripts which are reactions or actions on certain messages posted in slack.
+A Marvin instance composes of a collection of scripts which are reactions or actions on certain messages posted in slack.
 Each script is a Haskell source file. 
 They get compiled into one single static binary, which is a HTTP server that listens for slack's event calls.
 
@@ -156,10 +156,9 @@ adapter {
 
 ### Wiring manually
 
-Currently marvin only supports creating a HTTP server.
-You can create the server yourself with the `runServer` function.
-You'll want to collect all `ScriptInit` initializers and hand them to `runServer` which runs a server with the provided scripts.
-In the future it is planned to make the server more modular.
+How Marvin interacts with your chat program depends on the used Adapter.
+For instance the currently default `slack-rtm` adapter creates a (client) websocket connection with the slack API and listens to the events there.
+Other adapters may require to set up a server. 
 
 ### Why no prelude?
 

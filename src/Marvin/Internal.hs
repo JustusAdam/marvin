@@ -167,15 +167,6 @@ messageRoom room msg = do
     liftIO $ A.messageRoom a room msg
 
 
-    -- token <- requireAppConfigVal "token"
-    -- liftIO $ async $ post "https://slack.com/api/chat.postMessage"
-    --                     [ "token" := (token :: Text)
-    --                     , "channel" := roomname room
-    --                     , "text" := msg
-    --                     ]
-    -- return ()
-
-
 -- | Define a new script for marvin
 --
 -- You need to provide a ScriptId (which can simple be written as a non-empty string).
@@ -247,12 +238,18 @@ requireAppConfigVal name = do
     liftIO $ C.require cfg name
 
 
+-- | Take a reaction and produce an IO action with the same effect.
+-- Useful for creating actions which can be scheduled to execute a certain time or asynchronous.
+-- The idea is that one can conveniently send messages from inside a schedulable action.
 extractReaction :: BotReacting a s o -> BotReacting a s (IO o)
 extractReaction reac = BotReacting $ do
     s <- get
     return $ evalStateT (runReaction reac) s
 
 
+-- | Take an action and produce an IO action with the same effect.
+-- Useful for creating actions which can be scheduled to execute a certain time or asynchronous.
+-- The idea is that one can conveniently send messages from inside a schedulable action.
 extractAction :: BotReacting a () o -> ScriptDefinition a (IO o)
 extractAction ac = ScriptDefinition $ do
     a <- use adapter
