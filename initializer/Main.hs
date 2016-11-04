@@ -1,8 +1,8 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE RecordWildCards #-}
 module Main where
 
 import ClassyPrelude
-import Options.Generic
+import Options.Applicative
 import Paths_marvin
 import System.Directory
 import System.FilePath
@@ -13,11 +13,8 @@ import Text.Mustache.Types
 
 data Opts = Opts 
     { botname :: String
-    , adapter :: Maybe String
-    } deriving (Generic)
-
-
-instance ParseRecord Opts
+    , adapter :: String
+    }
 
 
 fromEither :: Show a => Either a b -> b
@@ -46,13 +43,13 @@ adType =
 
 main :: IO ()
 main = do
-    opts <- getRecord "Marvin init"
+    Opts{..} <- execParser infoParser
     d <- (</> "initializer") <$> getDataDir
-    unless ((== Just True) $ (`member` adType) <$> adapter opts) $ putStrLn "Unrecognized adapter"
+    unless (adapter `member` adType) $ putStrLn "Unrecognized adapter"
 
-    let subsData = object [ "name" ~> botname opts
-                          , "scriptsig" ~> maybe "IsAdapter a => ScriptInit a" ("ScriptInit " ++) (adapter opts >>= flip lookup adType)
-                          , "adapter" ~> adapter opts
+    let subsData = object [ "name" ~> botname
+                          , "scriptsig" ~> maybe "IsAdapter a => ScriptInit a" ("ScriptInit " ++) (lookup adapter adType)
+                          , "adapter" ~> adapter
                           ]
 
     for_ wantDirectories $ \dir -> do
@@ -68,3 +65,16 @@ main = do
             else copyFile source targetName
 
     return ()
+  where
+    infoParser = info 
+        (helper <*> optsParser) 
+        (fullDesc ++ header "marvin-init ~ make a new marvin project")
+    optsParser = Opts
+        <$> argument str (metavar "BOTNAME")
+        <*> strOption
+            (  long "adapter"
+            ++ short 'a'
+            ++ metavar "ID"
+            ++ value "slack-rtm"
+            ++ help "id of the adapter to use" )
+        

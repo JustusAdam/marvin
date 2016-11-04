@@ -45,7 +45,7 @@ main = do
   where
     infoParser = info 
         (helper <*> optsParser) 
-        (fullDesc ++ header "marvin-pp, the marvin preprocessor")
+        (fullDesc ++ header "marvin-pp ~ the marvin preprocessor")
     optsParser = Opts
         <$> strOption
             (  long "adapter"

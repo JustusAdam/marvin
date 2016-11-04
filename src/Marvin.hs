@@ -16,7 +16,7 @@ module Marvin
     , IsAdapter
       -- * Reacting
     , hear, respond, send, reply, messageRoom
-    , getMessage, getMatch
+    , getMessage, getMatch, getUserInfo
     , Message(..), User(..), Room(..)
     , getConfigVal, requireConfigVal
     , BotReacting, HasMessage, HasMatch
