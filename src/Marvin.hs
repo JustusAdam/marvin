@@ -17,7 +17,7 @@ module Marvin
       -- * Reacting
     , hear, respond, send, reply, messageRoom
     , getMessage, getMatch, getUserInfo
-    , Message(..), User(..), Room(..)
+    , Message(..), User(..), Room(..), UserInfo(..)
     , getConfigVal, requireConfigVal
     , BotReacting, HasMessage, HasMatch
     , MessageReactionData, messageField, matchField
