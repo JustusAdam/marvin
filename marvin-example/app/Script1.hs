@@ -1,6 +1,6 @@
 module Script1 where
-    
-import Marvin.Prelude
+
+import           Marvin.Prelude
 
 
 script = defineScript "script-1" $ do

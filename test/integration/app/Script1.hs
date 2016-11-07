@@ -12,5 +12,5 @@ script = defineScript "test" $ do
         msg <- getMessage
         infoM (content msg)
         send "Pong"
-    respond "hello" $ 
+    respond "hello" $
         reply "Hello to you too"

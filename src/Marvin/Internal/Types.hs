@@ -41,7 +41,7 @@ data Message = Message
 
 instance FromJSON TimeStamp where
     parseJSON (String s) = maybe mzero (return . TimeStamp) $ readMay s
-    parseJSON _ = mzero
+    parseJSON _          = mzero
 
 instance ToJSON TimeStamp where
     toJSON = toJSON . show . unwrapTimeStamp
@@ -95,5 +95,5 @@ prioMapping = map ((pack . show) &&& id) [L.DEBUG, L.INFO, L.NOTICE, L.WARNING, 
 
 instance C.Configured L.Priority where
     convert (C.String s) = lookup (toUpper s) prioMapping
-    convert _ = Nothing
+    convert _            = Nothing
 

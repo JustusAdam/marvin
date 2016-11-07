@@ -89,7 +89,7 @@ mkApp scripts cfg adapter = handler
             catMaybes <$> for things (\(trigger, action) ->
                 case match trigger toMatch of
                         Nothing -> return Nothing
-                        Just m -> Just <$> async (action msg m))
+                        Just m  -> Just <$> async (action msg m))
 
     flattenActions = foldr $ \script -> flip (foldr (addAction script adapter)) (script^.actions)
 

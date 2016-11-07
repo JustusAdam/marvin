@@ -1,19 +1,19 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 import           ClassyPrelude
+import           Data.Aeson            hiding (object)
+import           Options.Applicative
 import           System.Directory
 import           System.FilePath
 import           Text.Mustache
 import           Text.Mustache.Compile
-import           Options.Applicative
-import Data.Aeson hiding (object)
 
 
-data Opts = Opts 
-    { adapter :: String
-    , sourceName :: FilePath
-    , sourceLocation :: FilePath
-    , targetFile :: FilePath
+data Opts = Opts
+    { adapter         :: String
+    , sourceName      :: FilePath
+    , sourceLocation  :: FilePath
+    , targetFile      :: FilePath
     , externalScripts :: FilePath
     }
 
@@ -49,12 +49,12 @@ main = do
         processed = substitute tpl (object [ "scripts" ~> intercalate ", " (map (++ ".script") scripts)
                                             , "imports" ~> scripts
                                             , "adapter-import" ~> adapterImport
-                                            , "adapter-type" ~> adapterType 
+                                            , "adapter-type" ~> adapterType
                                             ])
     writeFile targetFile processed
   where
-    infoParser = info 
-        (helper <*> optsParser) 
+    infoParser = info
+        (helper <*> optsParser)
         (fullDesc ++ header "marvin-pp ~ the marvin preprocessor")
     optsParser = Opts
         <$> strOption
@@ -68,7 +68,7 @@ main = do
         <*> argument str (metavar "NAME")
         <*> argument str (metavar "PATH")
         <*> argument str (metavar "PATH")
-        <*> strOption 
+        <*> strOption
             (  long "external-scripts"
             ++ short 's'
             ++ value "external-scripts.json"

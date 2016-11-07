@@ -29,7 +29,7 @@ data InternalType
 
 instance FromJSON URI where
     parseJSON (String t) = maybe mzero return $ parseURI $ unpack t
-    parseJSON _ = mzero
+    parseJSON _          = mzero
 
 
 instance ToJSON URI where
@@ -144,13 +144,13 @@ userInfoParser (Object o) = do
     usr <- o .: "user"
     case usr of
         (Object o) -> UserInfo <$> o .: "name" <*> o .: "id"
-        _ -> mzero
+        _          -> mzero
 userInfoParser _ = mzero
 
 
 apiResponseParser :: (Value -> Parser a) -> Value -> Parser (APIResponse a)
 apiResponseParser f v@(Object o) = APIResponse <$> o .: "ok" <*> f v
-apiResponseParser _ _ = mzero
+apiResponseParser _ _            = mzero
 
 
 runConnectionLoop :: C.Config -> MVar BS.ByteString -> MVar Connection -> IO ()
@@ -170,7 +170,7 @@ runConnectionLoop cfg messageChan connTracker = forever $ do
                     return 443
             port <- case uriPort authority of
                         v@(':':r) -> maybe (portOnErr v) return $ readMay r
-                        v -> portOnErr v
+                        v         -> portOnErr v
             debugM pa $ "connecting to socket '" ++ showt uri ++ "'"
             catch
                 (runSecureClient host port path $ \conn -> do

@@ -1,35 +1,35 @@
 {-# LANGUAGE RecordWildCards #-}
 module Main where
 
-import ClassyPrelude
-import Options.Applicative
-import Paths_marvin
-import System.Directory
-import System.FilePath
-import Text.Mustache.Compile
-import Text.Mustache.Render
-import Text.Mustache.Types
+import           ClassyPrelude
+import           Options.Applicative
+import           Paths_marvin
+import           System.Directory
+import           System.FilePath
+import           Text.Mustache.Compile
+import           Text.Mustache.Render
+import           Text.Mustache.Types
 
 
-data Opts = Opts 
+data Opts = Opts
     { botname :: String
     , adapter :: String
     }
 
 
 fromEither :: Show a => Either a b -> b
-fromEither (Left e) = error $ "Was left: " ++ show e
+fromEither (Left e)  = error $ "Was left: " ++ show e
 fromEither (Right v) = v
 
 
 wantDirectories :: [FilePath]
-wantDirectories = 
+wantDirectories =
     [ "bot" ]
 
 
 wantFiles :: [(FilePath, Template)]
 wantFiles = map (second $ fromEither . compileTemplate "")
-    [ ("Main.hs.mustache", "bot/Main.hs") 
+    [ ("Main.hs.mustache", "bot/Main.hs")
     , ("MyScript.hs.mustache", "bot/MyScript.hs")
     , ("config.cfg.mustache", "config.cfg")
     , ("bot.cabal.mustache", "{{name}}.cabal")
@@ -61,13 +61,13 @@ main = do
         if ".mustache" == takeExtension source
             then do
                 tpl <- fromEither <$> automaticCompile [d] source
-                writeFile targetName $ substituteValue tpl subsData 
+                writeFile targetName $ substituteValue tpl subsData
             else copyFile source targetName
 
     return ()
   where
-    infoParser = info 
-        (helper <*> optsParser) 
+    infoParser = info
+        (helper <*> optsParser)
         (fullDesc ++ header "marvin-init ~ make a new marvin project")
     optsParser = Opts
         <$> argument str (metavar "BOTNAME")
@@ -77,4 +77,4 @@ main = do
             ++ metavar "ID"
             ++ value "slack-rtm"
             ++ help "id of the adapter to use" )
-        
+
