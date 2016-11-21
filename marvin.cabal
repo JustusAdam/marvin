@@ -69,6 +69,8 @@ executable marvin-pp
                      , mustache
                      , directory
                      , filepath
+                     , marvin
+                     , configurator
                      , optparse-applicative
                      , aeson
   default-language:    Haskell2010

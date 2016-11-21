@@ -2,19 +2,22 @@
 {-# LANGUAGE TemplateHaskell #-}
 import           ClassyPrelude
 import           Data.Aeson            hiding (object)
-import           Options.Applicative
 import           System.Directory
 import           System.FilePath
 import           Text.Mustache
 import           Text.Mustache.Compile
+import           Options.Applicative
+import qualified Data.Configurator as C
+import Marvin.Run (defaultConfigName, lookupFromAppConfig)
 
 
 data Opts = Opts
-    { adapter         :: String
+    { adapter         :: Maybe String
     , sourceName      :: FilePath
     , sourceLocation  :: FilePath
     , targetFile      :: FilePath
     , externalScripts :: FilePath
+    , configLocation  :: Maybe FilePath
     }
 
 
@@ -33,6 +36,16 @@ tpl = $(embedTemplate ["preprocessor"] "Main.mustache")
 main :: IO ()
 main = do
     Opts{..} <- execParser infoParser
+
+    (adapterImport, adapterType) <- maybe 
+        (do
+            (cfg, _) <- autoReload autoConfig [Optional configLocation]
+            fromConf <- lookupFromAppConfig cfg "adapter"
+            return $ fromMaybe slackRtmData $ fromConf >>= flip lookup adapters
+        ) 
+        return 
+        adapter
+
     let dir = takeDirectory sourceName
     paths <- filter (not . ((||) <$> isPrefixOf "_" <*> isPrefixOf ".")) <$> getDirectoryContents dir
     files <- filterM (doesFileExist . (dir </>)) paths
@@ -57,13 +70,13 @@ main = do
         (helper <*> optsParser)
         (fullDesc ++ header "marvin-pp ~ the marvin preprocessor")
     optsParser = Opts
-        <$> strOption
-            (  long "adapter"
-            ++ short 'a'
-            ++ value "slack-rtm"
-            ++ metavar "ID"
-            ++ help "adapter to use"
-            ++ showDefault
+        <$> optional 
+            (strOption
+                $  long "adapter"
+                ++ short 'a'
+                ++ metavar "ID"
+                ++ help "adapter to use"
+                ++ showDefault
             )
         <*> argument str (metavar "NAME")
         <*> argument str (metavar "PATH")
@@ -75,4 +88,12 @@ main = do
             ++ metavar "PATH"
             ++ help "config file of external scripts to load"
             ++ showDefault
+            )
+        <*> strOption
+            (  long "config-location"
+            ++ short 'c'
+            ++ metavar "PATH"
+            ++ help "config to use"
+            ++ showDefault
+            ++ value defaultConfigName
             )

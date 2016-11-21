@@ -17,6 +17,7 @@ Portability : POSIX
 {-# LANGUAGE TemplateHaskell        #-}
 module Marvin.Run
     ( runMarvin, ScriptInit, IsAdapter
+    , requireFromAppConfig, lookupFromAppConfig, defaultConfigName
     ) where
 
 
@@ -52,6 +53,10 @@ instance ParseRecord CmdOptions
 
 defaultBotName :: Text
 defaultBotName = "marvin"
+
+
+defaultConfigName :: FilePath
+defaultConfigName = "config.cfg"
 
 
 requireFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO a
@@ -158,7 +163,7 @@ runMarvin s' = do
     when (verbose args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.INFO)
     when (debug args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.DEBUG)
     cfgLoc <- maybe
-                (L.noticeM "bot" "Using default config: config.cfg" >> return "config.cfg")
+                (L.noticeM "bot" "Using default config: config.cfg" >> return defaultConfigName)
                 return
                 (configPath args)
     (cfg, cfgTid) <- C.autoReload C.autoConfig [C.Required cfgLoc]
