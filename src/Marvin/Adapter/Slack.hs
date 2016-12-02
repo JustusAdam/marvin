@@ -36,50 +36,6 @@ instance ToJSON URI where
     toJSON = toJSON . show
 
 
-
--- data BotData = BotData
---     { botId :: Text
---     , notName :: Text
---     , botCreated :: UTCTime
---     }
-
--- {
---     "ok": true,
---     "url": "wss:\/\/ms9.slack-msgs.com\/websocket\/7I5yBpcvk",
-
---     "self": {
---         "id": "U023BECGF",
---         "name": "bobby",
---         "prefs": {
---             …
---         },
---         "created": 1402463766,
---         "manual_presence": "active"
---     },
---     "team": {
---         "id": "T024BE7LD",
---         "name": "Example Team",
---         "email_domain": "",
---         "domain": "example",
---         "icon": {
---             …
---         },
---         "msg_edit_window_mins": -1,
---         "over_storage_limit": false
---         "prefs": {
---             …
---         },
---         "plan": "std"
---     },
---     "users": [ … ],
-
---     "channels": [ … ],
---     "groups": [ … ],
---     "mpims": [ … ],
---     "ims": [ … ],
-
---     "bots": [ … ],
--- }
 data RTMData = RTMData
     { ok  :: Bool
     , url :: URI
@@ -153,6 +109,15 @@ apiResponseParser f v@(Object o) = APIResponse <$> o .: "ok" <*> f v
 apiResponseParser _ _            = mzero
 
 
+data SlackRTMAdapter = SlackRTMAdapter
+    { sendMessage :: BS.ByteString -> IO ()
+    , userConfig  :: C.Config
+    , midTracker  :: MVar Int
+    , channelChache :: MVar (HashMap Room LimitedChannelInfo)
+    , userInfoCache :: MVar (HashMap User UserInfo)
+    }
+
+
 runConnectionLoop :: C.Config -> MVar BS.ByteString -> MVar Connection -> IO ()
 runConnectionLoop cfg messageChan connTracker = forever $ do
     token <- C.require cfg "token"
@@ -217,7 +182,7 @@ runnerImpl cfg handlerInit = do
     let send d = do
             conn <- readMVar connTracker
             sendTextData conn d
-        adapter = SlackRTMAdapter send cfg midTracker
+    adapter <- SlackRTMAdapter send cfg midTracker <$> newMVar mempty <*> newMVar mempty
     handler <- handlerInit adapter
     void $ async $ runConnectionLoop cfg messageChan connTracker
     runHandlerLoop adapter messageChan handler
@@ -251,24 +216,59 @@ messageRoomImpl adapter (Room room) msg = do
                 ]
 
 
-getUserInfoImpl :: SlackRTMAdapter -> User -> IO (Maybe UserInfo)
-getUserInfoImpl adapter (User user) = do
-    usr <- execAPIMethod userInfoParser adapter "users.info" ["user" := user]
-    case usr of
-        Left err -> errorM adapter ("Parse error when getting user data " ++ pack err) >> return Nothing
-        Right (APIResponse True v) -> return (Just v)
-        Right (APIResponse False _) -> errorM adapter "Server denied getting user info request" >> return Nothing
-
-
-data SlackRTMAdapter = SlackRTMAdapter
-    { sendMessage :: BS.ByteString -> IO ()
-    , userConfig  :: C.Config
-    , midTracker  :: MVar Int
+data UserInfo = UserInfo
+    { uiUsername :: Text
+    , uiId :: User
     }
+
+
+getUserInfoImpl :: SlackRTMAdapter -> User -> IO UserInfo
+getUserInfoImpl adapter user@(User user') = do
+    uc <- readMVar $ userInfoCache adapter
+    maybe refreshAndReturn return $ lookup user uc
+  where
+    refreshAndReturn = do
+        usr <- execAPIMethod userInfoParser adapter "users.info" ["user" := user']
+        case usr of
+            Left err -> error ("Parse error when getting user data " ++ err)
+            Right (APIResponse True v) -> do
+                modifyMVar_ (userInfoCache adapter) (return . insertMap user v) 
+                return v
+            Right (APIResponse False _) -> error "Server denied getting user info request" 
+
+
+data LimitedChannelInfo = LimitedChannelInfo
+    { lciId :: Room
+    , lciName :: Text
+    }
+
+lciParser (Object o) = LimitedChannelInfo <$> o .: "id" <*> o .: "name"
+lciParser _ = mzero
+
+
+lciListParser (Array a) = toList <$> mapM lciParser a
+lciListParser _ = mzero
+
+getChannelNameImpl :: SlackRTMAdapter -> Room -> IO Text
+getChannelNameImpl adapter channel = do
+    cc <- readMVar $ channelChache adapter
+    maybe refreshAndReturn return $ lciName <$> lookup channel cc
+  where
+    refreshAndReturn = do
+        usr <- execAPIMethod lciListParser adapter "channels.list" []
+        case usr of
+            Left err -> error ("Parse error when getting channel data " ++ err)
+            Right (APIResponse True v) -> do
+                let cmap = mapFromList $ map (lciId &&& id) v
+                putMVar (channelChache adapter) cmap
+                return $ lciName $ fromMaybe (error "Room not found") $ lookup channel cmap
+            Right (APIResponse False _) -> error "Server denied getting channel info request" 
 
 
 instance IsAdapter SlackRTMAdapter where
     adapterId = "slack-rtm"
     messageRoom = messageRoomImpl
-    getUserInfo = getUserInfoImpl
     runWithAdapter = runnerImpl
+    getUsername a = fmap uiUsername . getUserInfoImpl a
+    getChannelName = getChannelNameImpl
+    

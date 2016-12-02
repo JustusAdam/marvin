@@ -107,6 +107,18 @@ instance IsScript (ScriptDefinition a) where
 instance IsScript (BotReacting a b) where
     getScriptId = BotReacting $ use scriptId
 
+class AccessAdapter m where
+    type AdapterT m
+    getAdapter :: m (AdapterT m)
+
+instance AccessAdapter (ScriptDefinition a) where
+    type AdapterT (ScriptDefinition a) = a
+    getAdapter = ScriptDefinition $ use adapter
+
+instance AccessAdapter (BotReacting a b) where
+    type AdapterT (BotReacting a b) = a
+    getAdapter = BotReacting $ use adapter
+
 getSubConfFor :: HasConfigAccess m => ScriptId -> m C.Config
 getSubConfFor (ScriptId name) = C.subconfig ("script." ++ name) <$> getConfigInternal
 
@@ -139,13 +151,19 @@ respond !re = addReaction (Respond re)
 send :: (IsAdapter a, HasMessage m) => Text -> BotReacting a m ()
 send msg = do
     o <- getMessage
-    messageRoom (channel o) msg
+    messageRoom (channel o) msg 
 
 
-getUserInfo :: IsAdapter a => User -> BotReacting a m (Maybe UserInfo)
-getUserInfo u = do
-    a <- BotReacting $ use adapter
-    liftIO $ A.getUserInfo a u
+getUsername :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User -> m Text
+getUsername usr = do
+    a <- getAdapter
+    liftIO $ A.getUsername a usr
+
+
+getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Room -> m Text
+getChannelName rm = do
+    a <- getAdapter
+    liftIO $ A.getChannelName a rm
 
 
 -- | Send a message to the channel the original message came from and address the user that sent the original message.
@@ -154,16 +172,14 @@ getUserInfo u = do
 reply :: (IsAdapter a, HasMessage m) => Text -> BotReacting a m ()
 reply msg = do
     om <- getMessage
-    user <- getUserInfo $ sender om
-    case user of
-        Nothing -> errorM "Message sender has no info, message was not sent"
-        Just user -> send $ username user ++ " " ++ msg
+    user <- getUsername $ sender om    
+    send $ user ++ " " ++ msg
 
 
 -- | Send a message to a room
-messageRoom :: IsAdapter a => Room -> Text -> BotReacting a s ()
+messageRoom :: (IsAdapter (AdapterT m), AccessAdapter m, MonadIO m) => Room -> Text -> m ()
 messageRoom room msg = do
-    a <- BotReacting $ use adapter
+    a <- getAdapter
     liftIO $ A.messageRoom a room msg
 
 

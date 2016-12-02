@@ -14,18 +14,12 @@ import qualified Data.Configurator.Types as C
 import qualified System.Log.Logger       as L
 
 
-newtype User = User Text deriving (IsString, Eq)
-newtype Room = Room Text deriving (IsString, Eq, Show)
+newtype User = User Text deriving (IsString, Eq, Hashable)
+newtype Room = Room Text deriving (IsString, Eq, Show, Hashable)
 
 
 deriveJSON defaultOptions { unwrapUnaryRecords = True } ''User
 deriveJSON defaultOptions { unwrapUnaryRecords = True } ''Room
-
-
-data UserInfo = UserInfo
-    { username :: Text
-    , userID   :: User
-    }
 
 
 newtype TimeStamp = TimeStamp { unwrapTimeStamp :: Double } deriving Show
