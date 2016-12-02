@@ -148,19 +148,21 @@ respond !re = addReaction (Respond re)
 -- | Send a message to the channel the triggering message came from.
 --
 -- Equivalent to "robot.send" in hubot
-send :: (IsAdapter a, HasMessage m) => Text -> BotReacting a m ()
+send :: (IsAdapter a, HasMessage m) => LText -> BotReacting a m ()
 send msg = do
     o <- getMessage
     messageRoom (channel o) msg 
 
 
-getUsername :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User -> m Text
+-- | Get the username of a registered user.
+getUsername :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User -> m LText
 getUsername usr = do
     a <- getAdapter
     liftIO $ A.getUsername a usr
 
 
-getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Room -> m Text
+-- | Get the human readable name of a channel.
+getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Room -> m LText
 getChannelName rm = do
     a <- getAdapter
     liftIO $ A.getChannelName a rm
@@ -169,7 +171,7 @@ getChannelName rm = do
 -- | Send a message to the channel the original message came from and address the user that sent the original message.
 --
 -- Equivalent to "robot.reply" in hubot
-reply :: (IsAdapter a, HasMessage m) => Text -> BotReacting a m ()
+reply :: (IsAdapter a, HasMessage m) => LText -> BotReacting a m ()
 reply msg = do
     om <- getMessage
     user <- getUsername $ sender om    
@@ -177,7 +179,7 @@ reply msg = do
 
 
 -- | Send a message to a room
-messageRoom :: (IsAdapter (AdapterT m), AccessAdapter m, MonadIO m) => Room -> Text -> m ()
+messageRoom :: (IsAdapter (AdapterT m), AccessAdapter m, MonadIO m) => Room -> LText -> m ()
 messageRoom room msg = do
     a <- getAdapter
     liftIO $ A.messageRoom a room msg

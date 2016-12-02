@@ -21,9 +21,9 @@ import           Wuss
 data InternalType
     = Error
         { code :: Int
-        , msg  :: Text
+        , msg  :: LText
         }
-    | Unhandeled Text
+    | Unhandeled LText
     | Ignored
 
 
@@ -80,11 +80,11 @@ eventParser (Object o) = isErrParser <|> hasTypeParser
 eventParser _ = mzero
 
 
-rawBS :: BS.ByteString -> Text
-rawBS bs = "\"" ++ toStrict (decodeUtf8 bs) ++ "\""
+rawBS :: BS.ByteString -> LText
+rawBS bs = "\"" ++ decodeUtf8 bs ++ "\""
 
 
-showt :: Show a => a -> Text
+showt :: Show a => a -> LText
 showt = pack . show
 
 
@@ -192,7 +192,7 @@ execAPIMethod :: (Value -> Parser a) -> SlackRTMAdapter -> String -> [FormParam]
 execAPIMethod innerParser adapter method params = do
     token <- C.require cfg "token"
     response <- post ("https://slack.com/api/" ++ method) (("token" := (token :: Text)):params)
-    debugM adapter (toStrict $ decodeUtf8 $ response^.responseBody)
+    debugM adapter (decodeUtf8 $ response^.responseBody)
     return $ eitherDecode (response^.responseBody) >>= parseEither (apiResponseParser innerParser)
   where
     cfg = userConfig adapter
@@ -205,7 +205,7 @@ newMid SlackRTMAdapter{midTracker} = do
     return id
 
 
-messageRoomImpl :: SlackRTMAdapter -> Room -> Text -> IO ()
+messageRoomImpl :: SlackRTMAdapter -> Room -> LText -> IO ()
 messageRoomImpl adapter (Room room) msg = do
     mid <- newMid adapter
     sendMessage adapter $ encode $
@@ -217,7 +217,7 @@ messageRoomImpl adapter (Room room) msg = do
 
 
 data UserInfo = UserInfo
-    { uiUsername :: Text
+    { uiUsername :: LText
     , uiId :: User
     }
 
@@ -239,7 +239,7 @@ getUserInfoImpl adapter user@(User user') = do
 
 data LimitedChannelInfo = LimitedChannelInfo
     { lciId :: Room
-    , lciName :: Text
+    , lciName :: LText
     }
 
 lciParser (Object o) = LimitedChannelInfo <$> o .: "id" <*> o .: "name"
@@ -249,7 +249,7 @@ lciParser _ = mzero
 lciListParser (Array a) = toList <$> mapM lciParser a
 lciListParser _ = mzero
 
-getChannelNameImpl :: SlackRTMAdapter -> Room -> IO Text
+getChannelNameImpl :: SlackRTMAdapter -> Room -> IO LText
 getChannelNameImpl adapter channel = do
     cc <- readMVar $ channelChache adapter
     maybe refreshAndReturn return $ lciName <$> lookup channel cc
