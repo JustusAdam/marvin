@@ -33,7 +33,7 @@ instance Show Regex where
 
 
 -- | A match to a 'Regex'. Index 0 is the full match, all other indexes are match groups.
-type Match = [Text]
+type Match = [LText]
 
 -- | Compile a regex with options
 --
@@ -48,5 +48,5 @@ instance IsString Regex where
 
 
 -- | Match a regex against a string and return the first match found (if any).
-match :: Regex -> Text -> Maybe Match
-match re = fmap (Re.unfold Re.group) . Re.find (unwrapRegex re)
+match :: Regex -> LText -> Maybe Match
+match re = fmap (map fromStrict . Re.unfold Re.group) . Re.find (unwrapRegex re) . toStrict

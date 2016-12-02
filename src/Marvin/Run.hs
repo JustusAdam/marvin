@@ -83,8 +83,8 @@ mkApp scripts cfg adapter = handler
     handleMessage msg = do
         lDispatches <- doIfMatch allListens text
         botname <- fromMaybe defaultBotName <$> lookupFromAppConfig cfg "name"
-        let (trimmed, remainder) = splitAt (length botname) $ dropWhile isSpace text
-        rDispatches <- if toLower trimmed == toLower botname
+        let (trimmed, remainder) = splitAt (fromIntegral $ length botname) $ dropWhile isSpace text
+        rDispatches <- if toLower (toStrict trimmed) == toLower botname
                             then doIfMatch allReactions remainder
                             else return mempty
         mapM_ wait (lDispatches ++ rDispatches)

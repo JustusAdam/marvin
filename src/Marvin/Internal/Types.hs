@@ -28,7 +28,7 @@ newtype TimeStamp = TimeStamp { unwrapTimeStamp :: Double } deriving Show
 data Message = Message
     { sender    :: User
     , channel   :: Room
-    , content   :: Text
+    , content   :: LText
     , timestamp :: TimeStamp
     }
 
