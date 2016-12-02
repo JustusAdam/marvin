@@ -16,13 +16,13 @@ import           Marvin.Types
 import qualified System.Log.Logger as L
 
 
-scriptLog :: (MonadIO m, IsScript m) => (String -> String -> IO ()) -> Text -> m ()
+scriptLog :: (MonadIO m, IsScript m) => (String -> String -> IO ()) -> LText -> m ()
 scriptLog inner message = do
     (ScriptId sid) <- getScriptId
     liftIO $ inner (unpack $ "script." ++ sid) (unpack message)
 
 
-debugM, infoM, noticeM, warningM, errorM, criticalM, alertM, emergencyM :: (MonadIO m, IsScript m) => Text -> m ()
+debugM, infoM, noticeM, warningM, errorM, criticalM, alertM, emergencyM :: (MonadIO m, IsScript m) => LText -> m ()
 debugM = scriptLog L.debugM
 infoM = scriptLog L.infoM
 noticeM = scriptLog L.noticeM
@@ -33,5 +33,5 @@ alertM = scriptLog L.alertM
 emergencyM = scriptLog L.emergencyM
 
 
-logM :: (MonadIO m, IsScript m) => L.Priority -> Text -> m ()
+logM :: (MonadIO m, IsScript m) => L.Priority -> LText -> m ()
 logM prio = scriptLog (`L.logM` prio)
