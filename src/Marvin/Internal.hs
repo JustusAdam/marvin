@@ -151,7 +151,7 @@ respond !re = addReaction (Respond re)
 send :: (IsAdapter a, HasMessage m) => LText -> BotReacting a m ()
 send msg = do
     o <- getMessage
-    messageRoom (channel o) msg 
+    messageRoom (channel o) msg
 
 
 -- | Get the username of a registered user.
@@ -174,7 +174,7 @@ getChannelName rm = do
 reply :: (IsAdapter a, HasMessage m) => LText -> BotReacting a m ()
 reply msg = do
     om <- getMessage
-    user <- getUsername $ sender om    
+    user <- getUsername $ sender om
     send $ user ++ " " ++ msg
 
 

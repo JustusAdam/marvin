@@ -110,9 +110,9 @@ apiResponseParser _ _            = mzero
 
 
 data SlackRTMAdapter = SlackRTMAdapter
-    { sendMessage :: BS.ByteString -> IO ()
-    , userConfig  :: C.Config
-    , midTracker  :: MVar Int
+    { sendMessage   :: BS.ByteString -> IO ()
+    , userConfig    :: C.Config
+    , midTracker    :: MVar Int
     , channelChache :: MVar (HashMap Room LimitedChannelInfo)
     , userInfoCache :: MVar (HashMap User UserInfo)
     }
@@ -218,7 +218,7 @@ messageRoomImpl adapter (Room room) msg = do
 
 data UserInfo = UserInfo
     { uiUsername :: LText
-    , uiId :: User
+    , uiId       :: User
     }
 
 
@@ -232,13 +232,13 @@ getUserInfoImpl adapter user@(User user') = do
         case usr of
             Left err -> error ("Parse error when getting user data " ++ err)
             Right (APIResponse True v) -> do
-                modifyMVar_ (userInfoCache adapter) (return . insertMap user v) 
+                modifyMVar_ (userInfoCache adapter) (return . insertMap user v)
                 return v
-            Right (APIResponse False _) -> error "Server denied getting user info request" 
+            Right (APIResponse False _) -> error "Server denied getting user info request"
 
 
 data LimitedChannelInfo = LimitedChannelInfo
-    { lciId :: Room
+    { lciId   :: Room
     , lciName :: LText
     }
 
@@ -262,7 +262,7 @@ getChannelNameImpl adapter channel = do
                 let cmap = mapFromList $ map (lciId &&& id) v
                 putMVar (channelChache adapter) cmap
                 return $ lciName $ fromMaybe (error "Room not found") $ lookup channel cmap
-            Right (APIResponse False _) -> error "Server denied getting channel info request" 
+            Right (APIResponse False _) -> error "Server denied getting channel info request"
 
 
 instance IsAdapter SlackRTMAdapter where
@@ -271,4 +271,4 @@ instance IsAdapter SlackRTMAdapter where
     runWithAdapter = runnerImpl
     getUsername a = fmap uiUsername . getUserInfoImpl a
     getChannelName = getChannelNameImpl
-    
+

@@ -2,13 +2,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 import           ClassyPrelude
 import           Data.Aeson            hiding (object)
+import qualified Data.Configurator     as C
+import           Marvin.Run            (defaultConfigName, lookupFromAppConfig)
+import           Options.Applicative
 import           System.Directory
 import           System.FilePath
 import           Text.Mustache
 import           Text.Mustache.Compile
-import           Options.Applicative
-import qualified Data.Configurator as C
-import Marvin.Run (defaultConfigName, lookupFromAppConfig)
 
 
 data Opts = Opts
@@ -37,15 +37,15 @@ main :: IO ()
 main = do
     Opts{..} <- execParser infoParser
 
-    adapter' <- maybe 
+    adapter' <- maybe
         (do
             (cfg, _) <- C.autoReload C.autoConfig $ maybe [] (return . C.Optional) configLocation
             lookupFromAppConfig cfg "adapter"
         )
         (return . return)
         adapter
-    
-    let (adapterImport, adapterType) = fromMaybe slackRtmData $ adapter' >>= flip lookup adapters 
+
+    let (adapterImport, adapterType) = fromMaybe slackRtmData $ adapter' >>= flip lookup adapters
 
     let dir = takeDirectory sourceName
     paths <- filter (not . ((||) <$> isPrefixOf "_" <*> isPrefixOf ".")) <$> getDirectoryContents dir
@@ -70,7 +70,7 @@ main = do
         (helper <*> optsParser)
         (fullDesc ++ header "marvin-pp ~ the marvin preprocessor")
     optsParser = Opts
-        <$> optional 
+        <$> optional
             (strOption
                 $  long "adapter"
                 ++ short 'a'
@@ -89,7 +89,7 @@ main = do
             ++ help "config file of external scripts to load"
             ++ showDefault
             )
-        <*> optional 
+        <*> optional
             (strOption
             $  long "config-location"
             ++ short 'c'
