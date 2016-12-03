@@ -37,14 +37,15 @@ main :: IO ()
 main = do
     Opts{..} <- execParser infoParser
 
-    (adapterImport, adapterType) <- maybe 
+    adapter' <- maybe 
         (do
-            (cfg, _) <- autoReload autoConfig [Optional configLocation]
-            fromConf <- lookupFromAppConfig cfg "adapter"
-            return $ fromMaybe slackRtmData $ fromConf >>= flip lookup adapters
-        ) 
-        return 
+            (cfg, _) <- C.autoReload C.autoConfig $ maybe [] (return . C.Optional) configLocation
+            lookupFromAppConfig cfg "adapter"
+        )
+        (return . return)
         adapter
+    
+    let (adapterImport, adapterType) = fromMaybe slackRtmData $ adapter' >>= flip lookup adapters 
 
     let dir = takeDirectory sourceName
     paths <- filter (not . ((||) <$> isPrefixOf "_" <*> isPrefixOf ".")) <$> getDirectoryContents dir
@@ -58,7 +59,6 @@ main = do
             else return mempty
     let hsFiles = map dropExtensions $ filter (/= takeFileName sourceName) $ filter ((`elem` [".hs", ".lhs"]) . takeExtension) files
         scripts = hsFiles ++ externals
-        (adapterImport, adapterType) = fromMaybe slackRtmData $ lookup adapter adapters
         processed = substitute tpl (object [ "scripts" ~> intercalate ", " (map (++ ".script") scripts)
                                             , "imports" ~> scripts
                                             , "adapter-import" ~> adapterImport
@@ -89,8 +89,9 @@ main = do
             ++ help "config file of external scripts to load"
             ++ showDefault
             )
-        <*> strOption
-            (  long "config-location"
+        <*> optional 
+            (strOption
+            $  long "config-location"
             ++ short 'c'
             ++ metavar "PATH"
             ++ help "config to use"

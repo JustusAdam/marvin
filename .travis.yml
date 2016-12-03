@@ -6,6 +6,20 @@ cache:
   directories:
   - $HOME/.stack
 
+addons:
+  apt:
+    packages:
+    - g++ 
+    - gcc
+    - libc6-dev
+    - libffi-dev
+    - libgmp-dev
+    - make
+    - xz-utils
+    - zlib1g-dev
+    - git
+    - gnupg
+
 before_install:
 # Download and unpack the stack executable
 - mkdir -p ~/.local/bin
