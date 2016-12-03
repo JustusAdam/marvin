@@ -10,7 +10,8 @@ maintainer:          dev@justus.science
 copyright:           Copyright: (c) 2016 Justus Adam
 category:            Development
 build-type:          Simple
-extra-source-files:  preprocessor/Main.mustache
+extra-source-files:  README.md
+                   , preprocessor/Main.mustache
 data-dir:            resources
 data-files:          initializer/*.hs.mustache
                      initializer/config.cfg.mustache
