@@ -7,8 +7,11 @@ Marvin is an attempt to combine the ease of use of [hubot](https://hubot.github.
 
 ## Installation
 
-Marvin is not on Hackage yet, so to get it you can use [stack](https://docs.haskellstack.org) and add this repository to your `stack.yaml` file.
-Stack will take care of downloading and building it for you then.
+You can get a release version of marvin on [Hackage](https://hackage.haskell.org/package/marvin).
+
+However this library is still a very early stage so you might want to get updates quicker. 
+You can do so by using [stack](https://docs.haskellstack.org) and adding a recent commit of this repository to your `stack.yaml` file.
+Stack will take care of downloading and building it for you.
 
 For the regex module marvin further requires the `-dev` version of the `icu` library.
 
@@ -165,12 +168,12 @@ Other adapters may require to set up a server.
 To be more efficient this library uses the `Text` type for strings, rather than Haskells `String`.
 Most of the usual prelude functions work only on lists/strings but not `Text`.
 Plus the Haskell prelude is quite bad.
-Marvin therefore exports the `ClassyPrelude` as well wich exports sequence manipulation operations that work on lists and strings as well as text and have the same name as the prelude functions.
-Therefore you should be able to write your code as usual using the same functions you would in prelude.
+`Marvin.Prelude` therefore exports the `ClassyPrelude` as well wich contains sequence manipulation operations that work on lists and `String`s as well as `Text` and have the same names as the functions from Haskells standard `Prelude`.
+Therefore you should be able to write your code as usual using functions with the same names.
 
 ### Utilities
 
-All these utilities are directly available to you if you import `Marvin.Prelude`.
+All these utilities are already available to you if you import `Marvin.Prelude`.
 
 #### Regex
 
@@ -182,7 +185,7 @@ Implementation started in `Marvin.Util.Mutable`, documentation coming soon.
 
 #### Format strings
 
-Due to the lack of good format string libraries in haskell which work with efficient strings (`Text`) marvin includes a simple format string library.
+Due to the lack of good format string libraries in Haskell which work with efficient strings (`Text`) marvin includes a simple format string library.
 
 Format strings use `{}` as placeholder and can be defined as literals `"Hello {}, have a good {}"`. Substitution is done with `format` which accepts lists, tuples etc as input. Placeholders are replaced by index.
 
@@ -199,7 +202,9 @@ Marvin comes with a logging facility built in.
 Several functions are available, depending on the urgency of your message, like `errorM`, `infoM` and `criticalM`.
 Logging messages made this way are automatically formatted and tagged with the scripts that reported them.
 
-By default all logging messages with higher priority `NOTICE` or higher are shown. Using the command line parameter `verbose` also adds `INFO` messages and `debug` adds `DEBUG` messages. You can select the exact logging level in your config file (see also [configuration](#configuration)).
+By default all logging messages with higher priority `NOTICE` or higher are shown. 
+Using the command line parameter `verbose` also adds `INFO` messages and `debug` adds `DEBUG` messages.
+You can select the exact logging level in your config file (see also [configuration](#configuration)).
  
 
 #### Random
