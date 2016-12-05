@@ -51,7 +51,7 @@ data CmdOptions = CmdOptions
 instance ParseRecord CmdOptions
 
 
-defaultBotName :: Text
+defaultBotName :: String
 defaultBotName = "marvin"
 
 
@@ -84,7 +84,7 @@ mkApp scripts cfg adapter = handler
         lDispatches <- doIfMatch allListens text
         botname <- fromMaybe defaultBotName <$> lookupFromAppConfig cfg "name"
         let (trimmed, remainder) = splitAt (fromIntegral $ length botname) $ dropWhile isSpace text
-        rDispatches <- if toLower (toStrict trimmed) == toLower botname
+        rDispatches <- if toLower trimmed == toLower botname
                             then doIfMatch allReactions remainder
                             else return mempty
         mapM_ wait (lDispatches ++ rDispatches)
@@ -92,7 +92,7 @@ mkApp scripts cfg adapter = handler
         text = content msg
         doIfMatch things toMatch  =
             catMaybes <$> for things (\(trigger, action) ->
-                case match trigger toMatch of
+                case match [] trigger toMatch of
                         Nothing -> return Nothing
                         Just m  -> Just <$> async (action msg m))
 
