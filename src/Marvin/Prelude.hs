@@ -23,6 +23,8 @@ module Marvin.Prelude
     , module Marvin.Util.JSON
     -- | Format strings which resolve to efficient Strings, aka 'Text'
     , module Text.Printf
+    -- | Arbitrary IO in scripts
+    , MonadIO, liftIO
     ) where
 
 import           Marvin
@@ -32,3 +34,4 @@ import           Marvin.Util.Mutable
 import           Marvin.Util.Random
 import           Marvin.Util.Regex
 import           Text.Printf
+import Control.Monad.IO.Class (MonadIO, liftIO)

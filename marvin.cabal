@@ -75,6 +75,9 @@ executable marvin-pp
                      , marvin
                      , configurator
                      , optparse-applicative
+                     , bytestring
+                     , mono-traversable
+                     , text
                      , aeson
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
@@ -93,6 +96,8 @@ executable marvin-init
                      , directory
                      , filepath
                      , optparse-applicative
+                     , mono-traversable
+                     , text
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies
