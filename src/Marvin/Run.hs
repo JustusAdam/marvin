@@ -21,25 +21,29 @@ module Marvin.Run
     ) where
 
 
-import           ClassyPrelude
-import           Control.Concurrent.Async  (wait)
+import           Control.Concurrent.Async  (async, wait)
+import           Control.Exception
 import           Control.Lens              hiding (cons)
 import           Control.Monad.State       hiding (mapM_)
 import           Data.Char                 (isSpace)
 import qualified Data.Configurator         as C
 import qualified Data.Configurator.Types   as C
+import           Data.Maybe                (fromMaybe)
+import           Data.Sequences
+import           Data.Traversable          (for)
 import           Data.Vector               (Vector)
 import           Marvin.Adapter
 import           Marvin.Internal           hiding (match)
 import           Marvin.Internal.Types     hiding (channel)
 import           Marvin.Util.Regex
 import           Options.Generic
-import qualified Prelude                   as P
+import           Prelude                   hiding (dropWhile, splitAt, (++))
 import qualified System.Log.Formatter      as L
 import qualified System.Log.Handler.Simple as L
 import qualified System.Log.Logger         as L
 
-
+(++) :: Monoid a => a -> a -> a
+(++) = mappend
 
 data CmdOptions = CmdOptions
     { configPath :: Maybe FilePath
@@ -51,7 +55,7 @@ data CmdOptions = CmdOptions
 instance ParseRecord CmdOptions
 
 
-defaultBotName :: Text
+defaultBotName :: String
 defaultBotName = "marvin"
 
 
@@ -84,7 +88,7 @@ mkApp scripts cfg adapter = handler
         lDispatches <- doIfMatch allListens text
         botname <- fromMaybe defaultBotName <$> lookupFromAppConfig cfg "name"
         let (trimmed, remainder) = splitAt (fromIntegral $ length botname) $ dropWhile isSpace text
-        rDispatches <- if toLower (toStrict trimmed) == toLower botname
+        rDispatches <- if toLower trimmed == toLower botname
                             then doIfMatch allReactions remainder
                             else return mempty
         mapM_ wait (lDispatches ++ rDispatches)
@@ -92,7 +96,7 @@ mkApp scripts cfg adapter = handler
         text = content msg
         doIfMatch things toMatch  =
             catMaybes <$> for things (\(trigger, action) ->
-                case match trigger toMatch of
+                case match [] trigger toMatch of
                         Nothing -> return Nothing
                         Just m  -> Just <$> async (action msg m))
 
@@ -150,7 +154,7 @@ prepareLogger =
     handler = L.GenericHandler { L.priority = L.DEBUG
                                , L.formatter = L.simpleLogFormatter "$time [$prio:$loggername] $msg"
                                , L.privData = ()
-                               , L.writeFunc = const P.putStrLn
+                               , L.writeFunc = const putStrLn
                                , L.closeFunc = const $ return ()
                                }
 

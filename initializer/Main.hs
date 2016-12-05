@@ -1,9 +1,15 @@
 {-# LANGUAGE RecordWildCards #-}
 module Main where
 
-import           ClassyPrelude
+import           Control.Arrow         (second)
+import           Control.Monad
+import           Data.Containers
+import           Data.Foldable         (for_)
+import           Data.Sequences
+import qualified Data.Text.IO          as T
 import           Options.Applicative
 import           Paths_marvin
+import           Prelude               hiding (lookup)
 import           System.Directory
 import           System.FilePath
 import           Text.Mustache.Compile
@@ -18,7 +24,7 @@ data Opts = Opts
 
 
 fromEither :: Show a => Either a b -> b
-fromEither (Left e)  = error $ "Was left: " ++ show e
+fromEither (Left e)  = error $ "Was left: " <> show e
 fromEither (Right v) = v
 
 
@@ -48,7 +54,7 @@ main = do
     unless (adapter `member` adType) $ putStrLn "Unrecognized adapter"
 
     let subsData = object [ "name" ~> botname
-                          , "scriptsig" ~> maybe "IsAdapter a => ScriptInit a" ("ScriptInit " ++) (lookup adapter adType)
+                          , "scriptsig" ~> maybe "IsAdapter a => ScriptInit a" ("ScriptInit " <>) (lookup adapter adType)
                           , "adapter" ~> adapter
                           ]
 
@@ -61,20 +67,20 @@ main = do
         if ".mustache" == takeExtension source
             then do
                 tpl <- fromEither <$> automaticCompile [d] source
-                writeFile targetName $ substituteValue tpl subsData
+                T.writeFile targetName $ substituteValue tpl subsData
             else copyFile source targetName
 
     return ()
   where
     infoParser = info
         (helper <*> optsParser)
-        (fullDesc ++ header "marvin-init ~ make a new marvin project")
+        (fullDesc <> header "marvin-init ~ make a new marvin project")
     optsParser = Opts
         <$> argument str (metavar "BOTNAME")
         <*> strOption
             (  long "adapter"
-            ++ short 'a'
-            ++ metavar "ID"
-            ++ value "slack-rtm"
-            ++ help "id of the adapter to use" )
+            <> short 'a'
+            <> metavar "ID"
+            <> value "slack-rtm"
+            <> help "id of the adapter to use" )
 

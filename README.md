@@ -16,12 +16,10 @@ However this library is still a very early stage so you might want to get update
 You can do so by using [stack](https://docs.haskellstack.org) and adding a recent commit of this repository to your `stack.yaml` file.
 Stack will take care of downloading and building it for you.
 
-For the regex module marvin further requires the `-dev` version of the `icu` library.
 
 ## TLDR
 
 ```Haskell
-{-# LANGUAGE NoImplicitPrelude #-}
 module MyScript where
 
 import Marvin.Prelude
@@ -31,19 +29,19 @@ script = defineScript "my-script" $ do
     hear "I|i can't stand this (\w+)" $ do
         match <- getMatch
 
-        let thing = match `indexEx` 1
+        let thing = match !! 1
 
         reply $ "I'm sorry to tell you but you'll have to do " ++ thing
     
     respond "open the (\w+) door" $ do
         match <- getMatch
-        let door = match `indexEx` 1
+        let door = match !! 1
         openDoor door
-        send $ format "Door {} opened" [door]
+        send $ printf "Door %v opened" door
     
     respond "what is in file (\w+)" $ do
         match <- getMatch 
-        let file = match `indexEx` 1
+        let file = match !! 1
 
         liftIO $ readFile file
 
@@ -64,14 +62,11 @@ Defining scripts is very easy.
 
 Create a new Haskell source file like "MyScript.hs" and import marvins prelude `Marvin.Prelude`.
 This provides you with all the tools you need to interact with marvin.
-Since marvins prelude overwrites functions from the Haskell prelude you should hide the Haskell Prelude with either `{-# LANGUAGE NoImplicitPrelude #-}` at the top of the file or by using `import Prelude ()`.
-For more information why this is necessary see section [Why no prelude?](#why-no-prelude).
 
 Now you can start to define your script with `defineScript` which produces a script initializer.
 If you wish to use marvins automatic script discovery your script initializer should be named `script`  
 
 ```Haskell
-{-# LANGUAGE NoImplicitPrelude #-}
 module MyScript where
 
 import Marvin.Prelude
@@ -166,14 +161,6 @@ How Marvin interacts with your chat program depends on the used Adapter.
 For instance the currently default `slack-rtm` adapter creates a (client) websocket connection with the slack API and listens to the events there.
 Other adapters may require to set up a server. 
 
-### Why no prelude?
-
-To be more efficient this library uses the `Text` type for strings, rather than Haskells `String`.
-Most of the usual prelude functions work only on lists/strings but not `Text`.
-Plus the Haskell prelude is quite bad.
-`Marvin.Prelude` therefore exports the `ClassyPrelude` as well wich contains sequence manipulation operations that work on lists and `String`s as well as `Text` and have the same names as the functions from Haskells standard `Prelude`.
-Therefore you should be able to write your code as usual using functions with the same names.
-
 ### Utilities
 
 All these utilities are already available to you if you import `Marvin.Prelude`.
@@ -188,11 +175,11 @@ Implementation started in `Marvin.Util.Mutable`, documentation coming soon.
 
 #### Format strings
 
-Due to the lack of good format string libraries in Haskell which work with efficient strings (`Text`) marvin includes a simple format string library.
+For String formatting Marvin re-exposes the `Text.Printf` module.  
 
-Format strings use `{}` as placeholder and can be defined as literals `"Hello {}, have a good {}"`. Substitution is done with `format` which accepts lists, tuples etc as input. Placeholders are replaced by index.
-
-*Note*: The placeholder is literally **only** `{}`, even `{ }` does not work.  
+Format strings use placeholders with `%`, the default formatter (works for all `Show` datatypes) is `%v`.
+Substitution is done with the varargs function `printf`.
+You can find the full documentation in the documentation for the [`Text.Printf`](https://www.stackage.org/haddock/lts-7.12/base-4.9.0.0/Text-Printf.html#v:printf) module.
 
 #### JSON
 
