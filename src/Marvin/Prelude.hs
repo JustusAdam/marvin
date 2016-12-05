@@ -25,6 +25,8 @@ module Marvin.Prelude
     , module Text.Printf
     -- | Arbitrary IO in scripts
     , MonadIO, liftIO
+    -- | Useful functions not in the normal Prelude
+    , when, unless, for, for_, fromMaybe
     ) where
 
 import           Marvin
@@ -35,3 +37,7 @@ import           Marvin.Util.Random
 import           Marvin.Util.Regex
 import           Text.Printf
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad (when, unless)
+import Data.Foldable (for_)
+import Data.Traversable (for)
+import Data.Maybe (fromMaybe)
