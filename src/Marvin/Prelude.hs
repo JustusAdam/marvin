@@ -9,12 +9,8 @@ Portability : POSIX
 -}
 module Marvin.Prelude
     (
-    -- | For exposing parameterised and generalised versions of prelude functions
-    module ClassyPrelude
-    -- | Marvin :3
-    --
-    -- Common functions and Types for scripts
-    , module Marvin
+    -- | Common functions and Types for scripts
+      module Marvin
     -- | Mutable references in marvin scripts
     , module Marvin.Util.Mutable
     -- | Logging in Scripts
@@ -26,11 +22,10 @@ module Marvin.Prelude
     -- | Dealing with JSON
     , module Marvin.Util.JSON
     -- | Format strings which resolve to efficient Strings, aka 'Text'
-    , module Data.Text.Format
+    , module Text.Printf
     ) where
 
-import           ClassyPrelude
-import           Data.Text.Format    (format)
+import Text.Printf
 import           Marvin
 import           Marvin.Util.JSON
 import           Marvin.Util.Logging

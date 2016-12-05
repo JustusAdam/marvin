@@ -11,18 +11,18 @@ module Marvin.Util.Logging
     ( debugM, infoM, noticeM, warningM, errorM, criticalM, alertM, emergencyM, logM
     ) where
 
-import           ClassyPrelude
 import           Marvin.Types
 import qualified System.Log.Logger as L
+import Control.Monad.IO.Class
+import Data.Text (unpack)
 
-
-scriptLog :: (MonadIO m, IsScript m) => (String -> String -> IO ()) -> LText -> m ()
+scriptLog :: (MonadIO m, IsScript m) => (String -> String -> IO ()) -> String -> m ()
 scriptLog inner message = do
     (ScriptId sid) <- getScriptId
-    liftIO $ inner (unpack $ "script." ++ sid) (unpack message)
+    liftIO $ inner ("script." ++ unpack sid) message
 
 
-debugM, infoM, noticeM, warningM, errorM, criticalM, alertM, emergencyM :: (MonadIO m, IsScript m) => LText -> m ()
+debugM, infoM, noticeM, warningM, errorM, criticalM, alertM, emergencyM :: (MonadIO m, IsScript m) => String -> m ()
 debugM = scriptLog L.debugM
 infoM = scriptLog L.infoM
 noticeM = scriptLog L.noticeM
@@ -33,5 +33,5 @@ alertM = scriptLog L.alertM
 emergencyM = scriptLog L.emergencyM
 
 
-logM :: (MonadIO m, IsScript m) => L.Priority -> LText -> m ()
+logM :: (MonadIO m, IsScript m) => L.Priority -> String -> m ()
 logM prio = scriptLog (`L.logM` prio)

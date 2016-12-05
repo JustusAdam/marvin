@@ -2,7 +2,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Marvin.Adapter.Slack (SlackRTMAdapter) where
 
-import           ClassyPrelude
+
+import Prelude hiding (lookup)
 import           Control.Lens               hiding ((.=))
 import           Data.Aeson                 hiding (Error)
 import           Data.Aeson.TH
@@ -16,14 +17,27 @@ import           Network.URI
 import           Network.WebSockets
 import           Network.Wreq
 import           Wuss
+import Control.Concurrent.MVar (MVar, putMVar, takeMVar, newMVar, newEmptyMVar, readMVar, modifyMVar_)
+import Control.Concurrent.Async (async, wait)
+import Data.Text (Text, pack)
+import Data.HashMap.Strict (HashMap)
+import Control.Monad
+import Control.Applicative ((<|>))
+import Data.Maybe (fromMaybe)
+import Text.Read (readMaybe)
+import Control.Exception
+import Control.Arrow ((&&&))
+import Data.Containers
+import Data.Sequences
+import Data.Foldable (toList)
 
 
 data InternalType
     = Error
         { code :: Int
-        , msg  :: LText
+        , msg  :: String
         }
-    | Unhandeled LText
+    | Unhandeled String
     | Ignored
 
 
@@ -80,12 +94,8 @@ eventParser (Object o) = isErrParser <|> hasTypeParser
 eventParser _ = mzero
 
 
-rawBS :: BS.ByteString -> LText
-rawBS bs = "\"" ++ decodeUtf8 bs ++ "\""
-
-
-showt :: Show a => a -> LText
-showt = pack . show
+rawBS :: BS.ByteString -> String
+rawBS bs = "\"" ++ BS.unpack bs ++ "\""
 
 
 helloParser :: Value -> Parser Bool
@@ -124,19 +134,19 @@ runConnectionLoop cfg messageChan connTracker = forever $ do
     debugM pa "initializing socket"
     r <- post "https://slack.com/api/rtm.start" [ "token" := (token :: Text) ]
     case eitherDecode (r^.responseBody) of
-        Left err -> errorM pa $ "Error decoding rtm json: " ++ pack err
+        Left err -> errorM pa $ "Error decoding rtm json: " ++ err
         Right js -> do
             let uri = url js
                 authority = fromMaybe (error "URI lacks authority") (uriAuthority uri)
                 host = uriUserInfo authority ++ uriRegName authority
                 path = uriPath uri
                 portOnErr v = do
-                    debugM pa $ "Unreadable port '" ++ pack v ++ "'"
+                    debugM pa $ "Unreadable port '" ++ v ++ "'"
                     return 443
             port <- case uriPort authority of
-                        v@(':':r) -> maybe (portOnErr v) return $ readMay r
+                        v@(':':r) -> maybe (portOnErr v) return $ readMaybe r
                         v         -> portOnErr v
-            debugM pa $ "connecting to socket '" ++ showt uri ++ "'"
+            debugM pa $ "connecting to socket '" ++ show uri ++ "'"
             catch
                 (runSecureClient host port path $ \conn -> do
                     debugM pa "Connection established"
@@ -151,7 +161,7 @@ runConnectionLoop cfg messageChan connTracker = forever $ do
                         putMVar messageChan d)
                 $ \e -> do
                     void $ takeMVar connTracker
-                    errorM pa (pack $ show (e :: ConnectionException))
+                    errorM pa (show (e :: ConnectionException))
   where
     pa = error "Phantom value" :: SlackRTMAdapter
 
@@ -161,7 +171,7 @@ runHandlerLoop adapter messageChan handler =
     forever $ do
         d <- takeMVar messageChan
         case eitherDecode d >>= parseEither eventParser of
-            Left err -> errorM adapter $ "Error parsing json: " ++ pack err ++ " original data: " ++ rawBS d
+            Left err -> errorM adapter $ "Error parsing json: " ++ err ++ " original data: " ++ rawBS d
             Right v ->
                 case v of
                     Right event -> handler event
@@ -170,7 +180,7 @@ runHandlerLoop adapter messageChan handler =
                             Unhandeled type_ ->
                                 debugM adapter $ "Unhandeled event type " ++ type_ ++ " payload " ++ rawBS d
                             Error code msg ->
-                                errorM adapter $ "Error from remote code: " ++ showt code ++ " msg: " ++ msg
+                                errorM adapter $ "Error from remote code: " ++ show code ++ " msg: " ++ msg
                             Ignored -> return ()
 
 
@@ -192,7 +202,7 @@ execAPIMethod :: (Value -> Parser a) -> SlackRTMAdapter -> String -> [FormParam]
 execAPIMethod innerParser adapter method params = do
     token <- C.require cfg "token"
     response <- post ("https://slack.com/api/" ++ method) (("token" := (token :: Text)):params)
-    debugM adapter (decodeUtf8 $ response^.responseBody)
+    debugM adapter (BS.unpack $ response^.responseBody)
     return $ eitherDecode (response^.responseBody) >>= parseEither (apiResponseParser innerParser)
   where
     cfg = userConfig adapter
@@ -205,7 +215,7 @@ newMid SlackRTMAdapter{midTracker} = do
     return id
 
 
-messageRoomImpl :: SlackRTMAdapter -> Room -> LText -> IO ()
+messageRoomImpl :: SlackRTMAdapter -> Room -> String -> IO ()
 messageRoomImpl adapter (Room room) msg = do
     mid <- newMid adapter
     sendMessage adapter $ encode $
@@ -217,7 +227,7 @@ messageRoomImpl adapter (Room room) msg = do
 
 
 data UserInfo = UserInfo
-    { uiUsername :: LText
+    { uiUsername :: String
     , uiId       :: User
     }
 
@@ -239,7 +249,7 @@ getUserInfoImpl adapter user@(User user') = do
 
 data LimitedChannelInfo = LimitedChannelInfo
     { lciId   :: Room
-    , lciName :: LText
+    , lciName :: String
     }
 
 lciParser (Object o) = LimitedChannelInfo <$> o .: "id" <*> o .: "name"
@@ -249,7 +259,7 @@ lciParser _ = mzero
 lciListParser (Array a) = toList <$> mapM lciParser a
 lciListParser _ = mzero
 
-getChannelNameImpl :: SlackRTMAdapter -> Room -> IO LText
+getChannelNameImpl :: SlackRTMAdapter -> Room -> IO String
 getChannelNameImpl adapter channel = do
     cc <- readMVar $ channelChache adapter
     maybe refreshAndReturn return $ lciName <$> lookup channel cc

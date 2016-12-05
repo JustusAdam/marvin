@@ -21,8 +21,8 @@ module Marvin.Run
     ) where
 
 
-import           ClassyPrelude
-import           Control.Concurrent.Async  (wait)
+import Prelude hiding (splitAt, dropWhile, (++))
+import           Control.Concurrent.Async  (wait, async)
 import           Control.Lens              hiding (cons)
 import           Control.Monad.State       hiding (mapM_)
 import           Data.Char                 (isSpace)
@@ -34,12 +34,16 @@ import           Marvin.Internal           hiding (match)
 import           Marvin.Internal.Types     hiding (channel)
 import           Marvin.Util.Regex
 import           Options.Generic
-import qualified Prelude                   as P
 import qualified System.Log.Formatter      as L
 import qualified System.Log.Handler.Simple as L
 import qualified System.Log.Logger         as L
+import Control.Exception
+import Data.Maybe (fromMaybe)
+import Data.Sequences
+import Data.Traversable (for)
 
-
+(++) :: Monoid a => a -> a -> a
+(++) = mappend
 
 data CmdOptions = CmdOptions
     { configPath :: Maybe FilePath
@@ -150,7 +154,7 @@ prepareLogger =
     handler = L.GenericHandler { L.priority = L.DEBUG
                                , L.formatter = L.simpleLogFormatter "$time [$prio:$loggername] $msg"
                                , L.privData = ()
-                               , L.writeFunc = const P.putStrLn
+                               , L.writeFunc = const putStrLn
                                , L.closeFunc = const $ return ()
                                }
 

@@ -10,7 +10,6 @@
 module Marvin.Internal where
 
 
-import           ClassyPrelude
 import           Control.Monad.State
 import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
@@ -21,6 +20,8 @@ import qualified Marvin.Adapter          as A
 import           Marvin.Internal.Types
 import           Marvin.Util.Logging
 import           Marvin.Util.Regex       (Match, Regex)
+import Data.Sequences
+import Data.Monoid ((<>))
 
 
 
@@ -120,7 +121,7 @@ instance AccessAdapter (BotReacting a b) where
     getAdapter = BotReacting $ use adapter
 
 getSubConfFor :: HasConfigAccess m => ScriptId -> m C.Config
-getSubConfFor (ScriptId name) = C.subconfig ("script." ++ name) <$> getConfigInternal
+getSubConfFor (ScriptId name) = C.subconfig ("script." <> name) <$> getConfigInternal
 
 
 getConfig :: HasConfigAccess m => m C.Config
@@ -148,21 +149,21 @@ respond !re = addReaction (Respond re)
 -- | Send a message to the channel the triggering message came from.
 --
 -- Equivalent to "robot.send" in hubot
-send :: (IsAdapter a, HasMessage m) => LText -> BotReacting a m ()
+send :: (IsAdapter a, HasMessage m) => String -> BotReacting a m ()
 send msg = do
     o <- getMessage
     messageRoom (channel o) msg
 
 
 -- | Get the username of a registered user.
-getUsername :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User -> m LText
+getUsername :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User -> m String
 getUsername usr = do
     a <- getAdapter
     liftIO $ A.getUsername a usr
 
 
 -- | Get the human readable name of a channel.
-getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Room -> m LText
+getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Room -> m String
 getChannelName rm = do
     a <- getAdapter
     liftIO $ A.getChannelName a rm
@@ -171,7 +172,7 @@ getChannelName rm = do
 -- | Send a message to the channel the original message came from and address the user that sent the original message.
 --
 -- Equivalent to "robot.reply" in hubot
-reply :: (IsAdapter a, HasMessage m) => LText -> BotReacting a m ()
+reply :: (IsAdapter a, HasMessage m) => String -> BotReacting a m ()
 reply msg = do
     om <- getMessage
     user <- getUsername $ sender om
@@ -179,7 +180,7 @@ reply msg = do
 
 
 -- | Send a message to a room
-messageRoom :: (IsAdapter (AdapterT m), AccessAdapter m, MonadIO m) => Room -> LText -> m ()
+messageRoom :: (IsAdapter (AdapterT m), AccessAdapter m, MonadIO m) => Room -> String -> m ()
 messageRoom room msg = do
     a <- getAdapter
     liftIO $ A.messageRoom a room msg

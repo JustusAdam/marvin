@@ -5,17 +5,23 @@
 module Marvin.Internal.Types where
 
 
-import           ClassyPrelude
 import           Control.Lens
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Char               (isAlphaNum, isLetter)
 import qualified Data.Configurator.Types as C
 import qualified System.Log.Logger       as L
+import Data.String
+import Data.Hashable
+import Data.Text (Text, unpack, pack, toUpper)
+import Control.Monad.IO.Class
+import Control.Monad
+import Text.Read (readMaybe)
+import Control.Arrow ((&&&))
 
 
-newtype User = User Text deriving (IsString, Eq, Hashable)
-newtype Room = Room Text deriving (IsString, Eq, Show, Hashable)
+newtype User = User String deriving (IsString, Eq, Hashable)
+newtype Room = Room String deriving (IsString, Eq, Show, Hashable)
 
 
 deriveJSON defaultOptions { unwrapUnaryRecords = True } ''User
@@ -34,7 +40,7 @@ data Message = Message
 
 
 instance FromJSON TimeStamp where
-    parseJSON (String s) = maybe mzero (return . TimeStamp) $ readMay s
+    parseJSON (String s) = maybe mzero (return . TimeStamp) $ readMaybe (unpack s)
     parseJSON _          = mzero
 
 instance ToJSON TimeStamp where

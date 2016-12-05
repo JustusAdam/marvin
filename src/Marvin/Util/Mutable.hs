@@ -10,8 +10,8 @@ Portability : POSIX
 module Marvin.Util.Mutable where
 
 
-import           ClassyPrelude
-
+import Data.IORef
+import Control.Monad.IO.Class
 
 -- | A mutable reference to a value of type @v@
 type Mutable v = IORef v

@@ -13,8 +13,10 @@ module Marvin.Util.Random
     ) where
 
 
-import           ClassyPrelude
 import           System.Random
+import Control.Monad.IO.Class
+import Data.Sequences
+import Data.MonoTraversable
 
 
 -- | Generate a random value. For more information see 'random'
@@ -35,5 +37,5 @@ randomValFromRange = liftIO . randomRIO
 -- Usable in all IO capable monads, such as 'BotReacting' and 'ScriptDefinition'.
 randomFrom :: (IsSequence s, Index s ~ Int, MonadIO m) => s -> m (Element s)
 randomFrom list = do
-  n <- randomValFromRange (0, pred $ length list)
+  n <- randomValFromRange (0, pred $ olength list)
   return $ list `indexEx` n

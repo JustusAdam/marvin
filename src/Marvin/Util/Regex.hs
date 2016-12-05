@@ -31,8 +31,8 @@ module Marvin.Util.Regex
     , unwrapRegex
     ) where
 
-import           ClassyPrelude
 import qualified Text.Regex.PCRE.Light.Char8 as Re
+import Data.String
 
 
 -- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'.
