@@ -13,10 +13,10 @@ module Marvin.Util.Random
     ) where
 
 
+import           Control.Monad.IO.Class
+import           Data.MonoTraversable
+import           Data.Sequences
 import           System.Random
-import Control.Monad.IO.Class
-import Data.Sequences
-import Data.MonoTraversable
 
 
 -- | Generate a random value. For more information see 'random'

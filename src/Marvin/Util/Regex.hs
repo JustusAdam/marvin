@@ -12,7 +12,7 @@ module Marvin.Util.Regex
     -- * Compile time regex options
     , Re.PCREOption
 
-    , Re.anchored, Re.auto_callout 
+    , Re.anchored, Re.auto_callout
     , Re.caseless, Re.dollar_endonly
     , Re.dotall, Re.dupnames, Re.extended
     , Re.extra, Re.firstline, Re.multiline
@@ -23,7 +23,7 @@ module Marvin.Util.Regex
     -- * Runtime regex options
     , Re.PCREExecOption
 
-    , Re.exec_anchored 
+    , Re.exec_anchored
     , Re.exec_newline_cr, Re.exec_newline_crlf, Re.exec_newline_lf
     , Re.exec_notbol, Re.exec_noteol, Re.exec_notempty
     , Re.exec_no_utf8_check, Re.exec_partial
@@ -31,8 +31,8 @@ module Marvin.Util.Regex
     , unwrapRegex
     ) where
 
+import           Data.String
 import qualified Text.Regex.PCRE.Light.Char8 as Re
-import Data.String
 
 
 -- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'.

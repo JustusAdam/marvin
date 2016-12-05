@@ -5,19 +5,19 @@
 module Marvin.Internal.Types where
 
 
+import           Control.Arrow           ((&&&))
 import           Control.Lens
+import           Control.Monad
+import           Control.Monad.IO.Class
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Char               (isAlphaNum, isLetter)
 import qualified Data.Configurator.Types as C
+import           Data.Hashable
+import           Data.String
+import           Data.Text               (Text, pack, toUpper, unpack)
 import qualified System.Log.Logger       as L
-import Data.String
-import Data.Hashable
-import Data.Text (Text, unpack, pack, toUpper)
-import Control.Monad.IO.Class
-import Control.Monad
-import Text.Read (readMaybe)
-import Control.Arrow ((&&&))
+import           Text.Read               (readMaybe)
 
 
 newtype User = User String deriving (IsString, Eq, Hashable)

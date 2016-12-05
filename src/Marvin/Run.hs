@@ -21,26 +21,26 @@ module Marvin.Run
     ) where
 
 
-import Prelude hiding (splitAt, dropWhile, (++))
-import           Control.Concurrent.Async  (wait, async)
+import           Control.Concurrent.Async  (async, wait)
+import           Control.Exception
 import           Control.Lens              hiding (cons)
 import           Control.Monad.State       hiding (mapM_)
 import           Data.Char                 (isSpace)
 import qualified Data.Configurator         as C
 import qualified Data.Configurator.Types   as C
+import           Data.Maybe                (fromMaybe)
+import           Data.Sequences
+import           Data.Traversable          (for)
 import           Data.Vector               (Vector)
 import           Marvin.Adapter
 import           Marvin.Internal           hiding (match)
 import           Marvin.Internal.Types     hiding (channel)
 import           Marvin.Util.Regex
 import           Options.Generic
+import           Prelude                   hiding (dropWhile, splitAt, (++))
 import qualified System.Log.Formatter      as L
 import qualified System.Log.Handler.Simple as L
 import qualified System.Log.Logger         as L
-import Control.Exception
-import Data.Maybe (fromMaybe)
-import Data.Sequences
-import Data.Traversable (for)
 
 (++) :: Monoid a => a -> a -> a
 (++) = mappend

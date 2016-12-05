@@ -25,10 +25,10 @@ module Marvin.Prelude
     , module Text.Printf
     ) where
 
-import Text.Printf
 import           Marvin
 import           Marvin.Util.JSON
 import           Marvin.Util.Logging
 import           Marvin.Util.Mutable
 import           Marvin.Util.Random
 import           Marvin.Util.Regex
+import           Text.Printf

@@ -15,13 +15,13 @@ import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
 
 import           Control.Lens            hiding (cons)
+import           Data.Monoid             ((<>))
+import           Data.Sequences
 import           Marvin.Adapter          (IsAdapter)
 import qualified Marvin.Adapter          as A
 import           Marvin.Internal.Types
 import           Marvin.Util.Logging
 import           Marvin.Util.Regex       (Match, Regex)
-import Data.Sequences
-import Data.Monoid ((<>))
 
 
 

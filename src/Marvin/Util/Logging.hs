@@ -11,10 +11,10 @@ module Marvin.Util.Logging
     ( debugM, infoM, noticeM, warningM, errorM, criticalM, alertM, emergencyM, logM
     ) where
 
+import           Control.Monad.IO.Class
+import           Data.Text              (unpack)
 import           Marvin.Types
-import qualified System.Log.Logger as L
-import Control.Monad.IO.Class
-import Data.Text (unpack)
+import qualified System.Log.Logger      as L
 
 scriptLog :: (MonadIO m, IsScript m) => (String -> String -> IO ()) -> String -> m ()
 scriptLog inner message = do

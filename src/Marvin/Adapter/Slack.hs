@@ -3,33 +3,34 @@
 module Marvin.Adapter.Slack (SlackRTMAdapter) where
 
 
-import Prelude hiding (lookup)
+import           Control.Applicative        ((<|>))
+import           Control.Arrow              ((&&&))
+import           Control.Concurrent.Async   (async, wait)
+import           Control.Concurrent.MVar    (MVar, modifyMVar_, newEmptyMVar, newMVar, putMVar,
+                                             readMVar, takeMVar)
+import           Control.Exception
 import           Control.Lens               hiding ((.=))
+import           Control.Monad
 import           Data.Aeson                 hiding (Error)
 import           Data.Aeson.TH
 import           Data.Aeson.Types           hiding (Error)
 import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.Configurator          as C
 import qualified Data.Configurator.Types    as C
+import           Data.Containers
+import           Data.Foldable              (toList)
+import           Data.HashMap.Strict        (HashMap)
+import           Data.Maybe                 (fromMaybe)
+import           Data.Sequences
+import           Data.Text                  (Text, pack)
 import           Marvin.Adapter
 import           Marvin.Types
 import           Network.URI
 import           Network.WebSockets
 import           Network.Wreq
+import           Prelude                    hiding (lookup)
+import           Text.Read                  (readMaybe)
 import           Wuss
-import Control.Concurrent.MVar (MVar, putMVar, takeMVar, newMVar, newEmptyMVar, readMVar, modifyMVar_)
-import Control.Concurrent.Async (async, wait)
-import Data.Text (Text, pack)
-import Data.HashMap.Strict (HashMap)
-import Control.Monad
-import Control.Applicative ((<|>))
-import Data.Maybe (fromMaybe)
-import Text.Read (readMaybe)
-import Control.Exception
-import Control.Arrow ((&&&))
-import Data.Containers
-import Data.Sequences
-import Data.Foldable (toList)
 
 
 data InternalType

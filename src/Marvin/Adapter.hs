@@ -12,11 +12,11 @@ Portability : POSIX
 {-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Adapter where
 
+import           Control.Monad.IO.Class
 import qualified Data.Configurator.Types as C
+import           Data.Text               (unpack)
 import           Marvin.Internal.Types
 import qualified System.Log.Logger       as L
-import Control.Monad.IO.Class
-import Data.Text (unpack)
 
 data Event
     = MessageEvent Message
