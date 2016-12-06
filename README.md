@@ -26,26 +26,26 @@ import Marvin.Prelude
 
 script :: IsAdapter a => ScriptInit a
 script = defineScript "my-script" $ do
-    hear "I|i can't stand this (\w+)" $ do
+    hear "sudo (.+)" $ do
         match <- getMatch
 
         let thing = match !! 1
 
-        reply $ "I'm sorry to tell you but you'll have to do " ++ thing
+        reply $ "All right, i'll do " ++ thing
     
-    respond "open the (\w+) door" $ do
+    respond "open the (\\w+) door" $ do
         match <- getMatch
         let door = match !! 1
         openDoor door
-        send $ printf "Door %v opened" door
+        send $ printf "Door %s opened" door
     
-    respond "what is in file (\w+)" $ do
+    respond "what is in file (\\w+)\\??" $ do
         match <- getMatch 
         let file = match !! 1
 
-        liftIO $ readFile file
+        contents <- liftIO $ readFile file
 
-        send file
+        send contents
 ```
 
 ## How to Marvin
