@@ -28,10 +28,11 @@ type InitEventHandler a = a -> IO (EventHandler a)
 
 class IsAdapter a where
     adapterId :: AdapterId a
-    messageRoom :: a -> Room -> String -> IO ()
+    messageChannel :: a -> Channel -> String -> IO ()
     runWithAdapter :: RunWithAdapter a
     getUsername :: a -> User -> IO String
-    getChannelName :: a -> Room -> IO String
+    getChannelName :: a -> Channel -> IO String
+    resolveChannel :: a -> String -> IO (Maybe Channel)
 
 
 type RunWithAdapter a = C.Config -> InitEventHandler a -> IO ()

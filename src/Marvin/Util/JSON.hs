@@ -17,3 +17,13 @@ module Marvin.Util.JSON
 
 import           Data.Aeson
 import           Data.Aeson.TH
+import qualified Data.ByteString.Lazy as B
+import Control.Monad.IO.Class
+
+
+readJSON :: (MonadIO m, FromJSON a) => FilePath -> m (Either String a)
+readJSON = fmap eitherDecode . liftIO . B.readFile 
+
+
+writeJSON :: (MonadIO m, ToJSON a) => FilePath -> a -> m ()
+writeJSON fp = liftIO . B.writeFile fp . encode

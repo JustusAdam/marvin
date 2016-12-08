@@ -101,8 +101,8 @@ There are two main ways (currently) of reacting to events, `hear` and `respond`.
 Once a handler has triggered it may perform arbitrary IO actions (using `liftIO`) and send messages using `reply` and `send`.
 
 - `reply` addresses the message to the original sender of the message that triggered the handler.
-- `send` sends it to the same room the tiggering message weas sent to.
-- `messageRoom` sends a message to a room specified by the user.
+- `send` sends it to the same Channel the tiggering message weas sent to.
+- `messageChannel` sends a message to a Channel specified by the user.
 
 ### Configuration
 

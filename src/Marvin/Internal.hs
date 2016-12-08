@@ -55,7 +55,7 @@ data ActionData d where
 data WrappedAction a = forall d. WrappedAction (ActionData d) (BotReacting a d ())
 
 
--- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageRoom' as well as any arbitrary 'IO' action.
+-- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageChannel' as well as any arbitrary 'IO' action.
 --
 -- The type parameter @d@ is the accessible data provided by the trigger for this action.
 -- For message handlers like 'hear' and 'respond' this would be a regex 'Match' and a 'Message' for instance.
@@ -152,7 +152,7 @@ respond !re = addReaction (Respond re)
 send :: (IsAdapter a, HasMessage m) => String -> BotReacting a m ()
 send msg = do
     o <- getMessage
-    messageRoom (channel o) msg
+    messageChannel (channel o) msg
 
 
 -- | Get the username of a registered user.
@@ -162,8 +162,14 @@ getUsername usr = do
     liftIO $ A.getUsername a usr
 
 
+resolveChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => String -> m (Maybe Channel)
+resolveChannel name = do 
+    a <- getAdapter
+    liftIO $ A.resolveChannel a name
+
+
 -- | Get the human readable name of a channel.
-getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Room -> m String
+getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel -> m String
 getChannelName rm = do
     a <- getAdapter
     liftIO $ A.getChannelName a rm
@@ -179,11 +185,11 @@ reply msg = do
     send $ user ++ " " ++ msg
 
 
--- | Send a message to a room
-messageRoom :: (IsAdapter (AdapterT m), AccessAdapter m, MonadIO m) => Room -> String -> m ()
-messageRoom room msg = do
+-- | Send a message to a Channel
+messageChannel :: (IsAdapter (AdapterT m), AccessAdapter m, MonadIO m) => Channel -> String -> m ()
+messageChannel chan msg = do
     a <- getAdapter
-    liftIO $ A.messageRoom a room msg
+    liftIO $ A.messageChannel a chan msg
 
 
 -- | Define a new script for marvin

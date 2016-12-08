@@ -15,9 +15,9 @@ module Marvin
     , ScriptDefinition
     , IsAdapter
       -- * Reacting
-    , hear, respond, send, reply, messageRoom
+    , hear, respond, send, reply, messageChannel
     , getMessage, getMatch, getUsername, getChannelName
-    , Message(..), User(..), Room(..)
+    , Message(..), User(..), Channel(..)
     , getConfigVal, requireConfigVal
     , BotReacting, HasMessage, HasMatch
     , MessageReactionData, messageField, matchField

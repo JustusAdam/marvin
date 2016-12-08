@@ -120,11 +120,17 @@ apiResponseParser f v@(Object o) = APIResponse <$> o .: "ok" <*> f v
 apiResponseParser _ _            = mzero
 
 
+data ChannelCache = ChannelCache
+    { ccCache :: HashMap Channel LimitedChannelInfo
+    , nameResolver :: HashMap String Channel
+    }
+
+
 data SlackRTMAdapter = SlackRTMAdapter
     { sendMessage   :: BS.ByteString -> IO ()
     , userConfig    :: C.Config
     , midTracker    :: MVar Int
-    , channelChache :: MVar (HashMap Room LimitedChannelInfo)
+    , channelChache :: MVar ChannelCache
     , userInfoCache :: MVar (HashMap User UserInfo)
     }
 
@@ -193,7 +199,7 @@ runnerImpl cfg handlerInit = do
     let send d = do
             conn <- readMVar connTracker
             sendTextData conn d
-    adapter <- SlackRTMAdapter send cfg midTracker <$> newMVar mempty <*> newMVar mempty
+    adapter <- SlackRTMAdapter send cfg midTracker <$> newMVar (ChannelCache mempty mempty) <*> newMVar mempty
     handler <- handlerInit adapter
     void $ async $ runConnectionLoop cfg messageChan connTracker
     runHandlerLoop adapter messageChan handler
@@ -216,13 +222,13 @@ newMid SlackRTMAdapter{midTracker} = do
     return id
 
 
-messageRoomImpl :: SlackRTMAdapter -> Room -> String -> IO ()
-messageRoomImpl adapter (Room room) msg = do
+messageChannelImpl :: SlackRTMAdapter -> Channel -> String -> IO ()
+messageChannelImpl adapter (Channel chan) msg = do
     mid <- newMid adapter
     sendMessage adapter $ encode $
         object [ "id" .= mid
                 , "type" .= ("message" :: Text)
-                , "channel" .= room
+                , "channel" .= chan
                 , "text" .= msg
                 ]
 
@@ -249,7 +255,7 @@ getUserInfoImpl adapter user@(User user') = do
 
 
 data LimitedChannelInfo = LimitedChannelInfo
-    { lciId   :: Room
+    { lciId   :: Channel
     , lciName :: String
     }
 
@@ -260,26 +266,46 @@ lciParser _ = mzero
 lciListParser (Array a) = toList <$> mapM lciParser a
 lciListParser _ = mzero
 
-getChannelNameImpl :: SlackRTMAdapter -> Room -> IO String
+
+refreshChannels :: SlackRTMAdapter -> IO ChannelCache
+refreshChannels adapter = do
+    usr <- execAPIMethod lciListParser adapter "channels.list" []
+    case usr of
+        Left err -> error ("Parse error when getting channel data " ++ err)
+        Right (APIResponse True v) -> do
+            let cmap = mapFromList $ map (lciId &&& id) v
+                nmap = mapFromList $ map (lciName &&& lciId) v
+                cache = ChannelCache cmap nmap
+            putMVar (channelChache adapter) cache
+            return cache
+        Right (APIResponse False _) -> error "Server denied getting channel info request"
+
+
+resolveChannelImpl :: SlackRTMAdapter -> String -> IO (Maybe Channel)
+resolveChannelImpl adapter name = do
+    cc <- readMVar $ channelChache adapter
+    case lookup name (nameResolver cc) of
+        Nothing -> do
+            ncc <- refreshChannels adapter
+            return $ lookup name (nameResolver ncc)
+        Just found -> return (Just found)
+
+
+getChannelNameImpl :: SlackRTMAdapter -> Channel -> IO String
 getChannelNameImpl adapter channel = do
     cc <- readMVar $ channelChache adapter
-    maybe refreshAndReturn return $ lciName <$> lookup channel cc
-  where
-    refreshAndReturn = do
-        usr <- execAPIMethod lciListParser adapter "channels.list" []
-        case usr of
-            Left err -> error ("Parse error when getting channel data " ++ err)
-            Right (APIResponse True v) -> do
-                let cmap = mapFromList $ map (lciId &&& id) v
-                putMVar (channelChache adapter) cmap
-                return $ lciName $ fromMaybe (error "Room not found") $ lookup channel cmap
-            Right (APIResponse False _) -> error "Server denied getting channel info request"
+    case lookup channel (ccCache cc) of
+        Nothing -> do
+            ncc <- refreshChannels adapter
+            return $ lciName $ fromMaybe (error "Channel not found") $ lookup channel (ccCache ncc)
+        Just found -> return $ lciName found
 
 
 instance IsAdapter SlackRTMAdapter where
     adapterId = "slack-rtm"
-    messageRoom = messageRoomImpl
+    messageChannel = messageChannelImpl
     runWithAdapter = runnerImpl
     getUsername a = fmap uiUsername . getUserInfoImpl a
     getChannelName = getChannelNameImpl
+    resolveChannel = resolveChannelImpl
 

@@ -21,11 +21,11 @@ import           Text.Read               (readMaybe)
 
 
 newtype User = User String deriving (IsString, Eq, Hashable)
-newtype Room = Room String deriving (IsString, Eq, Show, Hashable)
+newtype Channel = Channel String deriving (IsString, Eq, Show, Hashable)
 
 
 deriveJSON defaultOptions { unwrapUnaryRecords = True } ''User
-deriveJSON defaultOptions { unwrapUnaryRecords = True } ''Room
+deriveJSON defaultOptions { unwrapUnaryRecords = True } ''Channel
 
 
 newtype TimeStamp = TimeStamp { unwrapTimeStamp :: Double } deriving Show
@@ -33,7 +33,7 @@ newtype TimeStamp = TimeStamp { unwrapTimeStamp :: Double } deriving Show
 
 data Message = Message
     { sender    :: User
-    , channel   :: Room
+    , channel   :: Channel
     , content   :: String
     , timestamp :: TimeStamp
     }
