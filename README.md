@@ -106,7 +106,7 @@ Once a handler has triggered it may perform arbitrary IO actions (using `liftIO`
 
 ### Configuration
 
-Configuration for marvin is written in the [configurator](https://hackage.haskell.com/package/configurator) syntax.
+Configuration for marvin is written in the [configurator](https://hackage.haskell.org/package/configurator) syntax.
 
 Configuration pertaining to the bot is stored under the "bot" key.
 
