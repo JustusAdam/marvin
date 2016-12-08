@@ -152,7 +152,7 @@ respond !re = addReaction (Respond re)
 send :: (IsAdapter a, HasMessage m) => String -> BotReacting a m ()
 send msg = do
     o <- getMessage
-    messageChannel (channel o) msg
+    messageChannel' (channel o) msg
 
 
 -- | Get the username of a registered user.
@@ -185,11 +185,18 @@ reply msg = do
     send $ user ++ " " ++ msg
 
 
--- | Send a message to a Channel
-messageChannel :: (IsAdapter (AdapterT m), AccessAdapter m, MonadIO m) => Channel -> String -> m ()
-messageChannel chan msg = do
+-- | Send a message to a Channel (by name)
+messageChannel :: (AccessAdapter m, IsAdapter (AdapterT m), IsScript m, MonadIO m) => String -> String -> m ()
+messageChannel name msg = do
+    mchan <- resolveChannel name
+    maybe (errorM $ "No channel known with the name " ++ name) (`messageChannel'` msg) mchan
+
+
+messageChannel' :: (AccessAdapter m, IsAdapter (AdapterT m), IsScript m, MonadIO m) => Channel -> String -> m ()
+messageChannel' chan msg = do
     a <- getAdapter
     liftIO $ A.messageChannel a chan msg
+
 
 
 -- | Define a new script for marvin
