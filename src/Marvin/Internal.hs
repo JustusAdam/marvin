@@ -51,6 +51,7 @@ declareFields [d|
 data ActionData d where
     Hear :: Regex -> ActionData MessageReactionData
     Respond :: Regex -> ActionData MessageReactionData
+    Custom :: (A.Event -> Maybe d) -> ActionData d
 
 
 data WrappedAction a = forall d. WrappedAction (ActionData d) (BotReacting a d ())

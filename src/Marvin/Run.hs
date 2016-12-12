@@ -29,7 +29,7 @@ import           Control.Monad.State       hiding (mapM_)
 import           Data.Char                 (isSpace)
 import qualified Data.Configurator         as C
 import qualified Data.Configurator.Types   as C
-import           Data.Maybe                (fromMaybe)
+import           Data.Maybe                (fromMaybe, mapMaybe)
 import           Data.Monoid               ((<>))
 import           Data.Sequences
 import           Data.Traversable          (for)
@@ -43,6 +43,7 @@ import           Prelude                   hiding (dropWhile, splitAt)
 import qualified System.Log.Formatter      as L
 import qualified System.Log.Handler.Simple as L
 import qualified System.Log.Logger         as L
+import Data.Foldable (for_)
 
 
 data CmdOptions = CmdOptions
@@ -75,13 +76,22 @@ declareFields [d|
     data Handlers = Handlers
         { handlersResponds :: [(Regex, Message -> Match -> IO ())]
         , handlersHears :: [(Regex, Message -> Match -> IO ())]
+        , handlersCustoms :: [Event -> Maybe (IO ())]
         }
     |]
 
 
+-- TODO add timeouts for handlers
 mkApp :: [Script a] -> C.Config -> a -> EventHandler a
-mkApp scripts cfg adapter = handler
+mkApp scripts cfg adapter = genericHandler
   where
+    genericHandler ev = do
+        generics <- async $ do
+            let applicables = mapMaybe ($ ev) allCustoms
+            asyncs <- for applicables async
+            for_ asyncs wait
+        handler ev
+        wait generics
     handler (MessageEvent msg) = handleMessage msg
 
     handleMessage msg = do
@@ -102,12 +112,14 @@ mkApp scripts cfg adapter = handler
 
     flattenActions = foldr $ \script -> flip (foldr (addAction script adapter)) (script^.actions)
 
-    allActions = flattenActions (Handlers mempty mempty) scripts
+    allActions = flattenActions (Handlers mempty mempty mempty) scripts
 
     allReactions :: Vector (Regex, Message -> Match -> IO ())
     allReactions = fromList $! allActions^.responds
     allListens :: Vector (Regex, Message -> Match -> IO ())
     allListens = fromList $! allActions^.hears
+    allCustoms :: [Event -> Maybe (IO ())]
+    allCustoms = allActions^.customs 
 
 
 addAction :: Script a -> a -> WrappedAction a -> Handlers -> Handlers
@@ -115,6 +127,10 @@ addAction script adapter wa =
     case wa of
         (WrappedAction (Hear re) ac) -> hears %~ cons (re, runMessageAction script adapter re ac)
         (WrappedAction (Respond re) ac) -> responds %~ cons (re, runMessageAction script adapter re ac)
+        (WrappedAction (Custom matcher) ac) -> customs %~ cons h
+          where
+            h ev = run <$> matcher ev
+            run s = runReaderT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) adapter s)
 
 
 runMessageAction :: Script a -> a -> Regex -> BotReacting a MessageReactionData () -> Message -> Match -> IO ()
