@@ -24,11 +24,13 @@ module Marvin.Run
 import           Control.Concurrent.Async  (async, wait)
 import           Control.Exception
 import           Control.Lens              hiding (cons)
+import           Control.Monad.Reader
 import           Control.Monad.State       hiding (mapM_)
 import           Data.Char                 (isSpace)
 import qualified Data.Configurator         as C
 import qualified Data.Configurator.Types   as C
 import           Data.Maybe                (fromMaybe)
+import           Data.Monoid               ((<>))
 import           Data.Sequences
 import           Data.Traversable          (for)
 import           Data.Vector               (Vector)
@@ -37,13 +39,11 @@ import           Marvin.Internal           hiding (match)
 import           Marvin.Internal.Types     hiding (channel)
 import           Marvin.Util.Regex
 import           Options.Generic
-import           Prelude                   hiding (dropWhile, splitAt, (++))
+import           Prelude                   hiding (dropWhile, splitAt)
 import qualified System.Log.Formatter      as L
 import qualified System.Log.Handler.Simple as L
 import qualified System.Log.Logger         as L
 
-(++) :: Monoid a => a -> a -> a
-(++) = mappend
 
 data CmdOptions = CmdOptions
     { configPath :: Maybe FilePath
@@ -91,7 +91,7 @@ mkApp scripts cfg adapter = handler
         rDispatches <- if toLower trimmed == toLower botname
                             then doIfMatch allReactions remainder
                             else return mempty
-        mapM_ wait (lDispatches ++ rDispatches)
+        mapM_ wait (lDispatches <> rDispatches)
       where
         text = content msg
         doIfMatch things toMatch  =
@@ -120,13 +120,13 @@ addAction script adapter wa =
 runMessageAction :: Script a -> a -> Regex -> BotReacting a MessageReactionData () -> Message -> Match -> IO ()
 runMessageAction script adapter re ac msg mtch =
     catch
-        (evalStateT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) adapter (MessageReactionData msg mtch)))
+        (runReaderT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) adapter (MessageReactionData msg mtch)))
         (onScriptExcept (script^.scriptId) re)
 
 
 onScriptExcept :: ScriptId -> Regex -> SomeException -> IO ()
 onScriptExcept (ScriptId id) r e = do
-    err $ "Unhandled exception during execution of script " ++ show id ++ " with trigger " ++ show r
+    err $ "Unhandled exception during execution of script " <> show id <> " with trigger " <> show r
     err $ show e
   where
     err = L.errorM "bot.dispatch"
@@ -141,7 +141,7 @@ application inits config ada = do
   where
     onInitExcept :: ScriptId -> SomeException -> IO (Maybe a')
     onInitExcept (ScriptId id) e = do
-        err $ "Unhandled exception during initialization of script " ++ show id
+        err $ "Unhandled exception during initialization of script " <> show id
         err $ show e
         return Nothing
       where err = L.errorM "bot.init"
@@ -174,6 +174,6 @@ runMarvin s' = do
     unless (verbose args || debug args) $ C.lookup cfg "bot.logging" >>= maybe (return ()) (L.updateGlobalLogger L.rootLoggerName . L.setLevel)
 
     runWithAdapter
-        (C.subconfig ("adapter." ++ unwrapAdapterId (adapterId :: AdapterId a)) cfg)
+        (C.subconfig ("adapter." <> unwrapAdapterId (adapterId :: AdapterId a)) cfg)
         $ application s' cfg
 

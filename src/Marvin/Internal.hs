@@ -10,6 +10,7 @@
 module Marvin.Internal where
 
 
+import           Control.Monad.Reader
 import           Control.Monad.State
 import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
@@ -24,7 +25,7 @@ import           Marvin.Util.Logging
 import           Marvin.Util.Regex       (Match, Regex)
 
 
-
+-- | Read only data available to a handler when the bot reacts to an event.
 declareFields [d|
     data BotActionState a d = BotActionState
         { botActionStateScriptId :: ScriptId
@@ -59,11 +60,13 @@ data WrappedAction a = forall d. WrappedAction (ActionData d) (BotReacting a d (
 --
 -- The type parameter @d@ is the accessible data provided by the trigger for this action.
 -- For message handlers like 'hear' and 'respond' this would be a regex 'Match' and a 'Message' for instance.
-newtype BotReacting a d r = BotReacting { runReaction :: StateT (BotActionState a d) IO r } deriving (Monad, MonadIO, Applicative, Functor)
+newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState a d) IO r } deriving (Monad, MonadIO, Applicative, Functor, MonadReader (BotActionState a d))
 
 -- | An abstract type describing a marvin script.
 --
 -- This is basically a collection of event handlers.
+--
+-- Internal structure is exposed for people wanting to extend this.
 declareFields [d|
     data Script a = Script
         { scriptActions   :: [WrappedAction a]
@@ -84,29 +87,29 @@ newtype ScriptInit a = ScriptInit (ScriptId, a -> C.Config -> IO (Script a))
 
 -- | Class which says that there is a way to get to a 'Message' from this type @m@.
 class HasMessage m where
-    message :: Lens' m Message
+    messageLens :: Lens' m Message
 
 instance HasMessageField m Message => HasMessage m where
-    message = messageField
+    messageLens = messageField
 
 -- | Class which says that there is a way to get to a 'Match' from this type @m@.
 class HasMatch m where
-    match :: Lens' m Match
+    matchLens :: Lens' m Match
 
 instance HasMatchField m Match => HasMatch m where
-    match = matchField
+    matchLens = matchField
 
 instance HasConfigAccess (ScriptDefinition a) where
     getConfigInternal = ScriptDefinition $ use config
 
 instance HasConfigAccess (BotReacting a b) where
-    getConfigInternal = BotReacting $ use config
+    getConfigInternal = view config
 
 instance IsScript (ScriptDefinition a) where
     getScriptId = ScriptDefinition $ use scriptId
 
 instance IsScript (BotReacting a b) where
-    getScriptId = BotReacting $ use scriptId
+    getScriptId = view scriptId
 
 class AccessAdapter m where
     type AdapterT m
@@ -118,7 +121,7 @@ instance AccessAdapter (ScriptDefinition a) where
 
 instance AccessAdapter (BotReacting a b) where
     type AdapterT (BotReacting a b) = a
-    getAdapter = BotReacting $ use adapter
+    getAdapter = view adapter
 
 getSubConfFor :: HasConfigAccess m => ScriptId -> m C.Config
 getSubConfFor (ScriptId name) = C.subconfig ("script." <> name) <$> getConfigInternal
@@ -163,7 +166,7 @@ getUsername usr = do
 
 
 resolveChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => String -> m (Maybe Channel)
-resolveChannel name = do 
+resolveChannel name = do
     a <- getAdapter
     liftIO $ A.resolveChannel a name
 
@@ -216,20 +219,20 @@ runDefinitions sid definitions ada cfg = execStateT (runScript definitions) (Scr
 
 -- | Obtain the reaction dependent data from the bot.
 getData :: BotReacting a d d
-getData = BotReacting $ use variable
+getData = view variable
 
 
 -- | Get the results from matching the regular expression.
 --
 -- Equivalent to "msg.match" in hubot.
 getMatch :: HasMatch m => BotReacting a m Match
-getMatch = BotReacting $ use (variable . match)
+getMatch = view (variable . matchLens)
 
 
 -- | Get the message that triggered this action
 -- Includes sender, target channel, as well as the full, untruncated text of the original message
 getMessage :: HasMessage m => BotReacting a m Message
-getMessage = BotReacting $ use (variable . message)
+getMessage = view (variable . messageLens)
 
 
 -- | Get a value out of the config, returns 'Nothing' if the value didn't exist.
@@ -275,8 +278,8 @@ requireAppConfigVal name = do
 -- The idea is that one can conveniently send messages from inside a schedulable action.
 extractReaction :: BotReacting a s o -> BotReacting a s (IO o)
 extractReaction reac = BotReacting $ do
-    s <- get
-    return $ evalStateT (runReaction reac) s
+    s <- ask
+    return $ runReaderT (runReaction reac) s
 
 
 -- | Take an action and produce an IO action with the same effect.
@@ -287,4 +290,4 @@ extractAction ac = ScriptDefinition $ do
     a <- use adapter
     sid <- use scriptId
     cfg <- use config
-    return $ evalStateT (runReaction ac) (BotActionState sid cfg a ())
+    return $ runReaderT (runReaction ac) (BotActionState sid cfg a ())

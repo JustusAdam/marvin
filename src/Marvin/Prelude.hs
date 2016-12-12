@@ -29,6 +29,11 @@ module Marvin.Prelude
     , when, unless, for, for_, fromMaybe
     ) where
 
+import           Control.Monad          (unless, when)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Data.Foldable          (for_)
+import           Data.Maybe             (fromMaybe)
+import           Data.Traversable       (for)
 import           Marvin
 import           Marvin.Util.JSON
 import           Marvin.Util.Logging
@@ -36,8 +41,3 @@ import           Marvin.Util.Mutable
 import           Marvin.Util.Random
 import           Marvin.Util.Regex
 import           Text.Printf
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad (when, unless)
-import Data.Foldable (for_)
-import Data.Traversable (for)
-import Data.Maybe (fromMaybe)

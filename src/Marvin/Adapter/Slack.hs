@@ -121,7 +121,7 @@ apiResponseParser _ _            = mzero
 
 
 data ChannelCache = ChannelCache
-    { ccCache :: HashMap Channel LimitedChannelInfo
+    { ccCache      :: HashMap Channel LimitedChannelInfo
     , nameResolver :: HashMap String Channel
     }
 
