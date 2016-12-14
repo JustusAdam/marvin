@@ -5,7 +5,7 @@
 
 Marvin is an attempt to combine the ease of use of [hubot](https://hubot.github.com) with the typesafety and easy syntax of Haskell and the performance gains from compiled languages.
 
-A more in-depth version of the contents of this readme can be found on the [wiki](https://github.com/JustusAdam/marvin/wiki).
+The in-depth documentation can be found on readthedocs https://marvin.readthedocs.org 
 
 
 ## Installation
