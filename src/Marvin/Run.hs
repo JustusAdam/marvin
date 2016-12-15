@@ -98,6 +98,7 @@ mkApp scripts cfg adapter = genericHandler
         lDispatches <- doIfMatch allListens text
         botname <- fromMaybe defaultBotName <$> lookupFromAppConfig cfg "name"
         let (trimmed, remainder) = splitAt (fromIntegral $ length botname) $ dropWhile isSpace text
+        -- TODO At some point this needs to support derivations of the name. Maybe make that configurable?
         rDispatches <- if toLower trimmed == toLower botname
                             then doIfMatch allReactions remainder
                             else return mempty

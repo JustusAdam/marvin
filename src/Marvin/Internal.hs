@@ -57,10 +57,16 @@ data ActionData d where
 data WrappedAction a = forall d. WrappedAction (ActionData d) (BotReacting a d ())
 
 
--- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageChannel' as well as any arbitrary 'IO' action.
+-- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageChannel' as well as any arbitrary 'IO' action using 'liftIO'.
 --
--- The type parameter @d@ is the accessible data provided by the trigger for this action.
+-- The type parameter @d@ is the accessible data provided by the trigger for this action and can be obtained with 'getData' or other custom functions like 'getMessage' and 'getMatch' which typically depend on a particular type of data in @d@.
 -- For message handlers like 'hear' and 'respond' this would be a regex 'Match' and a 'Message' for instance.
+--
+-- For completeness: @a@ is the adapter type and @r@ is the return type of the monadic computation.
+--
+-- This is also a 'MonadReader' instance, there you can inspect the entire state of this reaction. 
+-- This is typically only used in internal or utility functions and not necessary for the user.
+-- To inspect particular pieces of this state refer to the *Lenses* section.
 newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState a d) IO r } deriving (Monad, MonadIO, Applicative, Functor, MonadReader (BotActionState a d))
 
 -- | An abstract type describing a marvin script.
@@ -150,6 +156,15 @@ respond :: Regex -> BotReacting a MessageReactionData () -> ScriptDefinition a (
 respond !re = addReaction (Respond re)
 
 
+-- | Extension point for the user
+-- 
+-- Allows you to handle the raw event yourself.
+-- Returning 'Nothing' from the trigger function means you dont want to react to the event.
+-- The value returned inside the 'Just' is available in the handler later using 'getData'.
+customTrigger :: (A.Event -> Maybe d) -> BotReacting a d () -> ScriptDefinition a ()
+customTrigger tr = addReaction (Custom tr) 
+
+
 -- | Send a message to the channel the triggering message came from.
 --
 -- Equivalent to "robot.send" in hubot
@@ -218,7 +233,11 @@ runDefinitions :: ScriptId -> ScriptDefinition a () -> a -> C.Config -> IO (Scri
 runDefinitions sid definitions ada cfg = execStateT (runScript definitions) (Script mempty sid cfg ada)
 
 
--- | Obtain the reaction dependent data from the bot.
+-- | Obtain the event reaction data. 
+-- 
+-- The type of this data depends on the reacion function used.
+-- For instance 'hear' and 'respond' will contain 'MessageReactionData'.
+-- The actual contents comes from the event itself and was put together by the trigger.
 getData :: BotReacting a d d
 getData = view variable
 
