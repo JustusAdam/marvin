@@ -26,6 +26,7 @@ data Opts = Opts
     }
 
 
+slackRtmData :: (String, String)
 slackRtmData = ("Marvin.Adapter.Slack", "SlackRTMAdapter")
 
 

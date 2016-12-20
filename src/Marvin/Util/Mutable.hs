@@ -12,6 +12,7 @@ module Marvin.Util.Mutable where
 
 import           Control.Monad.IO.Class
 import           Data.IORef
+import Control.Concurrent.MVar
 
 -- | A mutable reference to a value of type @v@
 --
@@ -80,7 +81,7 @@ takeSynchronized = liftIO . takeMVar
 
 
 -- | Non blocking version of 'takeSynchronized', returns 'Nothing' if it was empty.
-tryTakeSynchronized :: MonadIO => Synchronized a -> m (Maybe a)
+tryTakeSynchronized :: MonadIO m => Synchronized a -> m (Maybe a)
 tryTakeSynchronized = liftIO . tryTakeMVar
 
 

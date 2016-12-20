@@ -10,7 +10,8 @@ Portability : POSIX
 This is provisionary, this might get properly wrapped at some point.
 -}
 module Marvin.Util.JSON
-    ( module Data.Aeson
+    ( readJSON, writeJSON
+    , module Data.Aeson
     , module Data.Aeson.TH
     ) where
 

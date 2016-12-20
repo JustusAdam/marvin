@@ -28,4 +28,3 @@ module Marvin
 import           Marvin.Adapter  (IsAdapter)
 import           Marvin.Internal
 import           Marvin.Internal.Types
-import           Marvin.Types

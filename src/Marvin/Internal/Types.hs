@@ -20,7 +20,9 @@ import qualified System.Log.Logger       as L
 import           Text.Read               (readMaybe)
 
 
+-- | Identifier for a user (internal and not necessarily equal to the username)
 newtype User = User String deriving (IsString, Eq, Hashable)
+-- | Identifier for a channel (internal and not necessarily equal to the channel name)
 newtype Channel = Channel String deriving (IsString, Eq, Show, Hashable)
 
 
@@ -31,6 +33,7 @@ deriveJSON defaultOptions { unwrapUnaryRecords = True } ''Channel
 newtype TimeStamp = TimeStamp { unwrapTimeStamp :: Double } deriving Show
 
 
+-- | contents and meta information of a recieved message
 data Message = Message
     { sender    :: User
     , channel   :: Channel

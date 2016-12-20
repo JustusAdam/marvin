@@ -25,7 +25,6 @@ import           Control.Concurrent.Async  (async, wait)
 import           Control.Exception
 import           Control.Lens              hiding (cons)
 import           Control.Monad.Reader
-import           Control.Monad.State       hiding (mapM_)
 import           Data.Char                 (isSpace)
 import qualified Data.Configurator         as C
 import qualified Data.Configurator.Types   as C
@@ -35,7 +34,7 @@ import           Data.Sequences
 import           Data.Traversable          (for)
 import           Data.Vector               (Vector)
 import           Marvin.Adapter
-import           Marvin.Internal           hiding (match)
+import           Marvin.Internal
 import           Marvin.Internal.Types     hiding (channel)
 import           Marvin.Util.Regex
 import           Options.Generic
@@ -176,7 +175,7 @@ prepareLogger =
                                }
 
 
-
+-- | Runs the marvin bot using whatever method the adapter uses.
 runMarvin :: forall a. IsAdapter a => [ScriptInit a] -> IO ()
 runMarvin s' = do
     prepareLogger

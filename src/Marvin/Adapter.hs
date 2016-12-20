@@ -23,6 +23,8 @@ import           Data.Text               (unpack)
 import           Marvin.Internal.Types
 import qualified System.Log.Logger       as L
 
+
+-- | Representation for the types of events which can occur
 data Event
     = MessageEvent Message
 
@@ -31,12 +33,19 @@ type EventHandler a = Event -> IO ()
 type InitEventHandler a = a -> IO (EventHandler a)
 
 
+-- | Basic functionality required of any adapter
 class IsAdapter a where
+    -- | Used for scopting config and logging
     adapterId :: AdapterId a
+    -- | Post a message to a channel given the internal channel identifier
     messageChannel :: a -> Channel -> String -> IO ()
+    -- | Initialize and run the bot
     runWithAdapter :: RunWithAdapter a
+    -- | Resolve a username given the internal user identifier
     getUsername :: a -> User -> IO String
+    -- | Resolve the human readable name for a channel given the  internal channel identifier
     getChannelName :: a -> Channel -> IO String
+    -- | Resolve to the internal channel identifier given a human readable name
     resolveChannel :: a -> String -> IO (Maybe Channel)
 
 
@@ -50,6 +59,7 @@ adapterLog inner _ message =
   where (AdapterId aid) = adapterId :: AdapterId a
 
 
+-- | Logging functions for adapters
 debugM, infoM, noticeM, warningM, errorM, criticalM, alertM, emergencyM :: (MonadIO m, IsAdapter a) => a -> String -> m ()
 debugM = adapterLog L.debugM
 infoM = adapterLog L.infoM

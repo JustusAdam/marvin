@@ -211,7 +211,7 @@ messageChannel name msg = do
     maybe (errorM $ "No channel known with the name " ++ name) (`messageChannel'` msg) mchan
 
 
-messageChannel' :: (AccessAdapter m, IsAdapter (AdapterT m), IsScript m, MonadIO m) => Channel -> String -> m ()
+messageChannel' :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel -> String -> m ()
 messageChannel' chan msg = do
     a <- getAdapter
     liftIO $ A.messageChannel a chan msg

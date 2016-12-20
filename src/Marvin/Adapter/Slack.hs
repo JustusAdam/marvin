@@ -1,3 +1,12 @@
+{-|
+Module      : $Header$
+Description : Adapter for communicating with Slack via its real time event API
+Copyright   : (c) Justus Adam, 2016
+License     : BSD3
+Maintainer  : dev@justus.science
+Stability   : experimental
+Portability : POSIX
+-}
 {-# LANGUAGE NamedFieldPuns  #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Marvin.Adapter.Slack (SlackRTMAdapter) where
@@ -5,7 +14,7 @@ module Marvin.Adapter.Slack (SlackRTMAdapter) where
 
 import           Control.Applicative        ((<|>))
 import           Control.Arrow              ((&&&))
-import           Control.Concurrent.Async   (async, wait)
+import           Control.Concurrent.Async   (async)
 import           Control.Concurrent.MVar    (MVar, modifyMVar_, newEmptyMVar, newMVar, putMVar,
                                              readMVar, takeMVar)
 import           Control.Exception
@@ -22,7 +31,7 @@ import           Data.Foldable              (toList)
 import           Data.HashMap.Strict        (HashMap)
 import           Data.Maybe                 (fromMaybe)
 import           Data.Sequences
-import           Data.Text                  (Text, pack)
+import           Data.Text                  (Text)
 import           Marvin.Adapter
 import           Marvin.Types
 import           Network.URI
@@ -259,10 +268,12 @@ data LimitedChannelInfo = LimitedChannelInfo
     , lciName :: String
     }
 
+lciParser :: Value -> Parser LimitedChannelInfo
 lciParser (Object o) = LimitedChannelInfo <$> o .: "id" <*> o .: "name"
 lciParser _ = mzero
 
 
+lciListParser :: Value -> Parser [LimitedChannelInfo]
 lciListParser (Array a) = toList <$> mapM lciParser a
 lciListParser _ = mzero
 
