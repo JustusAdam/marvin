@@ -10,7 +10,12 @@ Portability : POSIX
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Marvin.Adapter where
+module Marvin.Adapter 
+    ( Event(..)
+    , RunWithAdapter, EventHandler, InitEventHandler
+    , IsAdapter(..)
+    , debugM, infoM, noticeM, warningM, errorM, criticalM, alertM, emergencyM, logM
+    ) where
 
 import           Control.Monad.IO.Class
 import qualified Data.Configurator.Types as C

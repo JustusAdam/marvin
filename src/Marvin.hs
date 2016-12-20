@@ -22,8 +22,6 @@ module Marvin
     , BotReacting, HasMessage(messageLens), HasMatch(matchLens)
     -- ** Advanced actions
     , extractAction, extractReaction
-    -- * Lenses and internal types
-    , HasScriptId(scriptId), HasConfig(config), HasAdapter(adapter), HasMessageField(messageField), HasMatchField(matchField), HasVariable(variable), BotActionState(BotActionState), MessageReactionData(MessageReactionData), HasActions(actions)
     ) where
 
 

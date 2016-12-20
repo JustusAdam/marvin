@@ -32,7 +32,7 @@ library
                      , Marvin.Util.HTTP
                      , Marvin.Adapter
                      , Marvin.Adapter.Slack
-  other-modules:       Marvin.Internal
+                     , Marvin.Internal
                      , Marvin.Internal.Types
   build-depends:       base >= 4.7 && < 5
                      , wreq
