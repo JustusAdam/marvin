@@ -64,7 +64,7 @@ data WrappedAction a = forall d. WrappedAction (ActionData d) (BotReacting a d (
 --
 -- For completeness: @a@ is the adapter type and @r@ is the return type of the monadic computation.
 --
--- This is also a 'MonadReader' instance, there you can inspect the entire state of this reaction. 
+-- This is also a 'MonadReader' instance, there you can inspect the entire state of this reaction.
 -- This is typically only used in internal or utility functions and not necessary for the user.
 -- To inspect particular pieces of this state refer to the *Lenses* section.
 newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState a d) IO r } deriving (Monad, MonadIO, Applicative, Functor, MonadReader (BotActionState a d))
@@ -157,12 +157,12 @@ respond !re = addReaction (Respond re)
 
 
 -- | Extension point for the user
--- 
+--
 -- Allows you to handle the raw event yourself.
 -- Returning 'Nothing' from the trigger function means you dont want to react to the event.
 -- The value returned inside the 'Just' is available in the handler later using 'getData'.
 customTrigger :: (A.Event -> Maybe d) -> BotReacting a d () -> ScriptDefinition a ()
-customTrigger tr = addReaction (Custom tr) 
+customTrigger tr = addReaction (Custom tr)
 
 
 -- | Send a message to the channel the triggering message came from.
@@ -233,8 +233,8 @@ runDefinitions :: ScriptId -> ScriptDefinition a () -> a -> C.Config -> IO (Scri
 runDefinitions sid definitions ada cfg = execStateT (runScript definitions) (Script mempty sid cfg ada)
 
 
--- | Obtain the event reaction data. 
--- 
+-- | Obtain the event reaction data.
+--
 -- The type of this data depends on the reacion function used.
 -- For instance 'hear' and 'respond' will contain 'MessageReactionData'.
 -- The actual contents comes from the event itself and was put together by the trigger.

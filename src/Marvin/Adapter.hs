@@ -10,7 +10,7 @@ Portability : POSIX
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Marvin.Adapter 
+module Marvin.Adapter
     ( Event(..)
     , RunWithAdapter, EventHandler, InitEventHandler
     , IsAdapter(..)

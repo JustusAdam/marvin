@@ -12,6 +12,7 @@ import           Paths_marvin
 import           Prelude               hiding (lookup)
 import           System.Directory
 import           System.FilePath
+import           System.IO
 import           Text.Mustache.Compile
 import           Text.Mustache.Render
 import           Text.Mustache.Types
@@ -51,7 +52,7 @@ main :: IO ()
 main = do
     Opts{..} <- execParser infoParser
     d <- (</> "initializer") <$> getDataDir
-    unless (adapter `member` adType) $ putStrLn "Unrecognized adapter"
+    unless (adapter `member` adType) $ hPutStrLn stderr "Unrecognized adapter"
 
     let subsData = object [ "name" ~> botname
                           , "scriptsig" ~> maybe "IsAdapter a => ScriptInit a" ("ScriptInit " <>) (lookup adapter adType)

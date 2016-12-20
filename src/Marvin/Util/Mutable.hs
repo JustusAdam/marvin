@@ -10,13 +10,13 @@ Portability : POSIX
 module Marvin.Util.Mutable where
 
 
+import           Control.Concurrent.MVar
 import           Control.Monad.IO.Class
 import           Data.IORef
-import Control.Concurrent.MVar
 
 -- | A mutable reference to a value of type @v@
 --
--- This is like a pointer in c, the value behind which can be mutated by several functions. 
+-- This is like a pointer in c, the value behind which can be mutated by several functions.
 -- So long as they retain this reference they are able to retrieve the updated value.
 type Mutable v = IORef v
 
@@ -42,7 +42,7 @@ modifyMutable m = liftIO . modifyIORef m
 
 
 -- | A value that can be shared on multiple concurrent Threads.
--- 
+--
 -- This value works like a channel. It can either be empty or full.
 -- If it is empty 'writeSynchronized' fills it, otherwise the write blocks.
 -- If it is full 'takeSynchronized' empties, otherwise it blocks until it is filled.
@@ -55,7 +55,7 @@ modifyMutable m = liftIO . modifyIORef m
 --   writeSynchronized val -- write back the result
 -- @
 --
--- Another use for this type is as a message channel, where we have a producer and a consumer, 
+-- Another use for this type is as a message channel, where we have a producer and a consumer,
 -- the producer tries to write values into the 'Synchronized' ('writeSynchronized') and the consumer
 -- waits for the 'Synchronized' to be filled and takes the value 'takeSynchronized' for procesing.
 --

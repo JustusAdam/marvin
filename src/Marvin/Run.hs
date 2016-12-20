@@ -28,6 +28,7 @@ import           Control.Monad.Reader
 import           Data.Char                 (isSpace)
 import qualified Data.Configurator         as C
 import qualified Data.Configurator.Types   as C
+import           Data.Foldable             (for_)
 import           Data.Maybe                (fromMaybe, mapMaybe)
 import           Data.Monoid               ((<>))
 import           Data.Sequences
@@ -42,7 +43,6 @@ import           Prelude                   hiding (dropWhile, splitAt)
 import qualified System.Log.Formatter      as L
 import qualified System.Log.Handler.Simple as L
 import qualified System.Log.Logger         as L
-import Data.Foldable (for_)
 
 
 data CmdOptions = CmdOptions
@@ -119,7 +119,7 @@ mkApp scripts cfg adapter = genericHandler
     allListens :: Vector (Regex, Message -> Match -> IO ())
     allListens = fromList $! allActions^.hears
     allCustoms :: [Event -> Maybe (IO ())]
-    allCustoms = allActions^.customs 
+    allCustoms = allActions^.customs
 
 
 addAction :: Script a -> a -> WrappedAction a -> Handlers -> Handlers
