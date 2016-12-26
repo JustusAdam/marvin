@@ -318,18 +318,18 @@ lciListParser (Array a) = toList <$> mapM lciParser a
 lciListParser _ = mzero
 
 
-refreshChannels :: SlackRTMAdapter -> IO ChannelCache
+refreshChannels :: SlackRTMAdapter -> IO (Either String ChannelCache)
 refreshChannels adapter = do
     usr <- execAPIMethod lciListParser adapter "channels.list" []
     case usr of
-        Left err -> error ("Parse error when getting channel data " ++ err)
+        Left err -> return $ Left $ "Parse error when getting channel data " ++ err
         Right (APIResponse True v) -> do
             let cmap = mapFromList $ map ((^. idValue) &&& id) v
                 nmap = mapFromList $ map ((^. name) &&& (^. idValue)) v
                 cache = ChannelCache cmap nmap
             putMVar (channelChache adapter) cache
-            return cache
-        Right (APIResponse False _) -> error "Server denied getting channel info request"
+            return $ Right cache
+        Right (APIResponse False _) -> return $ Left "Server denied getting channel info request"
 
 
 resolveChannelImpl :: SlackRTMAdapter -> String -> IO (Maybe Channel)
@@ -337,8 +337,10 @@ resolveChannelImpl adapter name = do
     cc <- readMVar $ channelChache adapter
     case cc ^? nameResolver . ix name of
         Nothing -> do
-            ncc <- refreshChannels adapter
-            return $ ncc ^? nameResolver . ix name
+            refreshed <- refreshChannels adapter
+            case refreshed of
+                Left err -> errorM adapter err >> return Nothing
+                Right ncc -> return $ ncc ^? nameResolver . ix name
         Just found -> return (Just found)
 
 
@@ -348,7 +350,7 @@ getChannelNameImpl adapter channel = do
     case cc ^? infoCache . ix channel of
         Nothing -> do
             ncc <- refreshChannels adapter
-            return $ (^.name) $ fromMaybe (error "Channel not found") $ ncc ^? infoCache . ix channel
+            return $ (^.name) $ fromMaybe (error "Channel not found") $ ncc ^? _Right . infoCache . ix channel
         Just found -> return $ found ^. name
 
 
