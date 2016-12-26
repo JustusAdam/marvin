@@ -9,6 +9,9 @@ Portability : POSIX
 -}
 {-# LANGUAGE NamedFieldPuns  #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Marvin.Adapter.Slack (SlackRTMAdapter) where
 
 
@@ -42,15 +45,6 @@ import           Text.Read                  (readMaybe)
 import           Wuss
 
 
-data InternalType
-    = Error
-        { code :: Int
-        , msg  :: String
-        }
-    | Unhandeled String
-    | Ignored
-
-
 instance FromJSON URI where
     parseJSON (String t) = maybe mzero return $ parseURI $ unpack t
     parseJSON _          = mzero
@@ -72,6 +66,43 @@ data APIResponse a = APIResponse
     }
 
 
+declareFields [d|
+    data LimitedChannelInfo = LimitedChannelInfo
+        { limitedChannelInfoIdValue :: Channel
+        , limitedChannelInfoName :: String
+        }
+    |]
+
+declareFields [d|
+    data UserInfo = UserInfo
+        { userInfoUsername :: String
+        , userInfoIdValue  :: User
+        }
+    |]
+
+
+declareFields [d|
+    data ChannelCache = ChannelCache
+        { channelCacheInfoCache    :: HashMap Channel LimitedChannelInfo
+        , channelCacheNameResolver :: HashMap String Channel
+        }
+    |]
+
+
+data InternalType
+    = Error
+        { code :: Int
+        , msg  :: String
+        }
+    | Unhandeled String
+    | Ignored
+    | ChannelArchiveStatusChange Channel Bool
+    | ChannelCreated LimitedChannelInfo
+    | ChannelDeleted Channel
+    | ChannelRename LimitedChannelInfo
+    | UserChange UserInfo
+
+
 deriveJSON defaultOptions { fieldLabelModifier = camelTo2 '_' } ''RTMData
 
 
@@ -88,6 +119,7 @@ eventParser (Object o) = isErrParser <|> hasTypeParser
     hasTypeParser = do
         t <- o .: "type"
 
+        -- https://api.slack.com/rtm
         case t of
             "error" -> do
                 ev <- Error <$> o .: "code" <*> o .: "msg"
@@ -100,6 +132,22 @@ eventParser (Object o) = isErrParser <|> hasTypeParser
                         <*> o .: "ts"
                 return $ Right (MessageEvent ev)
             "reconnect_url" -> return $ Left Ignored
+            "channel_archive" -> do
+                ev <- ChannelArchiveStatusChange <$> o .: "channel" <*> pure True
+                return $ Left ev
+            "channel_unarchive" -> do
+                ev <- ChannelArchiveStatusChange <$> o .: "channel" <*> pure False
+                return $ Left ev
+            "channel_created" -> do
+                ev <- o .: "channel" >>= lciParser
+                return $ Left $ ChannelCreated ev
+            "channel_deleted" -> Left . ChannelDeleted <$> o .: "channel"
+            "channel_rename" -> do 
+                ev <- o .: "channel" >>= lciParser
+                pure $ Left $ ChannelRename ev
+            "user_change" -> do 
+                ev <- o .: "user" >>= userInfoParser
+                pure $ Left $ UserChange ev
             _ -> return $ Left $ Unhandeled t
 eventParser _ = mzero
 
@@ -127,13 +175,6 @@ userInfoParser _ = mzero
 apiResponseParser :: (Value -> Parser a) -> Value -> Parser (APIResponse a)
 apiResponseParser f v@(Object o) = APIResponse <$> o .: "ok" <*> f v
 apiResponseParser _ _            = mzero
-
-
-data ChannelCache = ChannelCache
-    { ccCache      :: HashMap Channel LimitedChannelInfo
-    , nameResolver :: HashMap String Channel
-    }
-
 
 data SlackRTMAdapter = SlackRTMAdapter
     { sendMessage   :: BS.ByteString -> IO ()
@@ -198,6 +239,14 @@ runHandlerLoop adapter messageChan handler =
                             Error code msg ->
                                 errorM adapter $ "Error from remote code: " ++ show code ++ " msg: " ++ msg
                             Ignored -> return ()
+                            ChannelArchiveStatusChange _ _ -> 
+                                -- TODO implement once we track the archiving status
+                                return ()
+                            ChannelCreated info ->
+                                putChannel adapter info
+                            ChannelDeleted chan -> deleteChannel adapter chan
+                            ChannelRename info -> renameChannel adapter info
+                            UserChange ui -> void $ refreshUserInfo adapter (ui^.idValue)
 
 
 runnerImpl :: RunWithAdapter SlackRTMAdapter
@@ -242,31 +291,22 @@ messageChannelImpl adapter (Channel chan) msg = do
                 ]
 
 
-data UserInfo = UserInfo
-    { uiUsername :: String
-    , uiId       :: User
-    }
-
-
 getUserInfoImpl :: SlackRTMAdapter -> User -> IO UserInfo
 getUserInfoImpl adapter user@(User user') = do
     uc <- readMVar $ userInfoCache adapter
-    maybe refreshAndReturn return $ lookup user uc
-  where
-    refreshAndReturn = do
-        usr <- execAPIMethod userInfoParser adapter "users.info" ["user" := user']
-        case usr of
-            Left err -> error ("Parse error when getting user data " ++ err)
-            Right (APIResponse True v) -> do
-                modifyMVar_ (userInfoCache adapter) (return . insertMap user v)
-                return v
-            Right (APIResponse False _) -> error "Server denied getting user info request"
+    maybe (refreshUserInfo adapter user) return $ lookup user uc
+  
 
+refreshUserInfo :: SlackRTMAdapter -> User -> IO UserInfo
+refreshUserInfo adapter user@(User user') = do
+    usr <- execAPIMethod userInfoParser adapter "users.info" ["user" := user']
+    case usr of
+        Left err -> error ("Parse error when getting user data " ++ err)
+        Right (APIResponse True v) -> do
+            modifyMVar_ (userInfoCache adapter) (return . insertMap user v)
+            return v
+        Right (APIResponse False _) -> error "Server denied getting user info request"
 
-data LimitedChannelInfo = LimitedChannelInfo
-    { lciId   :: Channel
-    , lciName :: String
-    }
 
 lciParser :: Value -> Parser LimitedChannelInfo
 lciParser (Object o) = LimitedChannelInfo <$> o .: "id" <*> o .: "name"
@@ -284,8 +324,8 @@ refreshChannels adapter = do
     case usr of
         Left err -> error ("Parse error when getting channel data " ++ err)
         Right (APIResponse True v) -> do
-            let cmap = mapFromList $ map (lciId &&& id) v
-                nmap = mapFromList $ map (lciName &&& lciId) v
+            let cmap = mapFromList $ map ((^. idValue) &&& id) v
+                nmap = mapFromList $ map ((^. name) &&& (^. idValue)) v
                 cache = ChannelCache cmap nmap
             putMVar (channelChache adapter) cache
             return cache
@@ -295,28 +335,58 @@ refreshChannels adapter = do
 resolveChannelImpl :: SlackRTMAdapter -> String -> IO (Maybe Channel)
 resolveChannelImpl adapter name = do
     cc <- readMVar $ channelChache adapter
-    case lookup name (nameResolver cc) of
+    case cc ^? nameResolver . ix name of
         Nothing -> do
             ncc <- refreshChannels adapter
-            return $ lookup name (nameResolver ncc)
+            return $ ncc ^? nameResolver . ix name
         Just found -> return (Just found)
 
 
 getChannelNameImpl :: SlackRTMAdapter -> Channel -> IO String
 getChannelNameImpl adapter channel = do
     cc <- readMVar $ channelChache adapter
-    case lookup channel (ccCache cc) of
+    case cc ^? infoCache . ix channel of
         Nothing -> do
             ncc <- refreshChannels adapter
-            return $ lciName $ fromMaybe (error "Channel not found") $ lookup channel (ccCache ncc)
-        Just found -> return $ lciName found
+            return $ (^.name) $ fromMaybe (error "Channel not found") $ ncc ^? infoCache . ix channel
+        Just found -> return $ found ^. name
+
+
+putChannel :: SlackRTMAdapter -> LimitedChannelInfo -> IO ()
+putChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id name) =
+    modifyMVar_ channelChache $ \cache ->
+        return $ cache
+            & infoCache . at id .~ Just channelInfo
+            & nameResolver . at name .~ Just id
+
+
+deleteChannel :: SlackRTMAdapter -> Channel -> IO ()
+deleteChannel SlackRTMAdapter{channelChache} channel =
+    modifyMVar_ channelChache $ \cache ->
+        return $ case cache ^? infoCache . ix channel of
+                    Nothing -> cache
+                    Just (LimitedChannelInfo _ name) ->
+                        cache & infoCache . at channel .~ Nothing
+                              & nameResolver . at name .~ Nothing
+
+
+renameChannel :: SlackRTMAdapter -> LimitedChannelInfo -> IO ()
+renameChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id name) =
+    modifyMVar_ channelChache $ \cache ->
+        let inserted = cache & infoCache . at id .~ Just channelInfo
+                             & nameResolver . at name .~ Just id
+        in return $ case cache ^? infoCache . ix id of
+                Just (LimitedChannelInfo _ oldName) | oldName /= name ->
+                    inserted & nameResolver . at oldName .~ Nothing
+                _ -> inserted
+
 
 
 instance IsAdapter SlackRTMAdapter where
     adapterId = "slack-rtm"
     messageChannel = messageChannelImpl
     runWithAdapter = runnerImpl
-    getUsername a = fmap uiUsername . getUserInfoImpl a
+    getUsername a = fmap (^.username) . getUserInfoImpl a
     getChannelName = getChannelNameImpl
     resolveChannel = resolveChannelImpl
 
