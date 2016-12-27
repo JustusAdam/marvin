@@ -41,13 +41,11 @@ library
                      , lens
                      , pcre-light
                      , vector
-                     , optparse-generic
+                     , optparse-applicative
                      , configurator
-                     , template-haskell
                      , bytestring
                      , async
                      , hslogger
-                     , text-format
                      , websockets
                      , network-uri
                      , wuss

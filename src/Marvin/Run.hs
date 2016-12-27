@@ -7,7 +7,6 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
-{-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE ExplicitForAll         #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
@@ -38,7 +37,7 @@ import           Marvin.Adapter
 import           Marvin.Internal
 import           Marvin.Internal.Types     hiding (channel)
 import           Marvin.Util.Regex
-import           Options.Generic
+import           Options.Applicative
 import           Prelude                   hiding (dropWhile, splitAt)
 import qualified System.Log.Formatter      as L
 import qualified System.Log.Handler.Simple as L
@@ -49,10 +48,7 @@ data CmdOptions = CmdOptions
     { configPath :: Maybe FilePath
     , verbose    :: Bool
     , debug      :: Bool
-    } deriving (Generic)
-
-
-instance ParseRecord CmdOptions
+    }
 
 
 defaultBotName :: String
@@ -179,7 +175,7 @@ prepareLogger =
 runMarvin :: forall a. IsAdapter a => [ScriptInit a] -> IO ()
 runMarvin s' = do
     prepareLogger
-    args <- getRecord "bot server"
+    args <- execParser infoParser
     when (verbose args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.INFO)
     when (debug args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.DEBUG)
     cfgLoc <- maybe
@@ -192,4 +188,27 @@ runMarvin s' = do
     runWithAdapter
         (C.subconfig ("adapter." <> unwrapAdapterId (adapterId :: AdapterId a)) cfg)
         $ application s' cfg
+  where
+    infoParser = info
+        (helper <*> optsParser)
+        (fullDesc <> header "Instance of marvin, the modular bot.")
+    optsParser = CmdOptions
+        <$> optional 
+            ( strOption
+            $  long "config-path"
+            <> value defaultConfigName
+            <> short 'c'
+            <> metavar "PATH"
+            <> help "root cofiguration file for the bot"
+            <> showDefault
+            )
+        <*> switch
+            (  long "verbose"
+            <> short 'v'
+            <> help "enable verbose logging (overrides config)"
+            )
+        <*> switch
+            (  long "debug"
+            <> help "enable debug logging (overrides config and verbose flag)"
+            )
 
