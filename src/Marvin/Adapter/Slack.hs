@@ -20,6 +20,7 @@ import           Control.Arrow              ((&&&))
 import           Control.Concurrent.Async   (async)
 import           Control.Concurrent.MVar    (MVar, modifyMVar_, newEmptyMVar, newMVar, putMVar,
                                              readMVar, takeMVar)
+import Control.Concurrent.Chan (newChan, writeChan, readChan, Chan)
 import           Control.Exception
 import           Control.Lens               hiding ((.=))
 import           Control.Monad
@@ -185,7 +186,7 @@ data SlackRTMAdapter = SlackRTMAdapter
     }
 
 
-runConnectionLoop :: C.Config -> MVar BS.ByteString -> MVar Connection -> IO ()
+runConnectionLoop :: C.Config -> Chan BS.ByteString -> MVar Connection -> IO ()
 runConnectionLoop cfg messageChan connTracker = forever $ do
     token <- C.require cfg "token"
     debugM pa "initializing socket"
@@ -215,7 +216,7 @@ runConnectionLoop cfg messageChan connTracker = forever $ do
                     putMVar connTracker conn
                     forever $ do
                         d <- receiveData conn
-                        putMVar messageChan d)
+                        writeChan messageChan d)
                 $ \e -> do
                     void $ takeMVar connTracker
                     errorM pa (show (e :: ConnectionException))
@@ -223,10 +224,10 @@ runConnectionLoop cfg messageChan connTracker = forever $ do
     pa = error "Phantom value" :: SlackRTMAdapter
 
 
-runHandlerLoop :: SlackRTMAdapter -> MVar BS.ByteString -> EventHandler SlackRTMAdapter -> IO ()
+runHandlerLoop :: SlackRTMAdapter -> Chan BS.ByteString -> EventHandler SlackRTMAdapter -> IO ()
 runHandlerLoop adapter messageChan handler =
     forever $ do
-        d <- takeMVar messageChan
+        d <- readChan messageChan
         case eitherDecode d >>= parseEither eventParser of
             Left err -> errorM adapter $ "Error parsing json: " ++ err ++ " original data: " ++ rawBS d
             Right v ->
@@ -249,14 +250,28 @@ runHandlerLoop adapter messageChan handler =
                             UserChange ui -> void $ refreshUserInfo adapter (ui^.idValue)
 
 
+sendMessageImpl :: MVar Connection -> BS.ByteString -> IO ()
+sendMessageImpl connTracker msg = go 3
+  where
+    pa = error "Phantom value" :: SlackRTMAdapter
+
+    go 0 = errorM pa "Connection error, quitting retry."
+    go n = 
+        catch 
+            (do
+                conn <- readMVar connTracker
+                sendTextData conn msg)
+            $ \e -> do
+                errorM pa $ show (e :: ConnectionException)
+                go (n-1)
+
+
 runnerImpl :: RunWithAdapter SlackRTMAdapter
 runnerImpl cfg handlerInit = do
     midTracker <- newMVar 0
     connTracker <- newEmptyMVar
-    messageChan <- newEmptyMVar
-    let send d = do
-            conn <- readMVar connTracker
-            sendTextData conn d
+    messageChan <- newChan
+    let send = sendMessageImpl connTracker
     adapter <- SlackRTMAdapter send cfg midTracker <$> newMVar (ChannelCache mempty mempty) <*> newMVar mempty
     handler <- handlerInit adapter
     void $ async $ runConnectionLoop cfg messageChan connTracker
