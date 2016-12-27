@@ -7,20 +7,21 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
-{-# LANGUAGE NamedFieldPuns  #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NamedFieldPuns         #-}
+{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE TypeSynonymInstances   #-}
 module Marvin.Adapter.Slack (SlackRTMAdapter) where
 
 
 import           Control.Applicative        ((<|>))
 import           Control.Arrow              ((&&&))
 import           Control.Concurrent.Async   (async)
+import           Control.Concurrent.Chan    (Chan, newChan, readChan, writeChan)
 import           Control.Concurrent.MVar    (MVar, modifyMVar_, newEmptyMVar, newMVar, putMVar,
                                              readMVar, takeMVar)
-import Control.Concurrent.Chan (newChan, writeChan, readChan, Chan)
+import           Control.Concurrent.STM     (TMVar, atomically, newTMVar, putTMVar, takeTMVar)
 import           Control.Exception
 import           Control.Lens               hiding ((.=))
 import           Control.Monad
@@ -143,10 +144,10 @@ eventParser (Object o) = isErrParser <|> hasTypeParser
                 ev <- o .: "channel" >>= lciParser
                 return $ Left $ ChannelCreated ev
             "channel_deleted" -> Left . ChannelDeleted <$> o .: "channel"
-            "channel_rename" -> do 
+            "channel_rename" -> do
                 ev <- o .: "channel" >>= lciParser
                 pure $ Left $ ChannelRename ev
-            "user_change" -> do 
+            "user_change" -> do
                 ev <- o .: "user" >>= userInfoParser
                 pure $ Left $ UserChange ev
             _ -> return $ Left $ Unhandeled t
@@ -180,7 +181,7 @@ apiResponseParser _ _            = mzero
 data SlackRTMAdapter = SlackRTMAdapter
     { sendMessage   :: BS.ByteString -> IO ()
     , userConfig    :: C.Config
-    , midTracker    :: MVar Int
+    , midTracker    :: TMVar Int
     , channelChache :: MVar ChannelCache
     , userInfoCache :: MVar (HashMap User UserInfo)
     }
@@ -240,7 +241,7 @@ runHandlerLoop adapter messageChan handler =
                             Error code msg ->
                                 errorM adapter $ "Error from remote code: " ++ show code ++ " msg: " ++ msg
                             Ignored -> return ()
-                            ChannelArchiveStatusChange _ _ -> 
+                            ChannelArchiveStatusChange _ _ ->
                                 -- TODO implement once we track the archiving status
                                 return ()
                             ChannelCreated info ->
@@ -256,8 +257,8 @@ sendMessageImpl connTracker msg = go 3
     pa = error "Phantom value" :: SlackRTMAdapter
 
     go 0 = errorM pa "Connection error, quitting retry."
-    go n = 
-        catch 
+    go n =
+        catch
             (do
                 conn <- readMVar connTracker
                 sendTextData conn msg)
@@ -268,7 +269,7 @@ sendMessageImpl connTracker msg = go 3
 
 runnerImpl :: RunWithAdapter SlackRTMAdapter
 runnerImpl cfg handlerInit = do
-    midTracker <- newMVar 0
+    midTracker <- atomically $ newTMVar 0
     connTracker <- newEmptyMVar
     messageChan <- newChan
     let send = sendMessageImpl connTracker
@@ -289,9 +290,9 @@ execAPIMethod innerParser adapter method params = do
 
 
 newMid :: SlackRTMAdapter -> IO Int
-newMid SlackRTMAdapter{midTracker} = do
-    id <- takeMVar midTracker
-    putMVar midTracker  (id + 1)
+newMid SlackRTMAdapter{midTracker} = atomically $ do
+    id <- takeTMVar midTracker
+    putTMVar midTracker  (id + 1)
     return id
 
 
@@ -310,7 +311,7 @@ getUserInfoImpl :: SlackRTMAdapter -> User -> IO UserInfo
 getUserInfoImpl adapter user@(User user') = do
     uc <- readMVar $ userInfoCache adapter
     maybe (refreshUserInfo adapter user) return $ lookup user uc
-  
+
 
 refreshUserInfo :: SlackRTMAdapter -> User -> IO UserInfo
 refreshUserInfo adapter user@(User user') = do
