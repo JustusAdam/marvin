@@ -235,7 +235,7 @@ runDefinitions sid definitions ada cfg = execStateT (runScript definitions) (Scr
 
 -- | Obtain the event reaction data.
 --
--- The type of this data depends on the reacion function used.
+-- The type of this data depends on the reaction function used.
 -- For instance 'hear' and 'respond' will contain 'MessageReactionData'.
 -- The actual contents comes from the event itself and was put together by the trigger.
 getData :: BotReacting a d d

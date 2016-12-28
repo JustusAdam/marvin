@@ -15,7 +15,7 @@ module Marvin
     , ScriptDefinition
     , IsAdapter
       -- * Reacting
-    , hear, respond, customTrigger, send, reply, messageChannel
+    , hear, respond, customTrigger, send, reply, messageChannel, messageChannel'
     , getData, getMessage, getMatch, getUsername, getChannelName
     , Message(..), User, Channel
     , getConfigVal, requireConfigVal

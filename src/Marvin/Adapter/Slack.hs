@@ -38,7 +38,7 @@ import           Data.Maybe                 (fromMaybe)
 import           Data.Sequences
 import           Data.Text                  (Text)
 import           Marvin.Adapter
-import           Marvin.Types
+import           Marvin.Types as Types
 import           Network.URI
 import           Network.WebSockets
 import           Network.Wreq
@@ -108,8 +108,16 @@ data InternalType
 deriveJSON defaultOptions { fieldLabelModifier = camelTo2 '_' } ''RTMData
 
 
+messageParser :: Value -> Parser Types.Message
+messageParser (Object o) = Message
+    <$> o .: "user"
+    <*> o .: "channel"
+    <*> o .: "text"
+    <*> o .: "ts"
+
+
 eventParser :: Value -> Parser (Either InternalType Event)
-eventParser (Object o) = isErrParser <|> hasTypeParser
+eventParser v@(Object o) = isErrParser <|> hasTypeParser
   where
     isErrParser = do
         e <- o .: "error"
@@ -127,12 +135,16 @@ eventParser (Object o) = isErrParser <|> hasTypeParser
                 ev <- Error <$> o .: "code" <*> o .: "msg"
                 return $ Left ev
             "message" -> do
-                ev <- Message
-                        <$> o .: "user"
-                        <*> o .: "channel"
-                        <*> o .: "text"
-                        <*> o .: "ts"
-                return $ Right (MessageEvent ev)
+                subt <- o .:? "subtype"
+                case (subt :: Maybe Text) of
+                    Just str 
+                        | str == "channel_join" || str == "group_join" -> do
+                            ev <- ChannelJoinEvent <$> o .: "user" <*> o .: "channel"
+                            return $ Right ev
+                        | str == "channel_leave" || str == "group_leave" -> do
+                            ev <- ChannelLeaveEvent <$> o .: "user" <*> o .: "channel"
+                            return $ Right ev
+                    _ -> Right . MessageEvent <$> messageParser v
             "reconnect_url" -> return $ Left Ignored
             "channel_archive" -> do
                 ev <- ChannelArchiveStatusChange <$> o .: "channel" <*> pure True

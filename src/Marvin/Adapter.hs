@@ -27,6 +27,8 @@ import qualified System.Log.Logger       as L
 -- | Representation for the types of events which can occur
 data Event
     = MessageEvent Message
+    | ChannelJoinEvent User Channel
+    | ChannelLeaveEvent User Channel
 
 
 type EventHandler a = Event -> IO ()
