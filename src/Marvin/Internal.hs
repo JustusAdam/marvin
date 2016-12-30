@@ -23,6 +23,7 @@ import qualified Marvin.Adapter          as A
 import           Marvin.Internal.Types
 import           Marvin.Util.Logging
 import           Marvin.Util.Regex       (Match, Regex)
+import Util
 
 
 -- | Read only data available to a handler when the bot reacts to an event.
@@ -154,6 +155,52 @@ hear !re = addReaction (Hear re)
 -- Equivalent to "robot.respond" in hubot
 respond :: Regex -> BotReacting a MessageReactionData () -> ScriptDefinition a ()
 respond !re = addReaction (Respond re)
+
+
+-- | This handler runs whenever a user enters __any channel__ (which the bot is subscribed to)
+--
+-- The payload contains the entering user and the channel which was entered.
+enter :: BotReacting a (User, Channel) -> ScriptDefinition a ()
+enter = notImplemented
+
+
+-- | This handler runs whenever a user exits __any channel__ (which the bot is subscribed to)
+--
+-- The payload contains the exiting user and the channel which was exited.
+exit :: BotReacting a (User, Channel) -> ScriptDefinition a ()
+exit = notImplemented
+
+
+-- | This handler runs whenever a user enters __the specified channel__.
+--
+-- The argument is the human readable name for the channel.
+--
+-- The payload contains the entering user.
+enterIn :: String -> BotReacting a User -> ScriptDefinition a ()
+enterIn = notImplemented
+
+
+-- | This handler runs whenever a user exits __the specified channel__, provided the bot is subscribed to the channel in question.
+--
+-- The argument is the human readable name for the channel.
+--
+-- The payload contains the exting user.
+exitFrom :: String -> BotReacting a User -> ScriptDefinition a ()
+exitFrom = notImplemented
+
+
+-- | This handler runs when the topic in __any channel__ the bot is subscribed to changes.
+--
+-- The payload contains the new topic and the channel in which it was set.
+topic :: BotReacting a (String, Channel) -> ScriptDefinition a ()
+topic = notImplemented
+
+
+-- | This handler runs when the topic in __the specified channel__ is changed, provided the bot is subscribed to the channel in question.
+--
+-- The argument is the human readable channel name.
+topicIn :: String -> BotReacting a String -> ScriptDefinition a ()
+topicIn = notImplemented
 
 
 -- | Extension point for the user
