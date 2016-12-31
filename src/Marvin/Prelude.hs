@@ -21,8 +21,8 @@ module Marvin.Prelude
     , module Marvin.Util.Regex
     -- | Dealing with JSON
     , module Marvin.Util.JSON
-    -- | Format strings which resolve to efficient Strings, aka 'Text'
-    , module Text.Printf
+    -- | Interpolated strings a la Scala and CoffeeScript
+    , module Marvin.Interpolate.String
     -- | Arbitrary IO in scripts
     , MonadIO, liftIO
     -- | Useful functions not in the normal Prelude
@@ -40,4 +40,4 @@ import           Marvin.Util.Logging
 import           Marvin.Util.Mutable
 import           Marvin.Util.Random
 import           Marvin.Util.Regex
-import           Text.Printf
+import Marvin.Interpolate.String

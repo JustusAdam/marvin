@@ -57,6 +57,7 @@ library
                      , unordered-containers
                      , mono-traversable
                      , stm
+                     , marvin-interpolate
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies
