@@ -107,6 +107,40 @@ class HasMatch m where
 instance HasMatchField m Match => HasMatch m where
     matchLens = matchField
 
+-- | Class which says that there is a way to get to a topic of type 'String' from this type @m@.
+class HasTopic m where
+    topicLens :: Lens' m String
+
+instance HasTopic (String, a) where
+    topicLens = _1
+
+idLens :: Lens' a a
+idLens = lens id (flip const)
+
+instance HasTopic String where
+    topicLens = idLens
+
+class HasChannel a where
+    channelLens :: Lens' a Channel
+
+instance HasChannel Channel where
+    channelLens = idLens
+
+instance HasChannel (a, Channel) where
+    channelLens = _2
+
+class HasUser a where
+    userLens :: Lens' a User
+
+instance HasUser User where
+    userLens = idLens
+
+instance HasUser (User, a) where
+    userLens = _1
+
+instance HasUser MessageReactionData where
+    userLens = messageField . lens sender (\a b -> a {sender = b})
+
 instance HasConfigAccess (ScriptDefinition a) where
     getConfigInternal = ScriptDefinition $ use config
 
@@ -300,6 +334,21 @@ getMatch = view (variable . matchLens)
 -- Includes sender, target channel, as well as the full, untruncated text of the original message
 getMessage :: HasMessage m => BotReacting a m Message
 getMessage = view (variable . messageLens)
+
+
+-- | Get the the new topic.
+getTopic :: HasTopic m => BotReacting a m String
+getTopic = view (variable . topicLens)
+
+
+-- | Get the stored channel in which something happened.
+getChannel :: HasChannel m => BotReacting a m Channel
+getChannel = view (variable . channelLens)
+
+
+-- | Get the user whihc was part of the triggered action.
+getUser :: HasUser m => BotReacting a m User
+getUser = view (variable . userLens)
 
 
 -- | Get a value out of the config, returns 'Nothing' if the value didn't exist.

@@ -17,10 +17,10 @@ module Marvin
       -- * Reacting
     , hear, respond, enter, exit, enterIn, exitFrom, topic, topicIn, customTrigger
     , send, reply, messageChannel, messageChannel'
-    , getData, getMessage, getMatch, getUsername, getChannelName
+    , getData, getMessage, getMatch, getTopic, getChannel, getUser, getUsername, getChannelName
     , Message(..), User, Channel
     , getConfigVal, requireConfigVal
-    , BotReacting, HasMessage(messageLens), HasMatch(matchLens)
+    , BotReacting, HasMessage(messageLens), HasMatch(matchLens), HasTopic(topicLens), HasChannel(channelLens), HasUser(userLens)
     -- ** Advanced actions
     , extractAction, extractReaction
     ) where
