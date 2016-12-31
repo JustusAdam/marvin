@@ -249,10 +249,10 @@ customTrigger tr = addReaction (Custom tr)
 -- | Send a message to the channel the triggering message came from.
 --
 -- Equivalent to "robot.send" in hubot
-send :: (IsAdapter a, HasMessage m) => String -> BotReacting a m ()
+send :: (IsAdapter a, HasChannel m) => String -> BotReacting a m ()
 send msg = do
-    o <- getMessage
-    messageChannel' (channel o) msg
+    o <- getChannel
+    messageChannel' o msg
 
 
 -- | Get the username of a registered user.
@@ -282,7 +282,7 @@ reply :: (IsAdapter a, HasMessage m) => String -> BotReacting a m ()
 reply msg = do
     om <- getMessage
     user <- getUsername $ sender om
-    send $ user ++ " " ++ msg
+    messageChannel' (channel om) $ user ++ " " ++ msg
 
 
 -- | Send a message to a Channel (by name)
