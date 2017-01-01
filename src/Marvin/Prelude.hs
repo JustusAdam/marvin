@@ -14,7 +14,7 @@ module Marvin.Prelude
     -- | Mutable references in marvin scripts
     , module Marvin.Util.Mutable
     -- | Logging in Scripts
-    , module Marvin.Util.Logging
+    , module Control.Monad.Logger
     -- | Random numbers and convenience functions
     , module Marvin.Util.Random
     -- | Marvins regex type and how to work with it
@@ -29,15 +29,15 @@ module Marvin.Prelude
     , when, unless, for, for_, fromMaybe
     ) where
 
-import           Control.Monad          (unless, when)
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Data.Foldable          (for_)
-import           Data.Maybe             (fromMaybe)
-import           Data.Traversable       (for)
+import           Control.Monad             (unless, when)
+import           Control.Monad.IO.Class    (MonadIO, liftIO)
+import           Control.Monad.Logger
+import           Data.Foldable             (for_)
+import           Data.Maybe                (fromMaybe)
+import           Data.Traversable          (for)
 import           Marvin
+import           Marvin.Interpolate.String
 import           Marvin.Util.JSON
-import           Marvin.Util.Logging
 import           Marvin.Util.Mutable
 import           Marvin.Util.Random
 import           Marvin.Util.Regex
-import Marvin.Interpolate.String

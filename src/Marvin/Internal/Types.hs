@@ -9,21 +9,23 @@ import           Control.Arrow           ((&&&))
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
+import           Control.Monad.Logger
 import           Data.Aeson
 import           Data.Aeson.TH
 import           Data.Char               (isAlphaNum, isLetter)
 import qualified Data.Configurator.Types as C
 import           Data.Hashable
 import           Data.String
-import           Data.Text               (Text, pack, toUpper, unpack)
-import qualified System.Log.Logger       as L
+import qualified Data.Text               as T
+import qualified Data.Text.Lazy          as LT
+import           Marvin.Interpolate.Text
 import           Text.Read               (readMaybe)
 
 
 -- | Identifier for a user (internal and not necessarily equal to the username)
-newtype User = User String deriving (IsString, Eq, Hashable)
+newtype User = User T.Text deriving (IsString, Eq, Hashable)
 -- | Identifier for a channel (internal and not necessarily equal to the channel name)
-newtype Channel = Channel String deriving (IsString, Eq, Show, Hashable)
+newtype Channel = Channel T.Text deriving (IsString, Eq, Show, Hashable)
 
 
 deriveJSON defaultOptions { unwrapUnaryRecords = True } ''User
@@ -37,13 +39,13 @@ newtype TimeStamp = TimeStamp { unwrapTimeStamp :: Double } deriving Show
 data Message = Message
     { sender    :: User
     , channel   :: Channel
-    , content   :: String
+    , content   :: LT.Text
     , timestamp :: TimeStamp
     }
 
 
 instance FromJSON TimeStamp where
-    parseJSON (String s) = maybe mzero (return . TimeStamp) $ readMaybe (unpack s)
+    parseJSON (String s) = maybe mzero (return . TimeStamp) $ readMaybe (T.unpack s)
     parseJSON _          = mzero
 
 instance ToJSON TimeStamp where
@@ -51,15 +53,23 @@ instance ToJSON TimeStamp where
 
 
 -- | A type, basically a String, which identifies a script to the config and the logging facilities.
-newtype ScriptId = ScriptId { unwrapScriptId :: Text } deriving (Show, Eq)
+newtype ScriptId = ScriptId { unwrapScriptId :: T.Text } deriving (Show, Eq)
 
 
 -- | A type, basically a String, which identifies an adapter to the config and the logging facilities.
-newtype AdapterId a = AdapterId { unwrapAdapterId :: Text } deriving (Show, Eq)
+newtype AdapterId a = AdapterId { unwrapAdapterId :: T.Text } deriving (Show, Eq)
+
+
+instance ShowT ScriptId where showT = unwrapScriptId
+
+instance ShowT (AdapterId a) where showT = unwrapAdapterId
 
 
 applicationScriptId :: ScriptId
 applicationScriptId = ScriptId "bot"
+
+
+type RunnerM = LoggingT IO
 
 
 verifyIdString :: String -> (String -> a) -> String -> a
@@ -91,12 +101,7 @@ class (IsScript m, MonadIO m) => HasConfigAccess m where
 class IsScript m where
     getScriptId :: m ScriptId
 
-
-prioMapping :: [(Text, L.Priority)]
-prioMapping = map ((pack . show) &&& id) [L.DEBUG, L.INFO, L.NOTICE, L.WARNING, L.ERROR, L.CRITICAL, L.ALERT, L.EMERGENCY]
-
-
-instance C.Configured L.Priority where
-    convert (C.String s) = lookup (toUpper s) prioMapping
+instance C.Configured LogLevel where
+    convert (C.String s) = readMaybe (T.unpack s)
     convert _            = Nothing
 

@@ -20,28 +20,30 @@ module Marvin.Run
     ) where
 
 
-import           Control.Concurrent.Async  (async, wait)
-import           Control.Exception
-import           Control.Lens              hiding (cons)
+import           Control.Concurrent.Async.Lifted (async, wait)
+import           Control.Exception.Lifted
+import           Control.Lens                    hiding (cons)
+import           Control.Monad.Logger
 import           Control.Monad.Reader
-import           Data.Char                 (isSpace)
-import qualified Data.Configurator         as C
-import qualified Data.Configurator.Types   as C
-import           Data.Foldable             (for_)
-import           Data.Maybe                (fromMaybe, mapMaybe)
-import           Data.Monoid               ((<>))
+import qualified Data.Configurator               as C
+import qualified Data.Configurator.Types         as C
+import           Data.Foldable                   (for_)
+import           Data.Maybe                      (fromMaybe, mapMaybe)
+import           Data.Monoid                     ((<>))
 import           Data.Sequences
-import           Data.Traversable          (for)
-import           Data.Vector               (Vector)
+import qualified Data.Text                       as T
+import qualified Data.Text.IO                    as T
+import qualified Data.Text.Lazy                  as L
+import           Data.Traversable                (for)
+import           Data.Vector                     (Vector)
 import           Marvin.Adapter
 import           Marvin.Internal
-import           Marvin.Internal.Types     hiding (channel)
+import           Marvin.Internal.Types           hiding (channel)
+import           Marvin.Interpolate.Text
 import           Marvin.Util.Regex
 import           Options.Applicative
-import           Prelude                   hiding (dropWhile, splitAt)
-import qualified System.Log.Formatter      as L
-import qualified System.Log.Handler.Simple as L
-import qualified System.Log.Logger         as L
+import           Prelude                         hiding (dropWhile, splitAt)
+import           System.IO                       (stderr)
 
 
 data CmdOptions = CmdOptions
@@ -51,7 +53,7 @@ data CmdOptions = CmdOptions
     }
 
 
-defaultBotName :: String
+defaultBotName :: L.Text
 defaultBotName = "marvin"
 
 
@@ -69,16 +71,16 @@ lookupFromAppConfig cfg = C.lookup (C.subconfig (unwrapScriptId applicationScrip
 
 declareFields [d|
     data Handlers = Handlers
-        { handlersResponds :: [(Regex, Message -> Match -> IO ())]
-        , handlersHears :: [(Regex, Message -> Match -> IO ())]
-        , handlersCustoms :: [Event -> Maybe (IO ())]
+        { handlersResponds :: [(Regex, Message -> Match -> RunnerM ())]
+        , handlersHears :: [(Regex, Message -> Match -> RunnerM ())]
+        , handlersCustoms :: [Event -> Maybe (RunnerM ())]
         }
     |]
 
 
 -- TODO add timeouts for handlers
 mkApp :: [Script a] -> C.Config -> a -> EventHandler a
-mkApp scripts cfg adapter = genericHandler
+mkApp scripts cfg adapter = runStderrLoggingT . genericHandler
   where
     genericHandler ev = do
         generics <- async $ do
@@ -91,10 +93,10 @@ mkApp scripts cfg adapter = genericHandler
 
     handleMessage msg = do
         lDispatches <- doIfMatch allListens text
-        botname <- fromMaybe defaultBotName <$> lookupFromAppConfig cfg "name"
-        let (trimmed, remainder) = splitAt (fromIntegral $ length botname) $ dropWhile isSpace text
+        botname <- fromMaybe defaultBotName <$> liftIO (lookupFromAppConfig cfg "name")
+        let (trimmed, remainder) = L.splitAt (fromIntegral $ L.length botname) $ L.stripStart text
         -- TODO At some point this needs to support derivations of the name. Maybe make that configurable?
-        rDispatches <- if toLower trimmed == toLower botname
+        rDispatches <- if L.toLower trimmed == L.toLower botname
                             then doIfMatch allReactions remainder
                             else return mempty
         mapM_ wait (lDispatches <> rDispatches)
@@ -102,7 +104,7 @@ mkApp scripts cfg adapter = genericHandler
         text = content msg
         doIfMatch things toMatch  =
             catMaybes <$> for things (\(trigger, action) ->
-                case match [] trigger toMatch of
+                case match trigger toMatch of
                         Nothing -> return Nothing
                         Just m  -> Just <$> async (action msg m))
 
@@ -110,11 +112,11 @@ mkApp scripts cfg adapter = genericHandler
 
     allActions = flattenActions (Handlers mempty mempty mempty) scripts
 
-    allReactions :: Vector (Regex, Message -> Match -> IO ())
+    allReactions :: Vector (Regex, Message -> Match -> RunnerM ())
     allReactions = fromList $! allActions^.responds
-    allListens :: Vector (Regex, Message -> Match -> IO ())
+    allListens :: Vector (Regex, Message -> Match -> RunnerM ())
     allListens = fromList $! allActions^.hears
-    allCustoms :: [Event -> Maybe (IO ())]
+    allCustoms :: [Event -> Maybe (RunnerM ())]
     allCustoms = allActions^.customs
 
 
@@ -126,74 +128,86 @@ addAction script adapter wa =
         (WrappedAction (Custom matcher) ac) -> customs %~ cons h
           where
             h ev = run <$> matcher ev
-            run s = runReaderT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) adapter s)
+            run s = runBotAction script adapter (Nothing :: Maybe ()) s ac
 
 
-runMessageAction :: Script a -> a -> Regex -> BotReacting a MessageReactionData () -> Message -> Match -> IO ()
-runMessageAction script adapter re ac msg mtch =
+runBotAction :: ShowT t => Script a -> a -> Maybe t -> d -> BotReacting a d () -> RunnerM ()
+runBotAction script adapter trigger data_ action =
     catch
-        (runReaderT (runReaction ac) (BotActionState (script^.scriptId) (script^.config) adapter (MessageReactionData msg mtch)))
-        (onScriptExcept (script^.scriptId) re)
+        (runReaderT (runReaction action) actionState)
+        (onScriptExcept (script^.scriptId) trigger)
 
-
-onScriptExcept :: ScriptId -> Regex -> SomeException -> IO ()
-onScriptExcept (ScriptId id) r e = do
-    err $ "Unhandled exception during execution of script " <> show id <> " with trigger " <> show r
-    err $ show e
   where
-    err = L.errorM "bot.dispatch"
+    actionState = BotActionState (script^.scriptId) (script^.config) adapter data_
+
+
+runMessageAction :: Script a -> a -> Regex -> BotReacting a MessageReactionData () -> Message -> Match -> RunnerM ()
+runMessageAction script adapter re ac msg mtch =
+    runBotAction script adapter (Just re) (MessageReactionData msg mtch) ac
+
+
+onScriptExcept :: ShowT t => ScriptId -> Maybe t -> SomeException -> RunnerM ()
+onScriptExcept (ScriptId id) trigger e = do
+    case trigger of
+        Just t ->
+            err $(isT "Unhandled exception during execution of script %{id} with trigger %{t}")
+        Nothing ->
+            err $(isT "Unhandled exception during execution of script %{id}")
+    err $(isT "%{e}")
+  where
+    err = logErrorNS "bot.dispatch"
 
 
 -- | Create a wai compliant application
 application :: [ScriptInit a] -> C.Config -> InitEventHandler a
-application inits config ada = do
-    L.infoM "bot" "Initializing scripts"
+application inits config ada = runStderrLoggingT $ do
+    $logInfoS "bot" "Initializing scripts"
     s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada config) (onInitExcept sid)) inits
     return $ mkApp s config ada
   where
-    onInitExcept :: ScriptId -> SomeException -> IO (Maybe a')
+    onInitExcept :: ScriptId -> SomeException -> RunnerM (Maybe a')
     onInitExcept (ScriptId id) e = do
-        err $ "Unhandled exception during initialization of script " <> show id
-        err $ show e
+        err $(isT "Unhandled exception during initialization of script ${id}")
+        err $(isT "%{e}")
         return Nothing
-      where err = L.errorM "bot.init"
+      where err = logErrorNS $(isT "%{applicationScriptId}.init")
 
 
-prepareLogger :: IO ()
-prepareLogger =
-    L.updateGlobalLogger L.rootLoggerName (L.setHandlers [handler])
-  where
-    handler = L.GenericHandler { L.priority = L.DEBUG
-                               , L.formatter = L.simpleLogFormatter "$time [$prio:$loggername] $msg"
-                               , L.privData = ()
-                               , L.writeFunc = const putStrLn
-                               , L.closeFunc = const $ return ()
-                               }
+-- prepareLogger :: IO ()
+-- prepareLogger =
+--     L.updateGlobalLogger L.rootLoggerName (L.setHandlers [handler])
+--   where
+--     handler = L.GenericHandler { L.priority = L.DEBUG
+--                                , L.formatter = L.simpleLogFormatter "$time [$prio:$loggername] $msg"
+--                                , L.privData = ()
+--                                , L.writeFunc = const putStrLn
+--                                , L.closeFunc = const $ return ()
+--                                }
 
 
 -- | Runs the marvin bot using whatever method the adapter uses.
-runMarvin :: forall a. IsAdapter a => [ScriptInit a] -> IO ()
+runMarvin :: forall a. IsAdapter a => [ScriptInit a] -> RunnerM ()
 runMarvin s' = do
-    prepareLogger
-    args <- execParser infoParser
-    when (verbose args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.INFO)
-    when (debug args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.DEBUG)
+    -- prepareLogger
+    args <- liftIO $ execParser infoParser
+    -- when (verbose args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.INFO)
+    -- when (debug args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.DEBUG)
     cfgLoc <- maybe
-                (L.noticeM "bot" "Using default config: config.cfg" >> return defaultConfigName)
+                ($logInfoS $(isT "${applicationScriptId}") "Using default config: config.cfg" >> return defaultConfigName)
                 return
                 (configPath args)
-    (cfg, cfgTid) <- C.autoReload C.autoConfig [C.Required cfgLoc]
-    unless (verbose args || debug args) $ C.lookup cfg "bot.logging" >>= maybe (return ()) (L.updateGlobalLogger L.rootLoggerName . L.setLevel)
+    (cfg, cfgTid) <- liftIO $ C.autoReload C.autoConfig [C.Required cfgLoc]
+    -- unless (verbose args || debug args) $ C.lookup cfg "bot.logging" >>= maybe (return ()) (L.updateGlobalLogger L.rootLoggerName . L.setLevel)
 
     runWithAdapter
-        (C.subconfig ("adapter." <> unwrapAdapterId (adapterId :: AdapterId a)) cfg)
+        (C.subconfig $(isT "adapter.%{adapterId :: AdapterId a}") cfg)
         $ application s' cfg
   where
     infoParser = info
         (helper <*> optsParser)
         (fullDesc <> header "Instance of marvin, the modular bot.")
     optsParser = CmdOptions
-        <$> optional 
+        <$> optional
             ( strOption
             $  long "config-path"
             <> value defaultConfigName

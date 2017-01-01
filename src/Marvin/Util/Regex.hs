@@ -9,30 +9,12 @@ Portability : POSIX
 -}
 module Marvin.Util.Regex
     ( Regex, Match, r, match
-    -- * Compile time regex options
-    , Re.PCREOption
-
-    , Re.anchored, Re.auto_callout
-    , Re.caseless, Re.dollar_endonly
-    , Re.dotall, Re.dupnames, Re.extended
-    , Re.extra, Re.firstline, Re.multiline
-    , Re.newline_cr
-    , Re.newline_crlf, Re.newline_lf, Re.no_auto_capture
-    , Re.ungreedy, Re.utf8, Re.no_utf8_check
-
-    -- * Runtime regex options
-    , Re.PCREExecOption
-
-    , Re.exec_anchored
-    , Re.exec_newline_cr, Re.exec_newline_crlf, Re.exec_newline_lf
-    , Re.exec_notbol, Re.exec_noteol, Re.exec_notempty
-    , Re.exec_no_utf8_check, Re.exec_partial
-    -- ** Unstable
-    , unwrapRegex
     ) where
 
 import           Data.String
-import qualified Text.Regex.PCRE.Light.Char8 as Re
+import qualified Data.Text      as T
+import qualified Data.Text.ICU  as Re
+import qualified Data.Text.Lazy as L
 
 
 -- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'.
@@ -49,20 +31,20 @@ instance Show Regex where
 
 
 -- | A match to a 'Regex'. Index 0 is the full match, all other indexes are match groups.
-type Match = [String]
+type Match = [L.Text]
 
 -- | Compile a regex with options
 --
 -- Normally it is sufficient to just write the regex as a plain string and have it be converted automatically, but if you want certain match options you can use this function.
-r :: [Re.PCREOption] -> String -> Regex
-r opts s = Regex $ Re.compile s opts
+r :: [Re.MatchOption] -> L.Text -> Regex
+r opts = Regex . Re.regex opts . L.toStrict
 
 
 instance IsString Regex where
     fromString "" = error "Empty regex is not permitted, use '.*' or similar instead"
-    fromString s = r [] s
+    fromString s = r [] (L.pack s)
 
 
 -- | Match a regex against a string and return the first match found (if any).
-match :: [Re.PCREExecOption] -> Regex -> String -> Maybe Match
-match opts re s = Re.match (unwrapRegex re) s opts
+match :: Regex -> L.Text -> Maybe Match
+match re s = map L.fromStrict . Re.unfold Re.group <$> Re.find (unwrapRegex re) (L.toStrict s)

@@ -5,7 +5,7 @@
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE Rank2Types                 #-}
-{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE UndecidableInstances       #-}
 module Marvin.Internal where
 
@@ -21,9 +21,12 @@ import           Data.Sequences
 import           Marvin.Adapter          (IsAdapter)
 import qualified Marvin.Adapter          as A
 import           Marvin.Internal.Types
-import           Marvin.Util.Logging
 import           Marvin.Util.Regex       (Match, Regex)
 import Util
+import Control.Monad.Logger
+import qualified Data.Text.Lazy as L
+import Control.Monad.Trans
+import Marvin.Interpolate.Text
 
 
 -- | Read only data available to a handler when the bot reacts to an event.
@@ -68,7 +71,7 @@ data WrappedAction a = forall d. WrappedAction (ActionData d) (BotReacting a d (
 -- This is also a 'MonadReader' instance, there you can inspect the entire state of this reaction.
 -- This is typically only used in internal or utility functions and not necessary for the user.
 -- To inspect particular pieces of this state refer to the *Lenses* section.
-newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState a d) IO r } deriving (Monad, MonadIO, Applicative, Functor, MonadReader (BotActionState a d))
+newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState a d) RunnerM r } deriving (Monad, MonadIO, Applicative, Functor, MonadReader (BotActionState a d), MonadLogger)
 
 -- | An abstract type describing a marvin script.
 --
@@ -86,11 +89,11 @@ declareFields [d|
 
 
 -- | A monad for gradually defining a 'Script' using 'respond' and 'hear' as well as any 'IO' action.
-newtype ScriptDefinition a r = ScriptDefinition { runScript :: StateT (Script a) IO r } deriving (Monad, MonadIO, Applicative, Functor)
+newtype ScriptDefinition a r = ScriptDefinition { runScript :: StateT (Script a) RunnerM r } deriving (Monad, MonadIO, Applicative, Functor, MonadLogger)
 
 
 -- | Initializer for a script. This gets run by the server during startup and creates a 'Script'
-newtype ScriptInit a = ScriptInit (ScriptId, a -> C.Config -> IO (Script a))
+newtype ScriptInit a = ScriptInit (ScriptId, a -> C.Config -> RunnerM (Script a))
 
 
 -- | Class which says that there is a way to get to a 'Message' from this type @m@.
@@ -109,15 +112,15 @@ instance HasMatchField m Match => HasMatch m where
 
 -- | Class which says that there is a way to get to a topic of type 'String' from this type @m@.
 class HasTopic m where
-    topicLens :: Lens' m String
+    topicLens :: Lens' m L.Text
 
-instance HasTopic (String, a) where
+instance HasTopic (L.Text, a) where
     topicLens = _1
 
 idLens :: Lens' a a
 idLens = lens id (flip const)
 
-instance HasTopic String where
+instance HasTopic L.Text where
     topicLens = idLens
 
 class HasChannel a where
@@ -249,53 +252,53 @@ customTrigger tr = addReaction (Custom tr)
 -- | Send a message to the channel the triggering message came from.
 --
 -- Equivalent to "robot.send" in hubot
-send :: (IsAdapter a, HasChannel m) => String -> BotReacting a m ()
+send :: (IsAdapter a, HasChannel m) => L.Text -> BotReacting a m ()
 send msg = do
     o <- getChannel
     messageChannel' o msg
 
 
 -- | Get the username of a registered user.
-getUsername :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User -> m String
+getUsername :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User -> m L.Text
 getUsername usr = do
     a <- getAdapter
-    liftIO $ A.getUsername a usr
+    A.liftAdapterAction $ A.getUsername a usr
 
 
-resolveChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => String -> m (Maybe Channel)
+resolveChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => L.Text -> m (Maybe Channel)
 resolveChannel name = do
     a <- getAdapter
-    liftIO $ A.resolveChannel a name
+    A.liftAdapterAction $ A.resolveChannel a name
 
 
 -- | Get the human readable name of a channel.
-getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel -> m String
+getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel -> m L.Text
 getChannelName rm = do
     a <- getAdapter
-    liftIO $ A.getChannelName a rm
+    A.liftAdapterAction $ A.getChannelName a rm
 
 
 -- | Send a message to the channel the original message came from and address the user that sent the original message.
 --
 -- Equivalent to "robot.reply" in hubot
-reply :: (IsAdapter a, HasMessage m) => String -> BotReacting a m ()
+reply :: (IsAdapter a, HasMessage m) => L.Text -> BotReacting a m ()
 reply msg = do
     om <- getMessage
     user <- getUsername $ sender om
-    messageChannel' (channel om) $ user ++ " " ++ msg
+    messageChannel' (channel om) $ user <> " " <> msg
 
 
 -- | Send a message to a Channel (by name)
-messageChannel :: (AccessAdapter m, IsAdapter (AdapterT m), IsScript m, MonadIO m) => String -> String -> m ()
+messageChannel :: (AccessAdapter m, IsAdapter (AdapterT m), IsScript m, MonadIO m, MonadLogger m) => L.Text -> L.Text -> m ()
 messageChannel name msg = do
     mchan <- resolveChannel name
-    maybe (errorM $ "No channel known with the name " ++ name) (`messageChannel'` msg) mchan
+    maybe ($logError [iqT|No channel known with the name %{name}|]) (`messageChannel'` msg) mchan
 
 
-messageChannel' :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel -> String -> m ()
+messageChannel' :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel -> L.Text -> m ()
 messageChannel' chan msg = do
     a <- getAdapter
-    liftIO $ A.messageChannel a chan msg
+    A.liftAdapterAction $ A.messageChannel a chan msg
 
 
 
@@ -310,7 +313,7 @@ defineScript sid definitions =
     ScriptInit (sid, runDefinitions sid definitions)
 
 
-runDefinitions :: ScriptId -> ScriptDefinition a () -> a -> C.Config -> IO (Script a)
+runDefinitions :: ScriptId -> ScriptDefinition a () -> a -> C.Config -> RunnerM (Script a)
 runDefinitions sid definitions ada cfg = execStateT (runScript definitions) (Script mempty sid cfg ada)
 
 
@@ -337,7 +340,7 @@ getMessage = view (variable . messageLens)
 
 
 -- | Get the the new topic.
-getTopic :: HasTopic m => BotReacting a m String
+getTopic :: HasTopic m => BotReacting a m L.Text
 getTopic = view (variable . topicLens)
 
 
@@ -395,7 +398,7 @@ requireAppConfigVal name = do
 extractReaction :: BotReacting a s o -> BotReacting a s (IO o)
 extractReaction reac = BotReacting $ do
     s <- ask
-    return $ runReaderT (runReaction reac) s
+    return $ runStderrLoggingT $ runReaderT (runReaction reac) s
 
 
 -- | Take an action and produce an IO action with the same effect.
@@ -406,4 +409,4 @@ extractAction ac = ScriptDefinition $ do
     a <- use adapter
     sid <- use scriptId
     cfg <- use config
-    return $ runReaderT (runReaction ac) (BotActionState sid cfg a ())
+    return $ runStderrLoggingT $ runReaderT (runReaction ac) (BotActionState sid cfg a ())
