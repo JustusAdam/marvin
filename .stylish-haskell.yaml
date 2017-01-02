@@ -157,3 +157,5 @@ language_extensions:
   - GADTs
   - NoImplicitPrelude
   - ExistentialQuantification
+  - TemplateHaskell
+  - QuasiQuotes

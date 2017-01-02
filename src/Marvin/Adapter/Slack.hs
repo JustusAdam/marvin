@@ -14,40 +14,40 @@ Portability : POSIX
 module Marvin.Adapter.Slack (SlackRTMAdapter) where
 
 
-import           Control.Applicative        ((<|>))
-import           Control.Arrow              ((&&&))
-import           Control.Concurrent.Async.Lifted   (async)
-import           Control.Concurrent.Chan.Lifted    (Chan, newChan, readChan, writeChan)
-import           Control.Concurrent.MVar.Lifted    (MVar, modifyMVar_, newEmptyMVar, newMVar, putMVar,
-                                             readMVar, takeMVar)
-import           Control.Concurrent.STM     (TMVar, atomically, newTMVar, putTMVar, takeTMVar)
+import           Control.Applicative             ((<|>))
+import           Control.Arrow                   ((&&&))
+import           Control.Concurrent.Async.Lifted (async)
+import           Control.Concurrent.Chan.Lifted  (Chan, newChan, readChan, writeChan)
+import           Control.Concurrent.MVar.Lifted  (MVar, modifyMVar_, newEmptyMVar, newMVar, putMVar,
+                                                  readMVar, takeMVar)
+import           Control.Concurrent.STM          (TMVar, atomically, newTMVar, putTMVar, takeTMVar)
 import           Control.Exception.Lifted
-import           Control.Lens               hiding ((.=))
+import           Control.Lens                    hiding ((.=))
 import           Control.Monad
-import           Data.Aeson                 hiding (Error)
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Data.Aeson                      hiding (Error)
 import           Data.Aeson.TH
-import           Data.Aeson.Types           hiding (Error)
-import qualified Data.ByteString.Lazy.Char8 as BS
-import qualified Data.Configurator          as C
-import qualified Data.Configurator.Types    as C
+import           Data.Aeson.Types                hiding (Error)
+import qualified Data.ByteString.Lazy.Char8      as BS
+import qualified Data.Configurator               as C
+import qualified Data.Configurator.Types         as C
 import           Data.Containers
-import           Data.Foldable              (toList)
-import           Data.HashMap.Strict        (HashMap)
-import           Data.Maybe                 (fromMaybe)
+import           Data.Foldable                   (toList)
+import           Data.HashMap.Strict             (HashMap)
+import           Data.Maybe                      (fromMaybe)
 import           Data.Sequences
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as L
+import qualified Data.Text                       as T
+import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter
-import           Marvin.Types as Types
+import           Marvin.Interpolate.Text
+import           Marvin.Types                    as Types
 import           Network.URI
 import           Network.WebSockets
 import           Network.Wreq
-import           Prelude                    hiding (lookup)
-import           Text.Read                  (readMaybe)
+import           Prelude                         hiding (lookup)
+import           Text.Read                       (readMaybe)
 import           Wuss
-import Control.Monad.Logger
-import Control.Monad.IO.Class
-import Marvin.Interpolate.Text
 
 
 instance FromJSON URI where
@@ -140,7 +140,7 @@ eventParser v@(Object o) = isErrParser <|> hasTypeParser
             "message" -> do
                 subt <- o .:? "subtype"
                 case (subt :: Maybe T.Text) of
-                    Just str 
+                    Just str
                         | str == "channel_join" || str == "group_join" -> do
                             ev <- ChannelJoinEvent <$> o .: "user" <*> o .: "channel"
                             return $ Right ev
@@ -194,7 +194,7 @@ apiResponseParser f v@(Object o) = APIResponse <$> o .: "ok" <*> f v
 apiResponseParser _ _            = mzero
 
 data SlackRTMAdapter = SlackRTMAdapter
-    { sendMessage   :: BS.ByteString -> AdapterMonad ()
+    { sendMessage   :: BS.ByteString -> RunnerM ()
     , userConfig    :: C.Config
     , midTracker    :: TMVar Int
     , channelChache :: MVar ChannelCache
@@ -202,7 +202,7 @@ data SlackRTMAdapter = SlackRTMAdapter
     }
 
 
-runConnectionLoop :: C.Config -> Chan BS.ByteString -> MVar Connection -> AdapterMonad ()
+runConnectionLoop :: C.Config -> Chan BS.ByteString -> MVar Connection -> RunnerM ()
 runConnectionLoop cfg messageChan connTracker = forever $ do
     token <- liftIO $ C.require cfg "token"
     $logDebug "initializing socket"
@@ -238,7 +238,7 @@ runConnectionLoop cfg messageChan connTracker = forever $ do
                     $logError [iqT|%{e :: ConnectionException}|]
 
 
-runHandlerLoop :: SlackRTMAdapter -> Chan BS.ByteString -> EventHandler SlackRTMAdapter -> AdapterMonad ()
+runHandlerLoop :: SlackRTMAdapter -> Chan BS.ByteString -> EventHandler SlackRTMAdapter -> RunnerM ()
 runHandlerLoop adapter messageChan handler =
     forever $ do
         d <- readChan messageChan
@@ -264,7 +264,7 @@ runHandlerLoop adapter messageChan handler =
                             UserChange ui -> void $ refreshUserInfo adapter (ui^.idValue)
 
 
-sendMessageImpl :: MVar Connection -> BS.ByteString -> AdapterMonad ()
+sendMessageImpl :: MVar Connection -> BS.ByteString -> RunnerM ()
 sendMessageImpl connTracker msg = go 3
   where
     go 0 = $logError "Connection error, quitting retry."
@@ -290,7 +290,7 @@ runnerImpl cfg handlerInit = do
     runHandlerLoop adapter messageChan handler
 
 
-execAPIMethod :: (Value -> Parser a) -> SlackRTMAdapter -> String -> [FormParam] -> AdapterMonad (Either String (APIResponse a))
+execAPIMethod :: (Value -> Parser a) -> SlackRTMAdapter -> String -> [FormParam] -> RunnerM (Either String (APIResponse a))
 execAPIMethod innerParser adapter method params = do
     token <- liftIO $ C.require cfg "token"
     response <- liftIO $ post ("https://slack.com/api/" ++ method) (("token" := (token :: T.Text)):params)
@@ -300,14 +300,14 @@ execAPIMethod innerParser adapter method params = do
     cfg = userConfig adapter
 
 
-newMid :: SlackRTMAdapter -> AdapterMonad Int
+newMid :: SlackRTMAdapter -> RunnerM Int
 newMid SlackRTMAdapter{midTracker} = liftIO $ atomically $ do
     id <- takeTMVar midTracker
     putTMVar midTracker  (id + 1)
     return id
 
 
-messageChannelImpl :: SlackRTMAdapter -> Channel -> L.Text -> AdapterMonad ()
+messageChannelImpl :: SlackRTMAdapter -> Channel -> L.Text -> RunnerM ()
 messageChannelImpl adapter (Channel chan) msg = do
     mid <- newMid adapter
     sendMessage adapter $ encode $
@@ -318,13 +318,13 @@ messageChannelImpl adapter (Channel chan) msg = do
                 ]
 
 
-getUserInfoImpl :: SlackRTMAdapter -> User -> AdapterMonad UserInfo
+getUserInfoImpl :: SlackRTMAdapter -> User -> RunnerM UserInfo
 getUserInfoImpl adapter user@(User user') = do
     uc <- readMVar $ userInfoCache adapter
     maybe (refreshUserInfo adapter user) return $ lookup user uc
 
 
-refreshUserInfo :: SlackRTMAdapter -> User -> AdapterMonad UserInfo
+refreshUserInfo :: SlackRTMAdapter -> User -> RunnerM UserInfo
 refreshUserInfo adapter user@(User user') = do
     usr <- execAPIMethod userInfoParser adapter "users.info" ["user" := user']
     case usr of
@@ -345,7 +345,7 @@ lciListParser (Array a) = toList <$> mapM lciParser a
 lciListParser _ = mzero
 
 
-refreshChannels :: SlackRTMAdapter -> AdapterMonad (Either String ChannelCache)
+refreshChannels :: SlackRTMAdapter -> RunnerM (Either String ChannelCache)
 refreshChannels adapter = do
     usr <- execAPIMethod lciListParser adapter "channels.list" []
     case usr of
@@ -359,7 +359,7 @@ refreshChannels adapter = do
         Right (APIResponse False _) -> return $ Left "Server denied getting channel info request"
 
 
-resolveChannelImpl :: SlackRTMAdapter -> L.Text -> AdapterMonad (Maybe Channel)
+resolveChannelImpl :: SlackRTMAdapter -> L.Text -> RunnerM (Maybe Channel)
 resolveChannelImpl adapter name = do
     cc <- readMVar $ channelChache adapter
     case cc ^? nameResolver . ix name of
@@ -371,7 +371,7 @@ resolveChannelImpl adapter name = do
         Just found -> return (Just found)
 
 
-getChannelNameImpl :: SlackRTMAdapter -> Channel -> AdapterMonad L.Text
+getChannelNameImpl :: SlackRTMAdapter -> Channel -> RunnerM L.Text
 getChannelNameImpl adapter channel = do
     cc <- readMVar $ channelChache adapter
     case cc ^? infoCache . ix channel of
@@ -381,7 +381,7 @@ getChannelNameImpl adapter channel = do
         Just found -> return $ found ^. name
 
 
-putChannel :: SlackRTMAdapter -> LimitedChannelInfo -> AdapterMonad ()
+putChannel :: SlackRTMAdapter -> LimitedChannelInfo -> RunnerM ()
 putChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id name) =
     modifyMVar_ channelChache $ \cache ->
         return $ cache
@@ -389,7 +389,7 @@ putChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id nam
             & nameResolver . at name .~ Just id
 
 
-deleteChannel :: SlackRTMAdapter -> Channel -> AdapterMonad ()
+deleteChannel :: SlackRTMAdapter -> Channel -> RunnerM ()
 deleteChannel SlackRTMAdapter{channelChache} channel =
     modifyMVar_ channelChache $ \cache ->
         return $ case cache ^? infoCache . ix channel of
@@ -399,7 +399,7 @@ deleteChannel SlackRTMAdapter{channelChache} channel =
                               & nameResolver . at name .~ Nothing
 
 
-renameChannel :: SlackRTMAdapter -> LimitedChannelInfo -> AdapterMonad ()
+renameChannel :: SlackRTMAdapter -> LimitedChannelInfo -> RunnerM ()
 renameChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id name) =
     modifyMVar_ channelChache $ \cache ->
         let inserted = cache & infoCache . at id .~ Just channelInfo

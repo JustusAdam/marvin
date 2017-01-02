@@ -14,6 +14,7 @@ Portability : POSIX
 {-# LANGUAGE NamedFieldPuns         #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE MultiWayIf #-}
 module Marvin.Run
     ( runMarvin, ScriptInit, IsAdapter
     , requireFromAppConfig, lookupFromAppConfig, defaultConfigName
@@ -44,6 +45,7 @@ import           Marvin.Util.Regex
 import           Options.Applicative
 import           Prelude                         hiding (dropWhile, splitAt)
 import           System.IO                       (stderr)
+import           Util
 
 
 data CmdOptions = CmdOptions
@@ -59,6 +61,10 @@ defaultBotName = "marvin"
 
 defaultConfigName :: FilePath
 defaultConfigName = "config.cfg"
+
+
+defaultLoggingLevel :: LogLevel
+defaultLoggingLevel = LevelWarn
 
 
 requireFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO a
@@ -79,8 +85,8 @@ declareFields [d|
 
 
 -- TODO add timeouts for handlers
-mkApp :: [Script a] -> C.Config -> a -> EventHandler a
-mkApp scripts cfg adapter = runStderrLoggingT . genericHandler
+mkApp :: LoggingFn -> [Script a] -> C.Config -> a -> EventHandler a
+mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
   where
     genericHandler ev = do
         generics <- async $ do
@@ -132,9 +138,10 @@ addAction script adapter wa =
 
 
 runBotAction :: ShowT t => Script a -> a -> Maybe t -> d -> BotReacting a d () -> RunnerM ()
-runBotAction script adapter trigger data_ action =
+runBotAction script adapter trigger data_ action = do
+    oldLogFn <- askLoggerIO
     catch
-        (runReaderT (runReaction action) actionState)
+        (liftIO $ flip runLoggingT (loggingAddSourcePrefix $(isT "script.%{script^.scriptId}") oldLogFn) $ flip runReaderT actionState $ runReaction action)
         (onScriptExcept (script^.scriptId) trigger)
 
   where
@@ -147,7 +154,7 @@ runMessageAction script adapter re ac msg mtch =
 
 
 onScriptExcept :: ShowT t => ScriptId -> Maybe t -> SomeException -> RunnerM ()
-onScriptExcept (ScriptId id) trigger e = do
+onScriptExcept id trigger e = do
     case trigger of
         Just t ->
             err $(isT "Unhandled exception during execution of script %{id} with trigger %{t}")
@@ -155,15 +162,15 @@ onScriptExcept (ScriptId id) trigger e = do
             err $(isT "Unhandled exception during execution of script %{id}")
     err $(isT "%{e}")
   where
-    err = logErrorNS "bot.dispatch"
+    err = logErrorNS "%{applicationScriptId}.dispatch"
 
 
 -- | Create a wai compliant application
-application :: [ScriptInit a] -> C.Config -> InitEventHandler a
-application inits config ada = runStderrLoggingT $ do
+application :: LoggingFn -> [ScriptInit a] -> C.Config -> InitEventHandler a
+application log inits config ada = flip runLoggingT log $ do
     $logInfoS "bot" "Initializing scripts"
     s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada config) (onInitExcept sid)) inits
-    return $ mkApp s config ada
+    return $ mkApp log s config ada
   where
     onInitExcept :: ScriptId -> SomeException -> RunnerM (Maybe a')
     onInitExcept (ScriptId id) e = do
@@ -173,36 +180,36 @@ application inits config ada = runStderrLoggingT $ do
       where err = logErrorNS $(isT "%{applicationScriptId}.init")
 
 
--- prepareLogger :: IO ()
--- prepareLogger =
---     L.updateGlobalLogger L.rootLoggerName (L.setHandlers [handler])
---   where
---     handler = L.GenericHandler { L.priority = L.DEBUG
---                                , L.formatter = L.simpleLogFormatter "$time [$prio:$loggername] $msg"
---                                , L.privData = ()
---                                , L.writeFunc = const putStrLn
---                                , L.closeFunc = const $ return ()
---                                }
+setLoggingLevelIn :: LogLevel -> RunnerM a -> RunnerM a
+setLoggingLevelIn lvl = filterLogger f
+    where f _ lvl2 = lvl2 < lvl
 
 
 -- | Runs the marvin bot using whatever method the adapter uses.
-runMarvin :: forall a. IsAdapter a => [ScriptInit a] -> RunnerM ()
-runMarvin s' = do
+runMarvin :: forall a. IsAdapter a => [ScriptInit a] -> IO ()
+runMarvin s' = runStderrLoggingT $ do
     -- prepareLogger
     args <- liftIO $ execParser infoParser
-    -- when (verbose args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.INFO)
-    -- when (debug args) $ L.updateGlobalLogger L.rootLoggerName (L.setLevel L.DEBUG)
-    cfgLoc <- maybe
-                ($logInfoS $(isT "${applicationScriptId}") "Using default config: config.cfg" >> return defaultConfigName)
-                return
-                (configPath args)
-    (cfg, cfgTid) <- liftIO $ C.autoReload C.autoConfig [C.Required cfgLoc]
-    -- unless (verbose args || debug args) $ C.lookup cfg "bot.logging" >>= maybe (return ()) (L.updateGlobalLogger L.rootLoggerName . L.setLevel)
 
-    runWithAdapter
-        (C.subconfig $(isT "adapter.%{adapterId :: AdapterId a}") cfg)
-        $ application s' cfg
+    cfgLoc <- maybe
+                    ($logInfoS $(isT "${applicationScriptId}") "Using default config: config.cfg" >> return defaultConfigName)
+                    return
+                    (configPath args)
+    (cfg, cfgTid) <- liftIO $ C.autoReload C.autoConfig [C.Required cfgLoc]
+    loggingLevelFromCfg <- liftIO $ C.lookup cfg $(isT "%{applicationScriptId}.logging")
+
+    let loggingLevel
+            | debug args = LevelDebug
+            | verbose args = LevelInfo
+            | otherwise = fromMaybe defaultLoggingLevel loggingLevelFromCfg
+    
+    setLoggingLevelIn loggingLevel $ do
+        oldLogFn <- askLoggerIO
+        liftIO $ flip runLoggingT (loggingAddSourcePrefix adapterPrefix oldLogFn) $ runWithAdapter
+            (C.subconfig adapterPrefix cfg)
+            $ application oldLogFn s' cfg
   where
+    adapterPrefix = $(isT "adapter.%{adapterId :: AdapterId a}")
     infoParser = info
         (helper <*> optsParser)
         (fullDesc <> header "Instance of marvin, the modular bot.")

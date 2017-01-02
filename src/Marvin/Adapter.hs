@@ -12,7 +12,7 @@ Portability : POSIX
 {-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Adapter
     ( Event(..)
-    , RunWithAdapter, EventHandler, InitEventHandler, AdapterMonad
+    , RunWithAdapter, EventHandler, InitEventHandler, RunnerM
     , IsAdapter(..)
     , liftAdapterAction
     ) where
@@ -33,10 +33,7 @@ data Event
 
 type EventHandler a = Event -> IO ()
 type InitEventHandler a = a -> IO (EventHandler a)
-type RunWithAdapter a = C.Config -> InitEventHandler a -> AdapterMonad ()
-
-
-type AdapterMonad = LoggingT IO
+type RunWithAdapter a = C.Config -> InitEventHandler a -> RunnerM ()
 
 
 -- | Basic functionality required of any adapter
@@ -44,16 +41,16 @@ class IsAdapter a where
     -- | Used for scoping config and logging
     adapterId :: AdapterId a
     -- | Post a message to a channel given the internal channel identifier
-    messageChannel :: a -> Channel -> L.Text -> AdapterMonad ()
+    messageChannel :: a -> Channel -> L.Text -> RunnerM ()
     -- | Initialize and run the bot
     runWithAdapter :: RunWithAdapter a
     -- | Resolve a username given the internal user identifier
-    getUsername :: a -> User -> AdapterMonad L.Text
+    getUsername :: a -> User -> RunnerM L.Text
     -- | Resolve the human readable name for a channel given the  internal channel identifier
-    getChannelName :: a -> Channel -> AdapterMonad L.Text
+    getChannelName :: a -> Channel -> RunnerM L.Text
     -- | Resolve to the internal channel identifier given a human readable name
-    resolveChannel :: a -> L.Text -> AdapterMonad (Maybe Channel)
+    resolveChannel :: a -> L.Text -> RunnerM (Maybe Channel)
 
 
-liftAdapterAction :: MonadIO m => AdapterMonad a -> m a
+liftAdapterAction :: MonadIO m => RunnerM a -> m a
 liftAdapterAction = liftIO . runStderrLoggingT

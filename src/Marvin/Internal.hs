@@ -4,8 +4,8 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE Rank2Types                 #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE UndecidableInstances       #-}
 module Marvin.Internal where
 
@@ -16,17 +16,17 @@ import qualified Data.Configurator       as C
 import qualified Data.Configurator.Types as C
 
 import           Control.Lens            hiding (cons)
+import           Control.Monad.Logger
+import           Control.Monad.Trans
 import           Data.Monoid             ((<>))
 import           Data.Sequences
+import qualified Data.Text.Lazy          as L
 import           Marvin.Adapter          (IsAdapter)
 import qualified Marvin.Adapter          as A
 import           Marvin.Internal.Types
+import           Marvin.Interpolate.Text
 import           Marvin.Util.Regex       (Match, Regex)
-import Util
-import Control.Monad.Logger
-import qualified Data.Text.Lazy as L
-import Control.Monad.Trans
-import Marvin.Interpolate.Text
+import           Util
 
 
 -- | Read only data available to a handler when the bot reacts to an event.
