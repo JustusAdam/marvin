@@ -11,10 +11,11 @@ Portability : POSIX
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiWayIf             #-}
 {-# LANGUAGE NamedFieldPuns         #-}
+{-# LANGUAGE Rank2Types             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE TemplateHaskell        #-}
-{-# LANGUAGE MultiWayIf, Rank2Types #-}
 module Marvin.Run
     ( runMarvin, ScriptInit, IsAdapter
     , requireFromAppConfig, lookupFromAppConfig, defaultConfigName
@@ -29,6 +30,7 @@ import           Control.Monad.Reader
 import qualified Data.Configurator               as C
 import qualified Data.Configurator.Types         as C
 import           Data.Foldable                   (for_)
+import qualified Data.HashMap.Strict             as HM
 import           Data.Maybe                      (fromMaybe, mapMaybe)
 import           Data.Monoid                     ((<>))
 import           Data.Sequences
@@ -36,7 +38,7 @@ import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Data.Traversable                (for)
 import           Data.Vector                     (Vector)
-import           Marvin.Adapter as A
+import           Marvin.Adapter                  as A
 import           Marvin.Internal
 import           Marvin.Internal.Types           hiding (channel)
 import           Marvin.Interpolate.Text
@@ -44,7 +46,6 @@ import           Marvin.Util.Regex
 import           Options.Applicative
 import           Prelude                         hiding (dropWhile, splitAt)
 import           Util
-import qualified Data.HashMap.Strict as HM
 
 
 data CmdOptions = CmdOptions
@@ -103,7 +104,7 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
     handler (MessageEvent msg) = handleMessage msg
     -- TODO implement other handlers
     handler (ChannelJoinEvent user chan) = changeHandlerHelper joins joinsIn user chan
-    handler (ChannelLeaveEvent user chan) = changeHandlerHelper leaves leavesFrom user chan 
+    handler (ChannelLeaveEvent user chan) = changeHandlerHelper leaves leavesFrom user chan
     handler (TopicChangeEvent topic chan) = changeHandlerHelper topicChange topicChangeIn topic chan
 
     changeHandlerHelper :: Getter Handlers [(b, Channel) -> RunnerM ()]
@@ -166,7 +167,7 @@ addAction script adapter wa =
           where reac chan = botAcWith (Just "Leave event" :: Maybe T.Text) chan ac
         WrappedAction Topic ac -> topicChange %~ cons (\d -> botAcWith (Just "Topic event" :: Maybe T.Text) d ac)
         WrappedAction (TopicIn chanName) ac -> topicChangeIn . at chanName %~ Just . maybe (return reac) (cons reac)
-          where reac chan = botAcWith (Just "Topic event" :: Maybe T.Text) chan ac 
+          where reac chan = botAcWith (Just "Topic event" :: Maybe T.Text) chan ac
         WrappedAction (Custom matcher) ac -> customs %~ cons h
           where
             h ev = run <$> matcher ev
@@ -241,7 +242,7 @@ runMarvin s' = runStderrLoggingT $ do
             | debug args = LevelDebug
             | verbose args = LevelInfo
             | otherwise = fromMaybe defaultLoggingLevel loggingLevelFromCfg
-    
+
     setLoggingLevelIn loggingLevel $ do
         oldLogFn <- askLoggerIO
         liftIO $ flip runLoggingT (loggingAddSourcePrefix adapterPrefix oldLogFn) $ runWithAdapter

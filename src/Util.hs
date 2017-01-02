@@ -1,9 +1,9 @@
 module Util where
 
 
+import           Control.Monad.Logger
 import qualified Data.Text               as T
 import           Marvin.Interpolate.Text
-import Control.Monad.Logger
 
 
 notImplemented :: a

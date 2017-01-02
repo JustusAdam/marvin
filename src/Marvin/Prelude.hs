@@ -22,21 +22,21 @@ module Marvin.Prelude
     -- | Dealing with JSON
     , module Marvin.Util.JSON
     -- | Interpolated strings a la Scala and CoffeeScript
-    , module Marvin.Interpolate.String
+    , module Marvin.Interpolate.Text.Lazy
     -- | Arbitrary IO in scripts
     , MonadIO, liftIO
     -- | Useful functions not in the normal Prelude
     , when, unless, for, for_, fromMaybe
     ) where
 
-import           Control.Monad             (unless, when)
-import           Control.Monad.IO.Class    (MonadIO, liftIO)
+import           Control.Monad                (unless, when)
+import           Control.Monad.IO.Class       (MonadIO, liftIO)
 import           Control.Monad.Logger
-import           Data.Foldable             (for_)
-import           Data.Maybe                (fromMaybe)
-import           Data.Traversable          (for)
+import           Data.Foldable                (for_)
+import           Data.Maybe                   (fromMaybe)
+import           Data.Traversable             (for)
 import           Marvin
-import           Marvin.Interpolate.String
+import           Marvin.Interpolate.Text.Lazy
 import           Marvin.Util.JSON
 import           Marvin.Util.Mutable
 import           Marvin.Util.Random
