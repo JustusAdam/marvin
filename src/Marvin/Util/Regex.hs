@@ -12,7 +12,6 @@ module Marvin.Util.Regex
     ) where
 
 import           Data.String
-import qualified Data.Text      as T
 import qualified Data.Text.ICU  as Re
 import qualified Data.Text.Lazy as L
 

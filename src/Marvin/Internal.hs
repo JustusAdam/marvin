@@ -17,7 +17,6 @@ import qualified Data.Configurator.Types as C
 
 import           Control.Lens            hiding (cons)
 import           Control.Monad.Logger
-import           Control.Monad.Trans
 import           Data.Monoid             ((<>))
 import           Data.Sequences
 import qualified Data.Text.Lazy          as L
@@ -55,6 +54,12 @@ declareFields [d|
 data ActionData d where
     Hear :: Regex -> ActionData MessageReactionData
     Respond :: Regex -> ActionData MessageReactionData
+    Join :: ActionData (User, Channel)
+    JoinIn :: L.Text -> ActionData User
+    Leave :: ActionData (User, Channel)
+    LeaveFrom :: L.Text -> ActionData User
+    Topic :: ActionData (L.Text, Channel)
+    TopicIn :: L.Text -> ActionData L.Text
     Custom :: (A.Event -> Maybe d) -> ActionData d
 
 
@@ -198,14 +203,14 @@ respond !re = addReaction (Respond re)
 --
 -- The payload contains the entering user and the channel which was entered.
 enter :: BotReacting a (User, Channel) () -> ScriptDefinition a ()
-enter = notImplemented
+enter = addReaction Join
 
 
 -- | This handler runs whenever a user exits __any channel__ (which the bot is subscribed to)
 --
 -- The payload contains the exiting user and the channel which was exited.
 exit :: BotReacting a (User, Channel) () -> ScriptDefinition a ()
-exit = notImplemented
+exit = addReaction Leave
 
 
 -- | This handler runs whenever a user enters __the specified channel__.
@@ -213,8 +218,8 @@ exit = notImplemented
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the entering user.
-enterIn :: String -> BotReacting a User () -> ScriptDefinition a ()
-enterIn = notImplemented
+enterIn :: L.Text -> BotReacting a User () -> ScriptDefinition a ()
+enterIn !chanName = addReaction (JoinIn chanName)
 
 
 -- | This handler runs whenever a user exits __the specified channel__, provided the bot is subscribed to the channel in question.
@@ -222,22 +227,22 @@ enterIn = notImplemented
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the exting user.
-exitFrom :: String -> BotReacting a User () -> ScriptDefinition a ()
-exitFrom = notImplemented
+exitFrom :: L.Text -> BotReacting a User () -> ScriptDefinition a ()
+exitFrom !chanName = addReaction (LeaveFrom chanName)
 
 
 -- | This handler runs when the topic in __any channel__ the bot is subscribed to changes.
 --
 -- The payload contains the new topic and the channel in which it was set.
-topic :: BotReacting a (String, Channel) () -> ScriptDefinition a ()
-topic = notImplemented
+topic :: BotReacting a (L.Text, Channel) () -> ScriptDefinition a ()
+topic = addReaction Topic
 
 
 -- | This handler runs when the topic in __the specified channel__ is changed, provided the bot is subscribed to the channel in question.
 --
 -- The argument is the human readable channel name.
-topicIn :: String -> BotReacting a String () -> ScriptDefinition a ()
-topicIn = notImplemented
+topicIn :: L.Text -> BotReacting a L.Text () -> ScriptDefinition a ()
+topicIn !chanName = addReaction (TopicIn chanName)
 
 
 -- | Extension point for the user
@@ -289,7 +294,7 @@ reply msg = do
 
 
 -- | Send a message to a Channel (by name)
-messageChannel :: (AccessAdapter m, IsAdapter (AdapterT m), IsScript m, MonadIO m, MonadLogger m) => L.Text -> L.Text -> m ()
+messageChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m, MonadLogger m) => L.Text -> L.Text -> m ()
 messageChannel name msg = do
     mchan <- resolveChannel name
     maybe ($logError [iqT|No channel known with the name %{name}|]) (`messageChannel'` msg) mchan

@@ -14,7 +14,7 @@ Portability : POSIX
 {-# LANGUAGE NamedFieldPuns         #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE TemplateHaskell        #-}
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE MultiWayIf, Rank2Types #-}
 module Marvin.Run
     ( runMarvin, ScriptInit, IsAdapter
     , requireFromAppConfig, lookupFromAppConfig, defaultConfigName
@@ -33,19 +33,18 @@ import           Data.Maybe                      (fromMaybe, mapMaybe)
 import           Data.Monoid                     ((<>))
 import           Data.Sequences
 import qualified Data.Text                       as T
-import qualified Data.Text.IO                    as T
 import qualified Data.Text.Lazy                  as L
 import           Data.Traversable                (for)
 import           Data.Vector                     (Vector)
-import           Marvin.Adapter
+import           Marvin.Adapter as A
 import           Marvin.Internal
 import           Marvin.Internal.Types           hiding (channel)
 import           Marvin.Interpolate.Text
 import           Marvin.Util.Regex
 import           Options.Applicative
 import           Prelude                         hiding (dropWhile, splitAt)
-import           System.IO                       (stderr)
 import           Util
+import qualified Data.HashMap.Strict as HM
 
 
 data CmdOptions = CmdOptions
@@ -80,12 +79,18 @@ declareFields [d|
         { handlersResponds :: [(Regex, Message -> Match -> RunnerM ())]
         , handlersHears :: [(Regex, Message -> Match -> RunnerM ())]
         , handlersCustoms :: [Event -> Maybe (RunnerM ())]
+        , handlersJoins :: [(User, Channel) -> RunnerM ()]
+        , handlersLeaves :: [(User, Channel) -> RunnerM ()]
+        , handlersTopicChange :: [(L.Text, Channel) -> RunnerM ()]
+        , handlersJoinsIn :: HM.HashMap L.Text [User -> RunnerM ()]
+        , handlersLeavesFrom :: HM.HashMap L.Text [User -> RunnerM ()]
+        , handlersTopicChangeIn :: HM.HashMap L.Text [L.Text -> RunnerM ()]
         }
     |]
 
 
 -- TODO add timeouts for handlers
-mkApp :: LoggingFn -> [Script a] -> C.Config -> a -> EventHandler a
+mkApp :: IsAdapter a => LoggingFn -> [Script a] -> C.Config -> a -> EventHandler a
 mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
   where
     genericHandler ev = do
@@ -96,6 +101,28 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
         handler ev
         wait generics
     handler (MessageEvent msg) = handleMessage msg
+    -- TODO implement other handlers
+    handler (ChannelJoinEvent user chan) = changeHandlerHelper joins joinsIn user chan
+    handler (ChannelLeaveEvent user chan) = changeHandlerHelper leaves leavesFrom user chan 
+    handler (TopicChangeEvent topic chan) = changeHandlerHelper topicChange topicChangeIn topic chan
+
+    changeHandlerHelper :: Getter Handlers [(b, Channel) -> RunnerM ()]
+                        -> Getter Handlers (HM.HashMap L.Text [b -> RunnerM ()])
+                        -> b
+                        -> Channel
+                        -> LoggingT IO ()
+    changeHandlerHelper getWildcards getSpecifics other chan = do
+        cName <- A.getChannelName adapter chan
+
+        let applicables = fromMaybe mempty $ allActions^?getSpecifics.ix cName
+
+        wildcards <- for (allActions^.getWildcards) (async . ($ (other, chan)))
+
+        applicablesRunning <- for applicables (async . ($ other))
+
+        mapM_ wait $ wildcards ++ applicablesRunning
+
+
 
     handleMessage msg = do
         lDispatches <- doIfMatch allListens text
@@ -116,7 +143,7 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
 
     flattenActions = foldr $ \script -> flip (foldr (addAction script adapter)) (script^.actions)
 
-    allActions = flattenActions (Handlers mempty mempty mempty) scripts
+    allActions = flattenActions (Handlers mempty mempty mempty mempty mempty mempty mempty mempty mempty) scripts
 
     allReactions :: Vector (Regex, Message -> Match -> RunnerM ())
     allReactions = fromList $! allActions^.responds
@@ -126,15 +153,27 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
     allCustoms = allActions^.customs
 
 
-addAction :: Script a -> a -> WrappedAction a -> Handlers -> Handlers
+addAction :: forall a. Script a -> a -> WrappedAction a -> Handlers -> Handlers
 addAction script adapter wa =
     case wa of
-        (WrappedAction (Hear re) ac) -> hears %~ cons (re, runMessageAction script adapter re ac)
-        (WrappedAction (Respond re) ac) -> responds %~ cons (re, runMessageAction script adapter re ac)
-        (WrappedAction (Custom matcher) ac) -> customs %~ cons h
+        WrappedAction (Hear re) ac -> hears %~ cons (re, runMessageAction script adapter re ac)
+        WrappedAction (Respond re) ac -> responds %~ cons (re, runMessageAction script adapter re ac)
+        WrappedAction Join ac -> joins %~ cons (\d -> botAcWith (Just "Join event" :: Maybe T.Text) d ac)
+        WrappedAction Leave ac -> leaves %~ cons (\d -> botAcWith (Just "Leave event" :: Maybe T.Text) d ac)
+        WrappedAction (JoinIn chName) ac -> joinsIn . at chName %~ Just . maybe (return reac) (cons reac)
+          where reac chan = botAcWith (Just "Join event" :: Maybe T.Text) chan ac
+        WrappedAction (LeaveFrom chName) ac -> leavesFrom . at chName %~ Just . maybe (return reac) (cons reac)
+          where reac chan = botAcWith (Just "Leave event" :: Maybe T.Text) chan ac
+        WrappedAction Topic ac -> topicChange %~ cons (\d -> botAcWith (Just "Topic event" :: Maybe T.Text) d ac)
+        WrappedAction (TopicIn chanName) ac -> topicChangeIn . at chanName %~ Just . maybe (return reac) (cons reac)
+          where reac chan = botAcWith (Just "Topic event" :: Maybe T.Text) chan ac 
+        WrappedAction (Custom matcher) ac -> customs %~ cons h
           where
             h ev = run <$> matcher ev
-            run s = runBotAction script adapter (Nothing :: Maybe ()) s ac
+            run s = botAcWith (Nothing :: Maybe ()) s ac
+  where
+    botAcWith :: ShowT t =>  Maybe t -> d -> BotReacting a d () -> RunnerM ()
+    botAcWith = runBotAction script adapter
 
 
 runBotAction :: ShowT t => Script a -> a -> Maybe t -> d -> BotReacting a d () -> RunnerM ()
@@ -166,7 +205,7 @@ onScriptExcept id trigger e = do
 
 
 -- | Create a wai compliant application
-application :: LoggingFn -> [ScriptInit a] -> C.Config -> InitEventHandler a
+application :: IsAdapter a => LoggingFn -> [ScriptInit a] -> C.Config -> InitEventHandler a
 application log inits config ada = flip runLoggingT log $ do
     $logInfoS "bot" "Initializing scripts"
     s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada config) (onInitExcept sid)) inits

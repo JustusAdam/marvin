@@ -117,6 +117,7 @@ messageParser (Object o) = Message
     <*> o .: "channel"
     <*> o .: "text"
     <*> o .: "ts"
+messageParser _ = mzero
 
 
 eventParser :: Value -> Parser (Either InternalType Event)
@@ -265,7 +266,7 @@ runHandlerLoop adapter messageChan handler =
 
 
 sendMessageImpl :: MVar Connection -> BS.ByteString -> RunnerM ()
-sendMessageImpl connTracker msg = go 3
+sendMessageImpl connTracker msg = go (3 :: Int)
   where
     go 0 = $logError "Connection error, quitting retry."
     go n =

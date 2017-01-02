@@ -29,6 +29,7 @@ data Event
     = MessageEvent Message
     | ChannelJoinEvent User Channel
     | ChannelLeaveEvent User Channel
+    | TopicChangeEvent L.Text Channel
 
 
 type EventHandler a = Event -> IO ()

@@ -5,7 +5,6 @@
 module Marvin.Internal.Types where
 
 
-import           Control.Arrow           ((&&&))
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
