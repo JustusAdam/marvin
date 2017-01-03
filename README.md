@@ -52,7 +52,7 @@ The best way to use Marvin is very much taken from hubot.
 
 A Marvin instance composes of a collection of scripts which are reactions or actions on certain messages posted in slack.
 Each script is a Haskell source file. 
-They get compiled into one single static binary, which is a HTTP server that listens for slack's event calls.
+They get compiled into one single static binary, which acts depending on the adapter used, in the case of the slack real time messaging adapter for instance it opens a websocket to the slack server from which it recieves events as they happen in your chat application.
 
 ### Defining scripts
 
@@ -177,7 +177,7 @@ Marvins Prelude exposes the [marvin-interpolate](https://github.com/JustusAdam/m
 
 ```haskell
 
-str = let x = "Hello" in $(isLT "%{x} World!")
+str = let x = "Hello" in $(isL "%{x} World!")
 -- "Hello World"
 ```
 
