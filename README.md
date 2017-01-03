@@ -29,15 +29,13 @@ script = defineScript "my-script" $ do
     hear "sudo (.+)" $ do
         match <- getMatch
 
-        let thing = match !! 1
-
-        reply $ "All right, i'll do " ++ thing
+        reply $(isL "All right, i'll do %{match !! 1}")
     
     respond "open the (\\w+) door" $ do
         match <- getMatch
         let door = match !! 1
         openDoor door
-        send $ printf "Door %s opened" door
+        send $(isL "Door %{door} opened")
     
     respond "what is in file (\\w+)\\??" $ do
         match <- getMatch 
@@ -175,11 +173,13 @@ Implementation started in `Marvin.Util.Mutable`, documentation coming soon.
 
 #### Format strings
 
-For String formatting Marvin re-exposes the `Text.Printf` module.  
+Marvins Prelude exposes the [marvin-interpolate](https://github.com/JustusAdam/marvin-interpolate) library, which enables the user to write CoffeeScript/Scala like interpolated Strings using Template Haskell.
 
-Format strings use placeholders with `%`, the default formatter (works for all `Show` datatypes) is `%v`.
-Substitution is done with the varargs function `printf`.
-You can find the full documentation in the documentation for the [`Text.Printf`](https://www.stackage.org/haddock/lts-7.12/base-4.9.0.0/Text-Printf.html#v:printf) module.
+```haskell
+
+str = let x = "Hello" in $(isLT "%{x} World!")
+-- "Hello World"
+```
 
 #### JSON
 
