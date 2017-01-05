@@ -189,7 +189,7 @@ Exposed in `Marvin.Util.JSON` documentation coming soon. Until then refer to [ae
 
 Marvin comes with a logging facility built in. 
 `Marvin.Util.Logging` expose the logging facility. 
-Several functions are available, depending on the urgency of your message, like `errorM`, `infoM` and `criticalM`.
+Several functions are available, depending on the urgency of your message, like `logError`, `logInfo` and `logWarn`.
 Logging messages made this way are automatically formatted and tagged with the scripts that reported them.
 
 By default all logging messages with higher priority `NOTICE` or higher are shown. 

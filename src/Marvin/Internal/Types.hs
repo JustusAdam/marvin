@@ -18,7 +18,8 @@ import           Data.String
 import qualified Data.Text               as T
 import qualified Data.Text.Lazy          as LT
 import           Marvin.Interpolate.Text
-import           Text.Read               (readMaybe)
+import qualified Data.HashMap.Strict as HM
+import Text.Read (readMaybe)
 
 
 -- | Identifier for a user (internal and not necessarily equal to the username)
@@ -101,6 +102,12 @@ class IsScript m where
     getScriptId :: m ScriptId
 
 instance C.Configured LogLevel where
-    convert (C.String s) = readMaybe (T.unpack s)
+    convert (C.String s) = 
+        case T.strip $ T.toLower s of
+            "debug" -> Just LevelDebug
+            "warning" -> Just LevelWarn
+            "error" -> Just LevelError
+            "info" -> Just LevelInfo
+            _ -> Nothing
     convert _            = Nothing
 

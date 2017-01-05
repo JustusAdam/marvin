@@ -22,7 +22,7 @@ module Marvin.Prelude
     -- | Dealing with JSON
     , module Marvin.Util.JSON
     -- | Interpolated strings a la Scala and CoffeeScript
-    , module Marvin.Interpolate.Text.Lazy
+    , isL, isT
     -- | Arbitrary IO in scripts
     , MonadIO, liftIO
     -- | Useful functions not in the normal Prelude
@@ -36,7 +36,8 @@ import           Data.Foldable                (for_)
 import           Data.Maybe                   (fromMaybe)
 import           Data.Traversable             (for)
 import           Marvin
-import           Marvin.Interpolate.Text.Lazy
+import           Marvin.Interpolate.Text.Lazy (isL)
+import           Marvin.Interpolate.Text      (isT)
 import           Marvin.Util.JSON
 import           Marvin.Util.Mutable
 import           Marvin.Util.Random
