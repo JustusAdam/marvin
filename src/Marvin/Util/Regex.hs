@@ -9,6 +9,7 @@ Portability : POSIX
 -}
 module Marvin.Util.Regex
     ( Regex, Match, r, match
+    , Re.MatchOption(..)
     ) where
 
 import           Data.String

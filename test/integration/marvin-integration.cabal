@@ -16,6 +16,7 @@ cabal-version:       >=1.10
 executable marvin-integration
   hs-source-dirs:      app
   main-is:             Main.hs
+  other-modules:       Script1
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
                      , marvin
@@ -25,4 +26,3 @@ executable marvin-integration
                      , MultiParamTypeClasses
                      , TupleSections
                      , GADTs
-                     , NoImplicitPrelude

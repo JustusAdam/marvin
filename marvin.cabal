@@ -56,7 +56,7 @@ library
                      , unordered-containers
                      , mono-traversable
                      , stm
-                     , marvin-interpolate > 0.2
+                     , marvin-interpolate > 0.3
                      , lifted-base
                      , lifted-async
   default-language:    Haskell2010

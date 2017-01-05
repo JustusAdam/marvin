@@ -137,6 +137,9 @@ instance HasChannel Channel where
 instance HasChannel (a, Channel) where
     channelLens = _2
 
+instance HasChannel MessageReactionData where
+    channelLens = messageField . lens channel (\a b -> a {channel = b})
+
 class HasUser a where
     userLens :: Lens' a User
 
