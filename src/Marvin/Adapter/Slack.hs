@@ -142,17 +142,26 @@ eventParser v@(Object o) = isErrParser <|> hasTypeParser
             "message" -> do
                 subt <- o .:? "subtype"
                 case (subt :: Maybe T.Text) of
-                    Just str
-                        | str == "channel_join" || str == "group_join" -> do
-                            ev <- ChannelJoinEvent <$> o .: "user" <*> o .: "channel"
-                            return $ Right ev
-                        | str == "channel_leave" || str == "group_leave" -> do
-                            ev <- ChannelLeaveEvent <$> o .: "user" <*> o .: "channel"
-                            return $ Right ev
-                        | str == "channel_topic" -> do
-                            t <- TopicChangeEvent <$> o .: "topic" <*> o .: "channel"
-                            return $ Right t
-                    _ -> Right . MessageEvent <$> messageParser v
+                    Just str ->
+                        case str of
+                            "channel_join" -> cJoin
+                            "group_join" -> cJoin
+                            "channel_leave" -> cLeave
+                            "group_leave" -> cLeave
+                            "channel_topic" -> do
+                                t <- TopicChangeEvent <$> o .: "topic" <*> o .: "channel"
+                                return $ Right t
+                            _ -> msgEv
+
+                    _ -> msgEv
+              where
+                msgEv = Right . MessageEvent <$> messageParser v
+                cJoin = do
+                    ev <- ChannelJoinEvent <$> o .: "user" <*> o .: "channel"
+                    return $ Right ev
+                cLeave = do
+                    ev <- ChannelLeaveEvent <$> o .: "user" <*> o .: "channel"
+                    return $ Right ev
             "reconnect_url" -> return $ Left Ignored
             "channel_archive" -> do
                 ev <- ChannelArchiveStatusChange <$> o .: "channel" <*> pure True
