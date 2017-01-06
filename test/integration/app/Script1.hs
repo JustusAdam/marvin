@@ -17,3 +17,7 @@ script = defineScript "test" $ do
         reply "Hello to you too"
     enter $
         send "Hello"
+    exit $ send "Goodbye"
+    topic $ do
+        t <- getTopic
+        send $(isL "The new topic is %{t}")

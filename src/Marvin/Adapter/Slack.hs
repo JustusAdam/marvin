@@ -149,6 +149,9 @@ eventParser v@(Object o) = isErrParser <|> hasTypeParser
                         | str == "channel_leave" || str == "group_leave" -> do
                             ev <- ChannelLeaveEvent <$> o .: "user" <*> o .: "channel"
                             return $ Right ev
+                        | str == "channel_topic" -> do
+                            t <- TopicChangeEvent <$> o .: "topic" <*> o .: "channel"
+                            return $ Right t
                     _ -> Right . MessageEvent <$> messageParser v
             "reconnect_url" -> return $ Left Ignored
             "channel_archive" -> do
