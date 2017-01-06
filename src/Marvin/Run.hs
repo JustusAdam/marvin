@@ -222,7 +222,7 @@ application log inits config ada = flip runLoggingT log $ do
 
 setLoggingLevelIn :: LogLevel -> RunnerM a -> RunnerM a
 setLoggingLevelIn lvl = filterLogger f
-    where f _ lvl2 = lvl2 < lvl
+    where f _ lvl2 = lvl2 >= lvl
 
 
 -- | Runs the marvin bot using whatever method the adapter uses.

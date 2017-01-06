@@ -48,6 +48,7 @@ import           Network.Wreq
 import           Prelude                         hiding (lookup)
 import           Text.Read                       (readMaybe)
 import           Wuss
+import Data.IORef.Lifted
 
 
 instance FromJSON URI where
@@ -75,7 +76,7 @@ declareFields [d|
     data LimitedChannelInfo = LimitedChannelInfo
         { limitedChannelInfoIdValue :: Channel
         , limitedChannelInfoName :: L.Text
-        }
+        } deriving Show
     |]
 
 declareFields [d|
@@ -198,8 +199,8 @@ data SlackRTMAdapter = SlackRTMAdapter
     { sendMessage   :: BS.ByteString -> RunnerM ()
     , userConfig    :: C.Config
     , midTracker    :: TMVar Int
-    , channelChache :: MVar ChannelCache
-    , userInfoCache :: MVar (HashMap User UserInfo)
+    , channelChache :: IORef ChannelCache
+    , userInfoCache :: IORef (HashMap User UserInfo)
     }
 
 
@@ -209,22 +210,23 @@ runConnectionLoop cfg messageChan connTracker = forever $ do
     $logDebug "initializing socket"
     r <- liftIO $ post "https://slack.com/api/rtm.start" [ "token" := (token :: T.Text) ]
     case eitherDecode (r^.responseBody) of
-        Left err -> $logError [iqT|Error decoding rtm json %{err}|]
+        Left err -> logErrorN $(isT "Error decoding rtm json %{err}")
         Right js -> do
             let uri = url js
                 authority = fromMaybe (error "URI lacks authority") (uriAuthority uri)
                 host = uriUserInfo authority ++ uriRegName authority
                 path = uriPath uri
                 portOnErr v = do
-                    $logError [iqT|Unreadable port %{v}|]
+                    logErrorN $(isT "Unreadable port %{v}")
                     return 443
             port <- case uriPort authority of
                         v@(':':r) -> maybe (portOnErr v) return $ readMaybe r
                         v         -> portOnErr v
-            $logDebug [iqT|connecting to socket '%{uri}'|]
+            $logDebug $(isT "connecting to socket '%{uri}'")
+            logFn <- askLoggerIO
             catch
-                (liftIO $ runSecureClient host port path $ \conn -> runStderrLoggingT $ do
-                    $logDebug "Connection established"
+                (liftIO $ runSecureClient host port path $ \conn -> flip runLoggingT logFn $ do
+                    logInfoN "Connection established"
                     d <- liftIO $ receiveData conn
                     case eitherDecode d >>= parseEither helloParser of
                         Right True -> $logDebug "Recieved hello packet"
@@ -236,7 +238,7 @@ runConnectionLoop cfg messageChan connTracker = forever $ do
                         writeChan messageChan d)
                 $ \e -> do
                     void $ takeMVar connTracker
-                    $logError [iqT|%{e :: ConnectionException}|]
+                    logErrorN $(isT "%{e :: ConnectionException}")
 
 
 runHandlerLoop :: SlackRTMAdapter -> Chan BS.ByteString -> EventHandler SlackRTMAdapter -> RunnerM ()
@@ -244,16 +246,16 @@ runHandlerLoop adapter messageChan handler =
     forever $ do
         d <- readChan messageChan
         case eitherDecode d >>= parseEither eventParser of
-            Left err -> $logError [iqT|Error parsing json: %{err} original data: %{rawBS d}|]
+            Left err -> logErrorN $(isT "Error parsing json: %{err} original data: %{rawBS d}")
             Right v ->
                 case v of
                     Right event -> liftIO $ handler event
                     Left internalEvent ->
                         case internalEvent of
                             Unhandeled type_ ->
-                                $logDebug [iqT|Unhandeled event type %{type_} payload: %{rawBS d}|]
+                                $logDebug $(isT "Unhandeled event type %{type_} payload: %{rawBS d}")
                             Error code msg ->
-                                $logError [iqT|Error from remote code: %{code} msg: %{msg}|]
+                                logErrorN $(isT "Error from remote code: %{code} msg: %{msg}")
                             Ignored -> return ()
                             ChannelArchiveStatusChange _ _ ->
                                 -- TODO implement once we track the archiving status
@@ -268,14 +270,14 @@ runHandlerLoop adapter messageChan handler =
 sendMessageImpl :: MVar Connection -> BS.ByteString -> RunnerM ()
 sendMessageImpl connTracker msg = go (3 :: Int)
   where
-    go 0 = $logError "Connection error, quitting retry."
+    go 0 = logErrorN "Connection error, quitting retry."
     go n =
         catch
             (do
                 conn <- readMVar connTracker
                 liftIO $ sendTextData conn msg)
             $ \e -> do
-                $logError [iqT|%{e :: ConnectionException}|]
+                logErrorN $(isT "%{e :: ConnectionException}")
                 go (n-1)
 
 
@@ -285,7 +287,7 @@ runnerImpl cfg handlerInit = do
     connTracker <- newEmptyMVar
     messageChan <- newChan
     let send = sendMessageImpl connTracker
-    adapter <- SlackRTMAdapter send cfg midTracker <$> newMVar (ChannelCache mempty mempty) <*> newMVar mempty
+    adapter <- SlackRTMAdapter send cfg midTracker <$> newIORef (ChannelCache mempty mempty) <*> newIORef mempty
     handler <- liftIO $ handlerInit adapter
     void $ async $ runConnectionLoop cfg messageChan connTracker
     runHandlerLoop adapter messageChan handler
@@ -321,7 +323,7 @@ messageChannelImpl adapter (Channel chan) msg = do
 
 getUserInfoImpl :: SlackRTMAdapter -> User -> RunnerM UserInfo
 getUserInfoImpl adapter user@(User user') = do
-    uc <- readMVar $ userInfoCache adapter
+    uc <- readIORef $ userInfoCache adapter
     maybe (refreshUserInfo adapter user) return $ lookup user uc
 
 
@@ -331,7 +333,7 @@ refreshUserInfo adapter user@(User user') = do
     case usr of
         Left err -> error ("Parse error when getting user data " ++ err)
         Right (APIResponse True v) -> do
-            modifyMVar_ (userInfoCache adapter) (return . insertMap user v)
+            atomicModifyIORef (userInfoCache adapter) ((, ()) . insertMap user v)
             return v
         Right (APIResponse False _) -> error "Server denied getting user info request"
 
@@ -348,67 +350,71 @@ lciListParser _ = mzero
 
 refreshChannels :: SlackRTMAdapter -> RunnerM (Either String ChannelCache)
 refreshChannels adapter = do
-    usr <- execAPIMethod lciListParser adapter "channels.list" []
+    usr <- execAPIMethod parser adapter "channels.list" []
     case usr of
         Left err -> return $ Left $ "Parse error when getting channel data " ++ err
         Right (APIResponse True v) -> do
+            $logDebug $(isT "Placing channels: %{v}")
             let cmap = mapFromList $ map ((^. idValue) &&& id) v
                 nmap = mapFromList $ map ((^. name) &&& (^. idValue)) v
                 cache = ChannelCache cmap nmap
-            putMVar (channelChache adapter) cache
+            atomicWriteIORef (channelChache adapter) cache
             return $ Right cache
         Right (APIResponse False _) -> return $ Left "Server denied getting channel info request"
+  where
+    parser (Object o) = o .: "channels" >>= lciListParser
+    parser _ = mzero
 
 
 resolveChannelImpl :: SlackRTMAdapter -> L.Text -> RunnerM (Maybe Channel)
 resolveChannelImpl adapter name = do
-    cc <- readMVar $ channelChache adapter
+    cc <- readIORef $ channelChache adapter
     case cc ^? nameResolver . ix name of
         Nothing -> do
             refreshed <- refreshChannels adapter
             case refreshed of
-                Left err -> $logError [iqT|%{err}|] >> return Nothing
+                Left err -> logErrorN $(isT "%{err}") >> return Nothing
                 Right ncc -> return $ ncc ^? nameResolver . ix name
         Just found -> return (Just found)
 
 
 getChannelNameImpl :: SlackRTMAdapter -> Channel -> RunnerM L.Text
 getChannelNameImpl adapter channel = do
-    cc <- readMVar $ channelChache adapter
+    cc <- readIORef $ channelChache adapter
     case cc ^? infoCache . ix channel of
         Nothing -> do
-            ncc <- refreshChannels adapter
-            return $ (^.name) $ fromMaybe (error "Channel not found") $ ncc ^? _Right . infoCache . ix channel
+            ncc <- either error id <$> refreshChannels adapter
+            return $ (^.name) $ fromMaybe (error "Channel not found") $ ncc ^? infoCache . ix channel
         Just found -> return $ found ^. name
 
 
 putChannel :: SlackRTMAdapter -> LimitedChannelInfo -> RunnerM ()
 putChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id name) =
-    modifyMVar_ channelChache $ \cache ->
-        return $ cache
-            & infoCache . at id .~ Just channelInfo
-            & nameResolver . at name .~ Just id
+    void $ atomicModifyIORef channelChache $ \cache ->
+        (, ()) $ cache
+                    & infoCache . at id .~ Just channelInfo
+                    & nameResolver . at name .~ Just id
 
 
 deleteChannel :: SlackRTMAdapter -> Channel -> RunnerM ()
 deleteChannel SlackRTMAdapter{channelChache} channel =
-    modifyMVar_ channelChache $ \cache ->
-        return $ case cache ^? infoCache . ix channel of
-                    Nothing -> cache
-                    Just (LimitedChannelInfo _ name) ->
-                        cache & infoCache . at channel .~ Nothing
-                              & nameResolver . at name .~ Nothing
+    void $ atomicModifyIORef channelChache $ \cache ->
+        case cache ^? infoCache . ix channel of
+            Nothing -> (cache, ())
+            Just (LimitedChannelInfo _ name) ->
+                (, ()) $ cache & infoCache . at channel .~ Nothing
+                               & nameResolver . at name .~ Nothing
 
 
 renameChannel :: SlackRTMAdapter -> LimitedChannelInfo -> RunnerM ()
 renameChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id name) =
-    modifyMVar_ channelChache $ \cache ->
+    void $ atomicModifyIORef channelChache $ \cache ->
         let inserted = cache & infoCache . at id .~ Just channelInfo
                              & nameResolver . at name .~ Just id
-        in return $ case cache ^? infoCache . ix id of
-                Just (LimitedChannelInfo _ oldName) | oldName /= name ->
-                    inserted & nameResolver . at oldName .~ Nothing
-                _ -> inserted
+        in case cache ^? infoCache . ix id of
+               Just (LimitedChannelInfo _ oldName) | oldName /= name ->
+                   (, ()) $ inserted & nameResolver . at oldName .~ Nothing
+               _ -> (inserted, ())
 
 
 
