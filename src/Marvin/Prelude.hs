@@ -36,8 +36,8 @@ import           Data.Foldable                (for_)
 import           Data.Maybe                   (fromMaybe)
 import           Data.Traversable             (for)
 import           Marvin
-import           Marvin.Interpolate.Text.Lazy (isL)
 import           Marvin.Interpolate.Text      (isT)
+import           Marvin.Interpolate.Text.Lazy (isL)
 import           Marvin.Util.JSON
 import           Marvin.Util.Mutable
 import           Marvin.Util.Random

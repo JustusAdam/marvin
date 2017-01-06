@@ -51,15 +51,18 @@ declareFields [d|
     |]
 
 
+type Topic = L.Text
+
+
 data ActionData d where
     Hear :: Regex -> ActionData MessageReactionData
     Respond :: Regex -> ActionData MessageReactionData
     Join :: ActionData (User, Channel)
-    JoinIn :: L.Text -> ActionData User
+    JoinIn :: L.Text -> ActionData (User, Channel)
     Leave :: ActionData (User, Channel)
-    LeaveFrom :: L.Text -> ActionData User
-    Topic :: ActionData (L.Text, Channel)
-    TopicIn :: L.Text -> ActionData L.Text
+    LeaveFrom :: L.Text -> ActionData (User, Channel)
+    TopicC :: ActionData (Topic, Channel)
+    TopicCIn :: L.Text -> ActionData (Topic, Channel)
     Custom :: (A.Event -> Maybe d) -> ActionData d
 
 
@@ -119,20 +122,14 @@ instance HasMatchField m Match => HasMatch m where
 class HasTopic m where
     topicLens :: Lens' m L.Text
 
-instance HasTopic (L.Text, a) where
+instance HasTopic (Topic, a) where
     topicLens = _1
 
 idLens :: Lens' a a
 idLens = lens id (flip const)
 
-instance HasTopic L.Text where
-    topicLens = idLens
-
 class HasChannel a where
     channelLens :: Lens' a Channel
-
-instance HasChannel Channel where
-    channelLens = idLens
 
 instance HasChannel (a, Channel) where
     channelLens = _2
@@ -221,7 +218,7 @@ exit = addReaction Leave
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the entering user.
-enterIn :: L.Text -> BotReacting a User () -> ScriptDefinition a ()
+enterIn :: L.Text -> BotReacting a (User, Channel) () -> ScriptDefinition a ()
 enterIn !chanName = addReaction (JoinIn chanName)
 
 
@@ -230,22 +227,22 @@ enterIn !chanName = addReaction (JoinIn chanName)
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the exting user.
-exitFrom :: L.Text -> BotReacting a User () -> ScriptDefinition a ()
+exitFrom :: L.Text -> BotReacting a (User, Channel) () -> ScriptDefinition a ()
 exitFrom !chanName = addReaction (LeaveFrom chanName)
 
 
 -- | This handler runs when the topic in __any channel__ the bot is subscribed to changes.
 --
 -- The payload contains the new topic and the channel in which it was set.
-topic :: BotReacting a (L.Text, Channel) () -> ScriptDefinition a ()
-topic = addReaction Topic
+topic :: BotReacting a (Topic, Channel) () -> ScriptDefinition a ()
+topic = addReaction TopicC
 
 
 -- | This handler runs when the topic in __the specified channel__ is changed, provided the bot is subscribed to the channel in question.
 --
 -- The argument is the human readable channel name.
-topicIn :: L.Text -> BotReacting a L.Text () -> ScriptDefinition a ()
-topicIn !chanName = addReaction (TopicIn chanName)
+topicIn :: L.Text -> BotReacting a (Topic, Channel) () -> ScriptDefinition a ()
+topicIn !chanName = addReaction (TopicCIn chanName)
 
 
 -- | Extension point for the user
@@ -300,7 +297,7 @@ reply msg = do
 messageChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m, MonadLogger m) => L.Text -> L.Text -> m ()
 messageChannel name msg = do
     mchan <- resolveChannel name
-    maybe ($logError [iqT|No channel known with the name %{name}|]) (`messageChannel'` msg) mchan
+    maybe ($logError $(isT "No channel known with the name #{name}")) (`messageChannel'` msg) mchan
 
 
 messageChannel' :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel -> L.Text -> m ()
@@ -348,7 +345,7 @@ getMessage = view (variable . messageLens)
 
 
 -- | Get the the new topic.
-getTopic :: HasTopic m => BotReacting a m L.Text
+getTopic :: HasTopic m => BotReacting a m Topic
 getTopic = view (variable . topicLens)
 
 

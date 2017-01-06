@@ -14,12 +14,12 @@ import           Data.Aeson.TH
 import           Data.Char               (isAlphaNum, isLetter)
 import qualified Data.Configurator.Types as C
 import           Data.Hashable
+import qualified Data.HashMap.Strict     as HM
 import           Data.String
 import qualified Data.Text               as T
 import qualified Data.Text.Lazy          as LT
 import           Marvin.Interpolate.Text
-import qualified Data.HashMap.Strict as HM
-import Text.Read (readMaybe)
+import           Text.Read               (readMaybe)
 
 
 -- | Identifier for a user (internal and not necessarily equal to the username)
@@ -102,7 +102,7 @@ class IsScript m where
     getScriptId :: m ScriptId
 
 instance C.Configured LogLevel where
-    convert (C.String s) = 
+    convert (C.String s) =
         case T.strip $ T.toLower s of
             "debug" -> Just LevelDebug
             "warning" -> Just LevelWarn

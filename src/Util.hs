@@ -13,7 +13,7 @@ notImplemented = error "Not implemented"
 addPrefix :: T.Text -> T.Text -> T.Text
 addPrefix prefix source
         | T.null source = prefix
-        | otherwise = $(isT "%{prefix}.%{source}")
+        | otherwise = $(isT "#{prefix}.#{source}")
 
 
 adaptLoggingSource :: (d -> b)  -> (a -> b -> c) -> a -> d -> c

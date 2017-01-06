@@ -29,13 +29,13 @@ script = defineScript "my-script" $ do
     hear "sudo (.+)" $ do
         match <- getMatch
 
-        reply $(isL "All right, i'll do %{match !! 1}")
+        reply $(isL "All right, i'll do #{match !! 1}")
     
     respond "open the (\\w+) door" $ do
         match <- getMatch
         let door = match !! 1
         openDoor door
-        send $(isL "Door %{door} opened")
+        send $(isL "Door #{door} opened")
     
     respond "what is in file (\\w+)\\??" $ do
         match <- getMatch 
@@ -177,7 +177,7 @@ Marvins Prelude exposes the [marvin-interpolate](https://github.com/JustusAdam/m
 
 ```haskell
 
-str = let x = "Hello" in $(isL "%{x} World!")
+str = let x = "Hello" in $(isL "#{x} World!")
 -- "Hello World"
 ```
 

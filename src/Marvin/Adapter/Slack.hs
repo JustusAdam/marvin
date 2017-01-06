@@ -35,6 +35,7 @@ import qualified Data.Configurator.Types         as C
 import           Data.Containers
 import           Data.Foldable                   (toList)
 import           Data.HashMap.Strict             (HashMap)
+import           Data.IORef.Lifted
 import           Data.Maybe                      (fromMaybe)
 import           Data.Sequences
 import qualified Data.Text                       as T
@@ -48,7 +49,6 @@ import           Network.Wreq
 import           Prelude                         hiding (lookup)
 import           Text.Read                       (readMaybe)
 import           Wuss
-import Data.IORef.Lifted
 
 
 instance FromJSON URI where
@@ -223,19 +223,19 @@ runConnectionLoop cfg messageChan connTracker = forever $ do
     $logDebug "initializing socket"
     r <- liftIO $ post "https://slack.com/api/rtm.start" [ "token" := (token :: T.Text) ]
     case eitherDecode (r^.responseBody) of
-        Left err -> logErrorN $(isT "Error decoding rtm json %{err}")
+        Left err -> logErrorN $(isT "Error decoding rtm json #{err}")
         Right js -> do
             let uri = url js
                 authority = fromMaybe (error "URI lacks authority") (uriAuthority uri)
                 host = uriUserInfo authority ++ uriRegName authority
                 path = uriPath uri
                 portOnErr v = do
-                    logErrorN $(isT "Unreadable port %{v}")
+                    logErrorN $(isT "Unreadable port #{v}")
                     return 443
             port <- case uriPort authority of
                         v@(':':r) -> maybe (portOnErr v) return $ readMaybe r
                         v         -> portOnErr v
-            $logDebug $(isT "connecting to socket '%{uri}'")
+            $logDebug $(isT "connecting to socket '#{uri}'")
             logFn <- askLoggerIO
             catch
                 (liftIO $ runSecureClient host port path $ \conn -> flip runLoggingT logFn $ do
@@ -251,7 +251,7 @@ runConnectionLoop cfg messageChan connTracker = forever $ do
                         writeChan messageChan d)
                 $ \e -> do
                     void $ takeMVar connTracker
-                    logErrorN $(isT "%{e :: ConnectionException}")
+                    logErrorN $(isT "#{e :: ConnectionException}")
 
 
 runHandlerLoop :: SlackRTMAdapter -> Chan BS.ByteString -> EventHandler SlackRTMAdapter -> RunnerM ()
@@ -259,16 +259,16 @@ runHandlerLoop adapter messageChan handler =
     forever $ do
         d <- readChan messageChan
         case eitherDecode d >>= parseEither eventParser of
-            Left err -> logErrorN $(isT "Error parsing json: %{err} original data: %{rawBS d}")
+            Left err -> logErrorN $(isT "Error parsing json: #{err} original data: #{rawBS d}")
             Right v ->
                 case v of
                     Right event -> liftIO $ handler event
                     Left internalEvent ->
                         case internalEvent of
                             Unhandeled type_ ->
-                                $logDebug $(isT "Unhandeled event type %{type_} payload: %{rawBS d}")
+                                $logDebug $(isT "Unhandeled event type #{type_} payload: #{rawBS d}")
                             Error code msg ->
-                                logErrorN $(isT "Error from remote code: %{code} msg: %{msg}")
+                                logErrorN $(isT "Error from remote code: #{code} msg: #{msg}")
                             Ignored -> return ()
                             ChannelArchiveStatusChange _ _ ->
                                 -- TODO implement once we track the archiving status
@@ -290,7 +290,7 @@ sendMessageImpl connTracker msg = go (3 :: Int)
                 conn <- readMVar connTracker
                 liftIO $ sendTextData conn msg)
             $ \e -> do
-                logErrorN $(isT "%{e :: ConnectionException}")
+                logErrorN $(isT "#{e :: ConnectionException}")
                 go (n-1)
 
 
@@ -310,7 +310,6 @@ execAPIMethod :: (Value -> Parser a) -> SlackRTMAdapter -> String -> [FormParam]
 execAPIMethod innerParser adapter method params = do
     token <- liftIO $ C.require cfg "token"
     response <- liftIO $ post ("https://slack.com/api/" ++ method) (("token" := (token :: T.Text)):params)
-    $logDebug (toStrict $ decodeUtf8 $ response^.responseBody)
     return $ eitherDecode (response^.responseBody) >>= parseEither (apiResponseParser innerParser)
   where
     cfg = userConfig adapter
@@ -366,7 +365,6 @@ refreshChannels adapter = do
     case usr of
         Left err -> return $ Left $ "Parse error when getting channel data " ++ err
         Right (APIResponse True v) -> do
-            $logDebug $(isT "Placing channels: %{v}")
             let cmap = mapFromList $ map ((^. idValue) &&& id) v
                 nmap = mapFromList $ map ((^. name) &&& (^. idValue)) v
                 cache = ChannelCache cmap nmap
@@ -376,25 +374,27 @@ refreshChannels adapter = do
 
 
 resolveChannelImpl :: SlackRTMAdapter -> L.Text -> RunnerM (Maybe Channel)
-resolveChannelImpl adapter name = do
+resolveChannelImpl adapter name' = do
     cc <- readIORef $ channelChache adapter
     case cc ^? nameResolver . ix name of
         Nothing -> do
             refreshed <- refreshChannels adapter
             case refreshed of
-                Left err -> logErrorN $(isT "%{err}") >> return Nothing
+                Left err -> logErrorN $(isT "#{err}") >> return Nothing
                 Right ncc -> return $ ncc ^? nameResolver . ix name
         Just found -> return (Just found)
+  where name = L.tail name'
 
 
 getChannelNameImpl :: SlackRTMAdapter -> Channel -> RunnerM L.Text
 getChannelNameImpl adapter channel = do
     cc <- readIORef $ channelChache adapter
-    case cc ^? infoCache . ix channel of
-        Nothing -> do
-            ncc <- either error id <$> refreshChannels adapter
-            return $ (^.name) $ fromMaybe (error "Channel not found") $ ncc ^? infoCache . ix channel
-        Just found -> return $ found ^. name
+    L.cons '#' <$>
+        case cc ^? infoCache . ix channel of
+            Nothing -> do
+                ncc <- either error id <$> refreshChannels adapter
+                return $ (^.name) $ fromMaybe (error "Channel not found") $ ncc ^? infoCache . ix channel
+            Just found -> return $ found ^. name
 
 
 putChannel :: SlackRTMAdapter -> LimitedChannelInfo -> RunnerM ()
