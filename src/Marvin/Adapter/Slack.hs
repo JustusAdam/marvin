@@ -76,6 +76,7 @@ declareFields [d|
     data LimitedChannelInfo = LimitedChannelInfo
         { limitedChannelInfoIdValue :: Channel
         , limitedChannelInfoName :: L.Text
+        , limitedChannelInfoTopic :: L.Text
         } deriving Show
     |]
 
@@ -351,18 +352,17 @@ refreshUserInfo adapter user@(User user') = do
 
 
 lciParser :: Value -> Parser LimitedChannelInfo
-lciParser (Object o) = LimitedChannelInfo <$> o .: "id" <*> o .: "name"
+lciParser (Object o) = LimitedChannelInfo <$> o .: "id" <*> o .: "name" <*> (o .: "topic" >>= withObject "object" (.: "value"))
 lciParser _ = mzero
 
 
 lciListParser :: Value -> Parser [LimitedChannelInfo]
-lciListParser (Array a) = toList <$> mapM lciParser a
-lciListParser _ = mzero
+lciListParser = withArray "array" $ fmap toList . mapM lciParser
 
 
 refreshChannels :: SlackRTMAdapter -> RunnerM (Either String ChannelCache)
 refreshChannels adapter = do
-    usr <- execAPIMethod parser adapter "channels.list" []
+    usr <- execAPIMethod (withObject "object" (\o -> o .: "channels" >>= lciListParser)) adapter "channels.list" []
     case usr of
         Left err -> return $ Left $ "Parse error when getting channel data " ++ err
         Right (APIResponse True v) -> do
@@ -373,9 +373,6 @@ refreshChannels adapter = do
             atomicWriteIORef (channelChache adapter) cache
             return $ Right cache
         Right (APIResponse False _) -> return $ Left "Server denied getting channel info request"
-  where
-    parser (Object o) = o .: "channels" >>= lciListParser
-    parser _ = mzero
 
 
 resolveChannelImpl :: SlackRTMAdapter -> L.Text -> RunnerM (Maybe Channel)
@@ -401,7 +398,7 @@ getChannelNameImpl adapter channel = do
 
 
 putChannel :: SlackRTMAdapter -> LimitedChannelInfo -> RunnerM ()
-putChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id name) =
+putChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id name _) =
     void $ atomicModifyIORef channelChache $ \cache ->
         (, ()) $ cache
                     & infoCache . at id .~ Just channelInfo
@@ -413,18 +410,18 @@ deleteChannel SlackRTMAdapter{channelChache} channel =
     void $ atomicModifyIORef channelChache $ \cache ->
         case cache ^? infoCache . ix channel of
             Nothing -> (cache, ())
-            Just (LimitedChannelInfo _ name) ->
+            Just (LimitedChannelInfo _ name _) ->
                 (, ()) $ cache & infoCache . at channel .~ Nothing
                                & nameResolver . at name .~ Nothing
 
 
 renameChannel :: SlackRTMAdapter -> LimitedChannelInfo -> RunnerM ()
-renameChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id name) =
+renameChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id name _) =
     void $ atomicModifyIORef channelChache $ \cache ->
         let inserted = cache & infoCache . at id .~ Just channelInfo
                              & nameResolver . at name .~ Just id
         in case cache ^? infoCache . ix id of
-               Just (LimitedChannelInfo _ oldName) | oldName /= name ->
+               Just (LimitedChannelInfo _ oldName _) | oldName /= name ->
                    (, ()) $ inserted & nameResolver . at oldName .~ Nothing
                _ -> (inserted, ())
 
