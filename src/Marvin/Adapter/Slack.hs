@@ -50,7 +50,8 @@ import           Network.Wreq
 import           Prelude                         hiding (lookup)
 import           Text.Read                       (readMaybe)
 import           Wuss
-
+import Data.String (IsString(..))
+import Data.Hashable
 
 instance FromJSON URI where
     parseJSON (String t) = maybe mzero return $ parseURI $ unpack t
@@ -101,7 +102,7 @@ declareFields [d|
 declareFields [d|
     data ChannelCache = ChannelCache
         { channelCacheInfoCache    :: HashMap SlackChannel LimitedChannelInfo
-        , channelCacheNameResolver :: HashMap L.Text Channel
+        , channelCacheNameResolver :: HashMap L.Text SlackChannel
         }
     |]
 
@@ -113,9 +114,9 @@ data InternalType
         }
     | Unhandeled String
     | Ignored
-    | ChannelArchiveStatusChange Channel Bool
+    | ChannelArchiveStatusChange SlackChannel Bool
     | ChannelCreated LimitedChannelInfo
-    | ChannelDeleted Channel
+    | ChannelDeleted SlackChannel
     | ChannelRename LimitedChannelInfo
     | UserChange UserInfo
 
@@ -123,16 +124,16 @@ data InternalType
 deriveJSON defaultOptions { fieldLabelModifier = camelTo2 '_' } ''RTMData
 
 
-messageParser :: Value -> Parser Types.Message
+messageParser :: Value -> Parser (Types.Message SlackRTMAdapter)
 messageParser (Object o) = Message
-    <$> o .: "user"
-    <*> o .: "channel"
+    <$> (User <$> o .: "user")
+    <*> (Channel <$> o .: "channel")
     <*> o .: "text"
     <*> o .: "ts"
 messageParser _ = mzero
 
 
-eventParser :: Value -> Parser (Either InternalType Event)
+eventParser :: Value -> Parser (Either InternalType (Event SlackRTMAdapter))
 eventParser v@(Object o) = isErrParser <|> hasTypeParser
   where
     isErrParser = do
@@ -160,18 +161,20 @@ eventParser v@(Object o) = isErrParser <|> hasTypeParser
                             "channel_leave" -> cLeave
                             "group_leave" -> cLeave
                             "channel_topic" -> do
-                                t <- TopicChangeEvent <$> o .: "topic" <*> o .: "channel"
+                                t <- TopicChangeEvent <$> o .: "topic" <*> channel
                                 return $ Right t
                             _ -> msgEv
 
                     _ -> msgEv
               where
                 msgEv = Right . MessageEvent <$> messageParser v
+                user = User <$> o .: "user"
+                channel = Channel <$> o .: "channel"
                 cJoin = do
-                    ev <- ChannelJoinEvent <$> o .: "user" <*> o .: "channel"
+                    ev <- ChannelJoinEvent <$> user <*> channel
                     return $ Right ev
                 cLeave = do
-                    ev <- ChannelLeaveEvent <$> o .: "user" <*> o .: "channel"
+                    ev <- ChannelLeaveEvent <$> user <*> channel
                     return $ Right ev
             "reconnect_url" -> return $ Left Ignored
             "channel_archive" -> do
@@ -330,8 +333,8 @@ newMid SlackRTMAdapter{midTracker} = liftIO $ atomically $ do
     return id
 
 
-messageChannelImpl :: SlackRTMAdapter -> Channel -> L.Text -> RunnerM ()
-messageChannelImpl adapter (Channel chan) msg = do
+messageChannelImpl :: SlackRTMAdapter -> SlackChannel -> L.Text -> RunnerM ()
+messageChannelImpl adapter (SlackChannel chan) msg = do
     mid <- newMid adapter
     sendMessage adapter $ encode $
         object [ "id" .= mid
@@ -342,13 +345,13 @@ messageChannelImpl adapter (Channel chan) msg = do
 
 
 getUserInfoImpl :: SlackRTMAdapter -> SlackUser -> RunnerM UserInfo
-getUserInfoImpl adapter user@(User user') = do
+getUserInfoImpl adapter user@(SlackUser user') = do
     uc <- readIORef $ userInfoCache adapter
     maybe (refreshUserInfo adapter user) return $ lookup user uc
 
 
 refreshUserInfo :: SlackRTMAdapter -> SlackUser -> RunnerM UserInfo
-refreshUserInfo adapter user@(User user') = do
+refreshUserInfo adapter user@(SlackUser user') = do
     usr <- execAPIMethod userInfoParser adapter "users.info" ["user" := user']
     case usr of
         Left err -> error ("Parse error when getting user data " ++ err)
@@ -436,8 +439,8 @@ renameChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id 
 
 
 instance IsAdapter SlackRTMAdapter where
-    type User = SlackUser
-    type Channel = SlackChannel
+    type UserT SlackRTMAdapter = SlackUser
+    type ChannelT SlackRTMAdapter = SlackChannel
     adapterId = "slack-rtm"
     messageChannel = messageChannelImpl
     runWithAdapter = runnerImpl

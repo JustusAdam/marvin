@@ -20,13 +20,18 @@ import           Control.Monad.Logger
 import           Data.Monoid             ((<>))
 import           Data.Sequences
 import qualified Data.Text.Lazy          as L
+import qualified Data.Text as T
 import           Marvin.Adapter          (IsAdapter)
 import qualified Marvin.Adapter          as A
-import           Marvin.Internal.Types
+import           Marvin.Internal.Types hiding (getUsername, resolveChannel)
 import           Marvin.Interpolate.Text
 import           Marvin.Util.Regex       (Match, Regex)
 import           Util
-import Data.Vector
+import qualified Data.Vector as V
+import  Data.Vector (Vector)
+import qualified Data.HashMap.Strict as HM
+import Control.Exception.Lifted
+
 
 
 -- | Read only data available to a handler when the bot reacts to an event.
@@ -39,26 +44,14 @@ declareFields [d|
         }
     |]
 
--- | Payload in the reaction Monad when triggered by a message.
---  Contains a field for the 'Message' and a field for the 'Match' from the 'Regex'.
---
--- Both fields are accessible directly via the 'getMessage' and 'getMatch' functions
--- or this data via 'getData'.
-declareFields [d|
-    data MessageReactionData a = MessageReactionData
-        { messageReactionDataMessageField :: Message a
-        , messageReactionDataMatchField :: Match
-        }
-    |]
-
 
 type Topic = L.Text
 
 
 declareFields [d|
     data Handlers a = Handlers
-        { handlersResponds :: Vector (Regex, Message a -> Match -> RunnerM ())
-        , handlersHears :: Vector (Regex, Message a -> Match -> RunnerM ())
+        { handlersResponds :: Vector (Regex, Match -> Message a -> RunnerM ())
+        , handlersHears :: Vector (Regex, Match -> Message a -> RunnerM ())
         , handlersCustoms :: Vector (Event a -> Maybe (RunnerM ()))
         , handlersJoins :: Vector ((User a, Channel a) -> RunnerM ())
         , handlersLeaves :: Vector ((User a, Channel a) -> RunnerM ())
@@ -68,6 +61,13 @@ declareFields [d|
         , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((Topic, Channel a) -> RunnerM ()))
         }
     |]
+
+
+instance Monoid (Handlers a) where
+    mempty = Handlers mempty mempty mempty mempty mempty mempty mempty mempty mempty
+    mappend (Handlers r1 h1 c1 j1 l1 t1 ji1 li1 ti1)
+            (Handlers r2 h2 c2 j2 l2 t2 ji2 li2 ti2) 
+        = Handlers (r1 <> r2) (h1 <> h2) (c1 <> c2) (j1 <> j2) (l1 <> l2) (t1 <> t2) (ji1 <> ji2) (li1 <> li2) (ti1 <> ti2)
 
 
 -- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageChannel' as well as any arbitrary 'IO' action using 'liftIO'.
@@ -80,7 +80,7 @@ declareFields [d|
 -- This is also a 'MonadReader' instance, there you can inspect the entire state of this reaction.
 -- This is typically only used in internal or utility functions and not necessary for the user.
 -- To inspect particular pieces of this state refer to the *Lenses* section.
-newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState a d) RunnerM r } deriving (Monad, MonadIO, Applicative, Functor, MonadReader (BotActionState a d), MonadLogger)
+newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState a d) RunnerM r } deriving (Monad, MonadIO, Applicative, Functor, MonadReader (BotActionState a d), MonadLogger, MonadLoggerIO)
 
 -- | An abstract type describing a marvin script.
 --
@@ -109,7 +109,7 @@ newtype ScriptInit a = ScriptInit (ScriptId, a -> C.Config -> RunnerM (Script a)
 class Get a b where
     getLens :: Lens' a b
 
-instance Get (a, Message) Message where
+instance Get (b, Message a) (Message a) where
     getLens = _2
 
 instance Get (Match, b) Match where
@@ -168,36 +168,71 @@ getConfig :: HasConfigAccess m => m C.Config
 getConfig = getScriptId >>= getSubConfFor
 
 
-addReaction :: ActionData d -> BotReacting a d () -> ScriptDefinition a ()
-addReaction data_ action = ScriptDefinition $ actions %= cons (WrappedAction data_ action)
+runBotAction :: ShowT t => ScriptId -> C.Config -> a -> Maybe t -> d -> BotReacting a d () -> RunnerM ()
+runBotAction scriptId config adapter trigger data_ action = do
+    oldLogFn <- askLoggerIO
+    catch
+        (liftIO $ flip runLoggingT (loggingAddSourcePrefix $(isT "script.#{scriptId}") oldLogFn) $ flip runReaderT actionState $ runReaction action)
+        (onScriptExcept scriptId trigger)
+  where
+    actionState = BotActionState scriptId config adapter data_
 
+prepareAction :: (MonadState (Script a) m, ShowT t) => Maybe t -> BotReacting a d () -> m (d -> RunnerM ())
+prepareAction trigger reac = do
+    ada <- use adapter
+    cfg <- use config
+    sid <- use scriptId
+    return $ \d -> runBotAction sid cfg ada trigger d reac
+
+
+onScriptExcept :: ShowT t => ScriptId -> Maybe t -> SomeException -> RunnerM ()
+onScriptExcept id trigger e = do
+    case trigger of
+        Just t ->
+            err $(isT "Unhandled exception during execution of script #{id} with trigger #{t}")
+        Nothing ->
+            err $(isT "Unhandled exception during execution of script #{id}")
+    err $(isT "#{e}")
+  where
+    err = logErrorNS "#{applicationScriptId}.dispatch"
 
 -- | Whenever any message matches the provided regex this handler gets run.
 --
 -- Equivalent to "robot.hear" in hubot
-hear :: Regex -> BotReacting a MessageReactionData () -> ScriptDefinition a ()
-hear !re = addReaction (Hear re)
-
+hear :: Regex -> BotReacting a (Match, Message a) () -> ScriptDefinition a ()
+hear !re ac = ScriptDefinition $ do
+    pac <- prepareAction (Just re) ac
+    actions . hears %= V.cons (re, curry pac)
 
 -- | Runs the handler only if the bot was directly addressed.
 --
 -- Equivalent to "robot.respond" in hubot
-respond :: Regex -> BotReacting a MessageReactionData () -> ScriptDefinition a ()
-respond !re = addReaction (Respond re)
+respond :: Regex -> BotReacting a (Match, Message a) () -> ScriptDefinition a ()
+respond !re ac = ScriptDefinition $ do
+    pac <- prepareAction (Just re) ac
+    actions . responds %= V.cons (re, curry pac)
 
 
 -- | This handler runs whenever a user enters __any channel__ (which the bot is subscribed to)
 --
 -- The payload contains the entering user and the channel which was entered.
-enter :: BotReacting a (User, Channel) () -> ScriptDefinition a ()
-enter = addReaction Join
+enter :: BotReacting a (User a, Channel a) () -> ScriptDefinition a ()
+enter ac = ScriptDefinition $ do
+    pac <- prepareAction (Just "enter event" :: Maybe T.Text) ac
+    actions . joins %= V.cons pac
 
 
 -- | This handler runs whenever a user exits __any channel__ (which the bot is subscribed to)
 --
 -- The payload contains the exiting user and the channel which was exited.
-exit :: BotReacting a (User, Channel) () -> ScriptDefinition a ()
-exit = addReaction Leave
+exit :: BotReacting a (User a, Channel a) () -> ScriptDefinition a ()
+exit ac = ScriptDefinition $ do
+    pac <- prepareAction (Just "exit event" :: Maybe T.Text) ac
+    actions . leaves %= V.cons pac
+
+
+alterHelper :: a -> Maybe (Vector a) -> Maybe (Vector a)
+alterHelper v = return . maybe (return v) (V.cons v)
 
 
 -- | This handler runs whenever a user enters __the specified channel__.
@@ -205,8 +240,10 @@ exit = addReaction Leave
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the entering user.
-enterIn :: L.Text -> BotReacting a (User, Channel) () -> ScriptDefinition a ()
-enterIn !chanName = addReaction (JoinIn chanName)
+enterIn :: L.Text -> BotReacting a (User a, Channel a) () -> ScriptDefinition a ()
+enterIn !chanName ac = ScriptDefinition $ do
+    pac <- prepareAction (Just $(isT "anter event in #{chanName}")) ac
+    actions . joinsIn %= HM.alter (alterHelper pac) chanName
 
 
 -- | This handler runs whenever a user exits __the specified channel__, provided the bot is subscribed to the channel in question.
@@ -214,22 +251,28 @@ enterIn !chanName = addReaction (JoinIn chanName)
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the exting user.
-exitFrom :: L.Text -> BotReacting a (User, Channel) () -> ScriptDefinition a ()
-exitFrom !chanName = addReaction (LeaveFrom chanName)
+exitFrom :: L.Text -> BotReacting a (User a, Channel a) () -> ScriptDefinition a ()
+exitFrom !chanName ac = ScriptDefinition $ do
+    pac <- prepareAction (Just $(isT "exit event in #{chanName}")) ac
+    actions . leavesFrom %= HM.alter (alterHelper pac) chanName
 
 
 -- | This handler runs when the topic in __any channel__ the bot is subscribed to changes.
 --
 -- The payload contains the new topic and the channel in which it was set.
-topic :: BotReacting a (Topic, Channel) () -> ScriptDefinition a ()
-topic = addReaction TopicC
+topic :: BotReacting a (Topic, Channel a) () -> ScriptDefinition a ()
+topic ac = ScriptDefinition $ do
+    pac <- prepareAction (Just "topic event" :: Maybe T.Text) ac
+    actions . topicChange %= V.cons pac
 
 
 -- | This handler runs when the topic in __the specified channel__ is changed, provided the bot is subscribed to the channel in question.
 --
 -- The argument is the human readable channel name.
-topicIn :: L.Text -> BotReacting a (Topic, Channel) () -> ScriptDefinition a ()
-topicIn !chanName = addReaction (TopicCIn chanName)
+topicIn :: L.Text -> BotReacting a (Topic, Channel a) () -> ScriptDefinition a ()
+topicIn !chanName ac = ScriptDefinition $ do
+    pac <- prepareAction (Just $(isT "topic event in #{chanName}")) ac
+    actions . topicChangeIn %= HM.alter (alterHelper pac) chanName
 
 
 -- | Extension point for the user
@@ -237,8 +280,10 @@ topicIn !chanName = addReaction (TopicCIn chanName)
 -- Allows you to handle the raw event yourself.
 -- Returning 'Nothing' from the trigger function means you dont want to react to the event.
 -- The value returned inside the 'Just' is available in the handler later using 'getData'.
-customTrigger :: (A.Event -> Maybe d) -> BotReacting a d () -> ScriptDefinition a ()
-customTrigger tr = addReaction (Custom tr)
+customTrigger :: (A.Event a -> Maybe d) -> BotReacting a d () -> ScriptDefinition a ()
+customTrigger tr ac = ScriptDefinition $ do
+    pac <- prepareAction (Nothing :: Maybe T.Text) ac
+    actions . customs %= V.cons (maybe Nothing (return . pac) . tr)
 
 
 -- | Send a message to the channel the triggering message came from.
@@ -251,21 +296,21 @@ send msg = do
 
 
 -- | Get the username of a registered user.
-getUsername :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User (AdapterT m) -> m L.Text
-getUsername usr = do
+getUsername :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User (AdapterT m) -> m L.Text
+getUsername (User usr) = do
     a <- getAdapter
     A.liftAdapterAction $ A.getUsername a usr
 
 
-resolveChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => L.Text -> m (Maybe (Channel (AdapterT m)))
+resolveChannel :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => L.Text -> m (Maybe (Channel (AdapterT m)))
 resolveChannel name = do
     a <- getAdapter
-    A.liftAdapterAction $ A.resolveChannel a name
+    fmap Channel <$> A.liftAdapterAction (A.resolveChannel a name)
 
 
 -- | Get the human readable name of a channel.
-getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> m L.Text
-getChannelName rm = do
+getChannelName :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> m L.Text
+getChannelName (Channel rm) = do
     a <- getAdapter
     A.liftAdapterAction $ A.getChannelName a rm
 
@@ -281,14 +326,14 @@ reply msg = do
 
 
 -- | Send a message to a Channel (by name)
-messageChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m, MonadLogger m) => L.Text -> L.Text -> m ()
+messageChannel :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m, MonadLogger m) => L.Text -> L.Text -> m ()
 messageChannel name msg = do
     mchan <- resolveChannel name
     maybe ($logError $(isT "No channel known with the name #{name}")) (`messageChannel'` msg) mchan
 
 
-messageChannel' :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> L.Text -> m ()
-messageChannel' chan msg = do
+messageChannel' :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> L.Text -> m ()
+messageChannel' (Channel chan) msg = do
     a <- getAdapter
     A.liftAdapterAction $ A.messageChannel a chan msg
 
@@ -322,28 +367,28 @@ getData = view variable
 --
 -- Equivalent to "msg.match" in hubot.
 getMatch :: Get m Match => BotReacting a m Match
-getMatch = view (variable . matchLens)
+getMatch = view (variable . getLens)
 
 
 -- | Get the message that triggered this action
 -- Includes sender, target channel, as well as the full, untruncated text of the original message
 getMessage :: Get m (Message a) => BotReacting a m (Message a)
-getMessage = view (variable . messageLens)
+getMessage = view (variable . getLens)
 
 
 -- | Get the the new topic.
 getTopic :: Get m Topic => BotReacting a m Topic
-getTopic = view (variable . topicLens)
+getTopic = view (variable . getLens)
 
 
 -- | Get the stored channel in which something happened.
 getChannel :: Get m (Channel a) => BotReacting a m (Channel a)
-getChannel = view (variable . channelLens)
+getChannel = view (variable . getLens)
 
 
 -- | Get the user whihc was part of the triggered action.
 getUser :: Get m (User a) => BotReacting a m (User a)
-getUser = view (variable . userLens)
+getUser = view (variable . getLens)
 
 
 -- | Get a value out of the config, returns 'Nothing' if the value didn't exist.

@@ -74,15 +74,8 @@ requireFromAppConfig cfg = C.require (C.subconfig (unwrapScriptId applicationScr
 lookupFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO (Maybe a)
 lookupFromAppConfig cfg = C.lookup (C.subconfig (unwrapScriptId applicationScriptId) cfg)
 
-
-mapHandlerFunctor :: (forall a. f a -> f' a) -> Handlers f -> Handlers f'
-mapHandlerFunctor f (Handlers respondsV hearsV customsV joinsV leavesV topicsV joinsInV leavesFromV topicsInV) =
-    Handlers (f respondsV) (f hearsV) (f customsV) (f joinsV) (f leavesV) (f topicsV)
-             (fmap f joinsInV) (fmap f leavesFromV) (fmap f topicsInV)
-
-
 -- TODO add timeouts for handlers
-mkApp :: IsAdapter a => LoggingFn -> [Script a] -> C.Config -> a -> EventHandler a
+mkApp :: forall a. IsAdapter a => LoggingFn -> [Script a] -> C.Config -> a -> EventHandler a
 mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
   where
     genericHandler ev = do
@@ -98,13 +91,13 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
     handler (ChannelLeaveEvent user chan) = changeHandlerHelper leavesV leavesFromV user chan
     handler (TopicChangeEvent topic chan) = changeHandlerHelper topicsV topicsInV topic chan
 
-    changeHandlerHelper :: Vector ((b, Channel) -> RunnerM ())
-                        -> (HM.HashMap L.Text (Vector ((b, Channel) -> RunnerM ())))
+    changeHandlerHelper :: Vector ((b, Channel a) -> RunnerM ())
+                        -> HM.HashMap L.Text (Vector ((b, Channel a) -> RunnerM ()))
                         -> b
-                        -> Channel
+                        -> Channel a
                         -> RunnerM ()
-    changeHandlerHelper wildcards specifics other chan = do
-        cName <- A.getChannelName adapter chan
+    changeHandlerHelper wildcards specifics other chan@(Channel c) = do
+        cName <- A.getChannelName adapter c
 
         let applicables = fromMaybe mempty $ specifics^?ix cName
 
@@ -131,64 +124,10 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
             catMaybes <$> for things (\(trigger, action) ->
                 case match trigger toMatch of
                         Nothing -> return Nothing
-                        Just m  -> Just <$> async (action msg m))
-
-    flattenActions = foldr $ \script -> flip (foldr (addAction script adapter)) (script^.actions)
+                        Just m  -> Just <$> async (action m msg))
 
     Handlers respondsV hearsV customsV joinsV leavesV topicsV joinsInV leavesFromV topicsInV =
-        (mapHandlerFunctor fromList :: Handlers [] -> Handlers Vector)
-        $ flattenActions (Handlers mempty mempty mempty mempty mempty mempty mempty mempty mempty :: Handlers []) scripts
-
-
-addAction :: forall a. Script a -> a -> WrappedAction a -> Handlers [] -> Handlers []
-addAction script adapter wa =
-    case wa of
-        WrappedAction (Hear re) ac -> hears %~ cons (re, runMessageAction script adapter re ac)
-        WrappedAction (Respond re) ac -> responds %~ cons (re, runMessageAction script adapter re ac)
-        WrappedAction Join ac -> joins %~ cons (\d -> botAcWith (Just "Join event" :: Maybe T.Text) d ac)
-        WrappedAction Leave ac -> leaves %~ cons (\d -> botAcWith (Just "Leave event" :: Maybe T.Text) d ac)
-        WrappedAction (JoinIn chName) ac -> joinsIn . at chName %~ Just . maybe (return reac) (cons reac)
-          where reac chan = botAcWith (Just "Join event" :: Maybe T.Text) chan ac
-        WrappedAction (LeaveFrom chName) ac -> leavesFrom . at chName %~ Just . maybe (return reac) (cons reac)
-          where reac chan = botAcWith (Just "Leave event" :: Maybe T.Text) chan ac
-        WrappedAction TopicC ac -> topicChange %~ cons (\d -> botAcWith (Just "Topic event" :: Maybe T.Text) d ac)
-        WrappedAction (TopicCIn chanName) ac -> topicChangeIn . at chanName %~ Just . maybe (return reac) (cons reac)
-          where reac chan = botAcWith (Just "Topic event" :: Maybe T.Text) chan ac
-        WrappedAction (Custom matcher) ac -> customs %~ cons h
-          where
-            h ev = run <$> matcher ev
-            run s = botAcWith (Nothing :: Maybe ()) s ac
-  where
-    botAcWith :: ShowT t =>  Maybe t -> d -> BotReacting a d () -> RunnerM ()
-    botAcWith = runBotAction script adapter
-
-
-runBotAction :: ShowT t => Script a -> a -> Maybe t -> d -> BotReacting a d () -> RunnerM ()
-runBotAction script adapter trigger data_ action = do
-    oldLogFn <- askLoggerIO
-    catch
-        (liftIO $ flip runLoggingT (loggingAddSourcePrefix $(isT "script.#{script^.scriptId}") oldLogFn) $ flip runReaderT actionState $ runReaction action)
-        (onScriptExcept (script^.scriptId) trigger)
-
-  where
-    actionState = BotActionState (script^.scriptId) (script^.config) adapter data_
-
-
-runMessageAction :: Script a -> a -> Regex -> BotReacting a MessageReactionData () -> Message -> Match -> RunnerM ()
-runMessageAction script adapter re ac msg mtch =
-    runBotAction script adapter (Just re) (MessageReactionData msg mtch) ac
-
-
-onScriptExcept :: ShowT t => ScriptId -> Maybe t -> SomeException -> RunnerM ()
-onScriptExcept id trigger e = do
-    case trigger of
-        Just t ->
-            err $(isT "Unhandled exception during execution of script #{id} with trigger #{t}")
-        Nothing ->
-            err $(isT "Unhandled exception during execution of script #{id}")
-    err $(isT "#{e}")
-  where
-    err = logErrorNS "#{applicationScriptId}.dispatch"
+        foldMap (^.actions) scripts 
 
 
 -- | Create a wai compliant application

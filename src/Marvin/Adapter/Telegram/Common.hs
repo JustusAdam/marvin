@@ -22,6 +22,7 @@ import Marvin.Types
 import Control.Monad.IO.Class
 import Control.Lens
 import Control.Monad
+import Unsafe.Coerce
 
 
 data Push
@@ -33,18 +34,20 @@ data APIResponse a
     | Error { errorCode :: Int, errDescription :: T.Text}
 
 
-data InternalEvent
-    = Ev Event
+data InternalEvent any 
+    = Ev (Event (TelegramAdapter any))
     | Ignored
     | Unhandeled
 
 
-instance FromJSON InternalEvent where
+instance FromJSON (InternalEvent any) where
     parseJSON = withObject "expected object" inner
       where
         inner o = isMessage <|> isUnhandeled
           where
-            isMessage = Ev . MessageEvent <$> (o .: "message" >>= msgParser)
+            isMessage = do 
+                msg <- o .: "message" >>= msgParser
+                return $ Ev $ MessageEvent msg
             isPost = Ev . MessageEvent <$> (o .: "channel_post" >>= msgParser)
             isUnhandeled = return Unhandeled
 

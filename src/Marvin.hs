@@ -20,7 +20,7 @@ module Marvin
     , getData, getMessage, getMatch, getTopic, getChannel, getUser, getUsername, getChannelName
     , Message(..), User, Channel
     , getConfigVal, requireConfigVal
-    , BotReacting, HasMessage(messageLens), HasMatch(matchLens), HasTopic(topicLens), HasChannel(channelLens), HasUser(userLens)
+    , BotReacting, Get(getLens)
     -- ** Advanced actions
     , extractAction, extractReaction
     ) where
@@ -28,4 +28,4 @@ module Marvin
 
 import           Marvin.Adapter        (IsAdapter)
 import           Marvin.Internal
-import           Marvin.Internal.Types
+import           Marvin.Internal.Types hiding (messageChannel, getUsername, getChannelName)
