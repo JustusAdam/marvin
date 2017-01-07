@@ -11,6 +11,7 @@ Portability : POSIX
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE NamedFieldPuns         #-}
 {-# LANGUAGE TypeSynonymInstances   #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Marvin.Adapter.Slack (SlackRTMAdapter) where
 
 
@@ -71,10 +72,19 @@ data APIResponse a = APIResponse
     , payload    :: a
     }
 
+-- | Identifier for a user (internal and not necessarily equal to the username)
+newtype SlackUser = SlackUser T.Text deriving (IsString, Eq, Hashable)
+-- | Identifier for a channel (internal and not necessarily equal to the channel name)
+newtype SlackChannel = SlackChannel T.Text deriving (IsString, Eq, Show, Hashable)
+
+
+deriveJSON defaultOptions { unwrapUnaryRecords = True } ''SlackUser
+deriveJSON defaultOptions { unwrapUnaryRecords = True } ''SlackChannel
+
 
 declareFields [d|
     data LimitedChannelInfo = LimitedChannelInfo
-        { limitedChannelInfoIdValue :: Channel
+        { limitedChannelInfoIdValue :: SlackChannel
         , limitedChannelInfoName :: L.Text
         , limitedChannelInfoTopic :: L.Text
         } deriving Show
@@ -83,14 +93,14 @@ declareFields [d|
 declareFields [d|
     data UserInfo = UserInfo
         { userInfoUsername :: L.Text
-        , userInfoIdValue  :: User
+        , userInfoIdValue  :: SlackUser
         }
     |]
 
 
 declareFields [d|
     data ChannelCache = ChannelCache
-        { channelCacheInfoCache    :: HashMap Channel LimitedChannelInfo
+        { channelCacheInfoCache    :: HashMap SlackChannel LimitedChannelInfo
         , channelCacheNameResolver :: HashMap L.Text Channel
         }
     |]
@@ -213,7 +223,7 @@ data SlackRTMAdapter = SlackRTMAdapter
     , userConfig    :: C.Config
     , midTracker    :: TMVar Int
     , channelChache :: IORef ChannelCache
-    , userInfoCache :: IORef (HashMap User UserInfo)
+    , userInfoCache :: IORef (HashMap SlackUser UserInfo)
     }
 
 
@@ -260,24 +270,22 @@ runHandlerLoop adapter messageChan handler =
         d <- readChan messageChan
         case eitherDecode d >>= parseEither eventParser of
             Left err -> logErrorN $(isT "Error parsing json: #{err} original data: #{rawBS d}")
-            Right v ->
-                case v of
-                    Right event -> liftIO $ handler event
-                    Left internalEvent ->
-                        case internalEvent of
-                            Unhandeled type_ ->
-                                $logDebug $(isT "Unhandeled event type #{type_} payload: #{rawBS d}")
-                            Error code msg ->
-                                logErrorN $(isT "Error from remote code: #{code} msg: #{msg}")
-                            Ignored -> return ()
-                            ChannelArchiveStatusChange _ _ ->
-                                -- TODO implement once we track the archiving status
-                                return ()
-                            ChannelCreated info ->
-                                putChannel adapter info
-                            ChannelDeleted chan -> deleteChannel adapter chan
-                            ChannelRename info -> renameChannel adapter info
-                            UserChange ui -> void $ refreshUserInfo adapter (ui^.idValue)
+            Right (Right event) -> liftIO $ handler event
+            Right (Left internalEvent) ->
+                case internalEvent of
+                    Unhandeled type_ ->
+                        $logDebug $(isT "Unhandeled event type #{type_} payload: #{rawBS d}")
+                    Error code msg ->
+                        logErrorN $(isT "Error from remote code: #{code} msg: #{msg}")
+                    Ignored -> return ()
+                    ChannelArchiveStatusChange _ _ ->
+                        -- TODO implement once we track the archiving status
+                        return ()
+                    ChannelCreated info ->
+                        putChannel adapter info
+                    ChannelDeleted chan -> deleteChannel adapter chan
+                    ChannelRename info -> renameChannel adapter info
+                    UserChange ui -> void $ refreshUserInfo adapter (ui^.idValue)
 
 
 sendMessageImpl :: MVar Connection -> BS.ByteString -> RunnerM ()
@@ -333,13 +341,13 @@ messageChannelImpl adapter (Channel chan) msg = do
                 ]
 
 
-getUserInfoImpl :: SlackRTMAdapter -> User -> RunnerM UserInfo
+getUserInfoImpl :: SlackRTMAdapter -> SlackUser -> RunnerM UserInfo
 getUserInfoImpl adapter user@(User user') = do
     uc <- readIORef $ userInfoCache adapter
     maybe (refreshUserInfo adapter user) return $ lookup user uc
 
 
-refreshUserInfo :: SlackRTMAdapter -> User -> RunnerM UserInfo
+refreshUserInfo :: SlackRTMAdapter -> SlackUser -> RunnerM UserInfo
 refreshUserInfo adapter user@(User user') = do
     usr <- execAPIMethod userInfoParser adapter "users.info" ["user" := user']
     case usr of
@@ -373,7 +381,7 @@ refreshChannels adapter = do
         Right (APIResponse False _) -> return $ Left "Server denied getting channel info request"
 
 
-resolveChannelImpl :: SlackRTMAdapter -> L.Text -> RunnerM (Maybe Channel)
+resolveChannelImpl :: SlackRTMAdapter -> L.Text -> RunnerM (Maybe SlackChannel)
 resolveChannelImpl adapter name' = do
     cc <- readIORef $ channelChache adapter
     case cc ^? nameResolver . ix name of
@@ -386,7 +394,7 @@ resolveChannelImpl adapter name' = do
   where name = L.tail name'
 
 
-getChannelNameImpl :: SlackRTMAdapter -> Channel -> RunnerM L.Text
+getChannelNameImpl :: SlackRTMAdapter -> SlackChannel -> RunnerM L.Text
 getChannelNameImpl adapter channel = do
     cc <- readIORef $ channelChache adapter
     L.cons '#' <$>
@@ -405,7 +413,7 @@ putChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id nam
                     & nameResolver . at name .~ Just id
 
 
-deleteChannel :: SlackRTMAdapter -> Channel -> RunnerM ()
+deleteChannel :: SlackRTMAdapter -> SlackChannel -> RunnerM ()
 deleteChannel SlackRTMAdapter{channelChache} channel =
     void $ atomicModifyIORef channelChache $ \cache ->
         case cache ^? infoCache . ix channel of
@@ -428,6 +436,8 @@ renameChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id 
 
 
 instance IsAdapter SlackRTMAdapter where
+    type User = SlackUser
+    type Channel = SlackChannel
     adapterId = "slack-rtm"
     messageChannel = messageChannelImpl
     runWithAdapter = runnerImpl

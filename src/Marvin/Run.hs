@@ -75,21 +75,6 @@ lookupFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO (Maybe a)
 lookupFromAppConfig cfg = C.lookup (C.subconfig (unwrapScriptId applicationScriptId) cfg)
 
 
-declareFields [d|
-    data Handlers f = Handlers
-        { handlersResponds :: f (Regex, Message -> Match -> RunnerM ())
-        , handlersHears :: f (Regex, Message -> Match -> RunnerM ())
-        , handlersCustoms :: f (Event -> Maybe (RunnerM ()))
-        , handlersJoins :: f ((User, Channel) -> RunnerM ())
-        , handlersLeaves :: f ((User, Channel) -> RunnerM ())
-        , handlersTopicChange :: f ((Topic, Channel) -> RunnerM ())
-        , handlersJoinsIn :: HM.HashMap L.Text (f ((User, Channel) -> RunnerM ()))
-        , handlersLeavesFrom :: HM.HashMap L.Text (f ((User, Channel) -> RunnerM ()))
-        , handlersTopicChangeIn :: HM.HashMap L.Text (f ((Topic, Channel) -> RunnerM ()))
-        }
-    |]
-
-
 mapHandlerFunctor :: (forall a. f a -> f' a) -> Handlers f -> Handlers f'
 mapHandlerFunctor f (Handlers respondsV hearsV customsV joinsV leavesV topicsV joinsInV leavesFromV topicsInV) =
     Handlers (f respondsV) (f hearsV) (f customsV) (f joinsV) (f leavesV) (f topicsV)

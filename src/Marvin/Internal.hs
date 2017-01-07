@@ -26,6 +26,7 @@ import           Marvin.Internal.Types
 import           Marvin.Interpolate.Text
 import           Marvin.Util.Regex       (Match, Regex)
 import           Util
+import Data.Vector
 
 
 -- | Read only data available to a handler when the bot reacts to an event.
@@ -44,8 +45,8 @@ declareFields [d|
 -- Both fields are accessible directly via the 'getMessage' and 'getMatch' functions
 -- or this data via 'getData'.
 declareFields [d|
-    data MessageReactionData = MessageReactionData
-        { messageReactionDataMessageField :: Message
+    data MessageReactionData a = MessageReactionData
+        { messageReactionDataMessageField :: Message a
         , messageReactionDataMatchField :: Match
         }
     |]
@@ -54,19 +55,19 @@ declareFields [d|
 type Topic = L.Text
 
 
-data ActionData d where
-    Hear :: Regex -> ActionData MessageReactionData
-    Respond :: Regex -> ActionData MessageReactionData
-    Join :: ActionData (User, Channel)
-    JoinIn :: L.Text -> ActionData (User, Channel)
-    Leave :: ActionData (User, Channel)
-    LeaveFrom :: L.Text -> ActionData (User, Channel)
-    TopicC :: ActionData (Topic, Channel)
-    TopicCIn :: L.Text -> ActionData (Topic, Channel)
-    Custom :: (A.Event -> Maybe d) -> ActionData d
-
-
-data WrappedAction a = forall d. WrappedAction (ActionData d) (BotReacting a d ())
+declareFields [d|
+    data Handlers a = Handlers
+        { handlersResponds :: Vector (Regex, Message a -> Match -> RunnerM ())
+        , handlersHears :: Vector (Regex, Message a -> Match -> RunnerM ())
+        , handlersCustoms :: Vector (Event a -> Maybe (RunnerM ()))
+        , handlersJoins :: Vector ((User a, Channel a) -> RunnerM ())
+        , handlersLeaves :: Vector ((User a, Channel a) -> RunnerM ())
+        , handlersTopicChange :: Vector ((Topic, Channel a) -> RunnerM ())
+        , handlersJoinsIn :: HM.HashMap L.Text (Vector ((User a, Channel a) -> RunnerM ()))
+        , handlersLeavesFrom :: HM.HashMap L.Text (Vector ((User a, Channel a) -> RunnerM ()))
+        , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((Topic, Channel a) -> RunnerM ()))
+        }
+    |]
 
 
 -- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageChannel' as well as any arbitrary 'IO' action using 'liftIO'.
@@ -88,7 +89,7 @@ newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState
 -- Internal structure is exposed for people wanting to extend this.
 declareFields [d|
     data Script a = Script
-        { scriptActions   :: [WrappedAction a]
+        { scriptActions   :: Handlers a 
         , scriptScriptId  :: ScriptId
         , scriptConfig    :: C.Config
         , scriptAdapter :: a
@@ -106,9 +107,9 @@ newtype ScriptInit a = ScriptInit (ScriptId, a -> C.Config -> RunnerM (Script a)
 
 -- | Class which says that there is a way to get to a 'Message' from this type @m@.
 class HasMessage m where
-    messageLens :: Lens' m Message
+    messageLens :: Lens' (m a) (Message a)
 
-instance HasMessageField m Message => HasMessage m where
+instance HasMessageField (m a) (Message a) => HasMessage (m a) where
     messageLens = messageField
 
 -- | Class which says that there is a way to get to a 'Match' from this type @m@.
