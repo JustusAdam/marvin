@@ -4,8 +4,10 @@ module Script1 (
     ) where
 
 
-import qualified Data.Text.Lazy as L
+import qualified Data.Text.Lazy           as L
+import qualified Data.Version             as V
 import           Marvin.Prelude
+import qualified Paths_marvin_integration as P
 
 
 script :: IsAdapter a => ScriptInit a
@@ -32,3 +34,9 @@ script = defineScript "test" $ do
     enterIn "#random" $ do
         u <- getUser >>= getUsername
         send $(isL "#{u} just entered random")
+
+    respond "^version\\??$" $ send $(isL "marvins integration test, version #{V.showVersion P.version}")
+
+    hear "^bot name\\??$" $ do
+        n <- getBotName
+        send $(isL "My name is #{n}, nice to meet you.")

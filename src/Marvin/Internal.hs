@@ -7,7 +7,40 @@
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE UndecidableInstances       #-}
-module Marvin.Internal where
+module Marvin.Internal 
+    ( 
+    -- * Exposed API
+    defineScript
+    -- ** Reacting
+    , hear, respond, topic, topicIn, enter, exit, enterIn, exitFrom, customTrigger
+    -- ** Sending messages
+    , send, reply, messageChannel, messageChannel'
+    -- ** Getting Data
+    , getData, getUser, getMatch, getMessage, getChannel, getTopic, getBotName, getChannelName, resolveChannel, getUsername
+    -- ** Interacting with the config
+    , getConfigVal, requireConfigVal
+    -- *** Access config (advanced, internal)
+    , getAppConfigVal, requireAppConfigVal, getConfig, getConfigInternal
+    -- ** Types
+    , Topic
+    -- ** Advanced Actions
+    , extractAction, extractReaction
+    -- * Internals
+    -- ** Values
+    , defaultBotName
+    -- ** Functions
+    , runDefinitions
+    -- ** Types
+    , BotActionState(BotActionState), ActionData(..), WrappedAction(..)
+    , BotReacting(..), Script(..), ScriptDefinition(..), ScriptInit(..), ScriptId(..)
+    -- ** Lenses and lens classes
+    , HasScriptId(scriptId), HasConfig(config), HasAdapter(adapter)
+    , HasVariable(variable), HasActions(actions), HasMessage(messageLens)
+    , HasMatch(matchLens), HasTopic(topicLens), HasChannel(channelLens)
+    , HasUser(userLens) 
+    -- ** HelperClasses
+    , AccessAdapter(AdapterT, getAdapter)
+    ) where
 
 
 import           Control.Monad.Reader
@@ -20,7 +53,8 @@ import           Control.Exception.Lifted
 import           Control.Lens             hiding (cons)
 import           Control.Monad.Logger
 import qualified Data.HashMap.Strict      as HM
-import           Data.Monoid              ((<>))
+import           Data.Maybe              (fromMaybe)
+import           Data.Monoid             ((<>))
 import           Data.Sequences
 import qualified Data.Text                as T
 import qualified Data.Text.Lazy           as L
@@ -34,6 +68,8 @@ import           Marvin.Util.Regex        (Match, Regex)
 import           Util
 
 
+defaultBotName :: L.Text
+defaultBotName = "marvin"
 
 -- | Read only data available to a handler when the bot reacts to an event.
 declareFields [d|
@@ -165,6 +201,7 @@ getSubConfFor :: HasConfigAccess m => ScriptId -> m C.Config
 getSubConfFor (ScriptId name) = C.subconfig ("script." <> name) <$> getConfigInternal
 
 
+-- | Get the config part for the currect script
 getConfig :: HasConfigAccess m => m C.Config
 getConfig = getScriptId >>= getSubConfFor
 
@@ -414,20 +451,34 @@ requireConfigVal name = do
     liftIO $ C.require cfg name
 
 
+-- | INTERNAL, USE WITH CARE
+--
+-- Get the configuration for the bot (should be "bot" subconfig)
 getAppConfig :: HasConfigAccess m => m C.Config
 getAppConfig = getSubConfFor applicationScriptId
 
 
+-- | INTERNAL, USE WITH CARE
+--
+-- Get a value from the bot config (should be "bot" subconfig)
 getAppConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m (Maybe a)
 getAppConfigVal name = do
     cfg <- getAppConfig
     liftIO $ C.lookup cfg name
 
 
+-- | INTERNAL, USE WITH CARE
+--
+-- Get a value from the bot config (should be "bot" subconfig)
 requireAppConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m a
 requireAppConfigVal name = do
     cfg <- getAppConfig
     liftIO $ C.require cfg name
+
+
+-- | Get the configured name of the bot.
+getBotName :: HasConfigAccess m => m L.Text
+getBotName = fromMaybe defaultBotName <$> getAppConfigVal "name"
 
 
 -- | Take a reaction and produce an IO action with the same effect.

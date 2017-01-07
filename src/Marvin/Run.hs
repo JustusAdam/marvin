@@ -55,10 +55,6 @@ data CmdOptions = CmdOptions
     }
 
 
-defaultBotName :: L.Text
-defaultBotName = "marvin"
-
-
 defaultConfigName :: FilePath
 defaultConfigName = "config.cfg"
 

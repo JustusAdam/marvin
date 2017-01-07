@@ -7,25 +7,33 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 
+For the proper, verbose documentation see <https://marvin.readthedocs.org/en/latest/scripting.html>.
+
 -}
 module Marvin
-    ( -- * Scripts
+    (
+    -- * The Script
       Script(..), defineScript, ScriptInit
     , ScriptId
-    , ScriptDefinition
-    , IsAdapter
-      -- * Reacting
+    , ScriptDefinition, IsAdapter
+    -- * Reacting
+    -- ** Reaction Functions
     , hear, respond, enter, exit, enterIn, exitFrom, topic, topicIn, customTrigger
+    -- ** Getting data
+    , getData, getMessage, getMatch, getTopic, getChannel, getUser, getUsername, getChannelName, resolveChannel
+    -- ** Sending messages
     , send, reply, messageChannel, messageChannel'
-    , getData, getMessage, getMatch, getTopic, getChannel, getUser, getUsername, getChannelName
-    , Message(..), User, Channel
-    , getConfigVal, requireConfigVal
-    , BotReacting, Get(getLens)
+    -- ** Interaction with the config
+    , getConfigVal, requireConfigVal, getBotName
+    -- ** Handler Types
+    , Message(..), User, Channel, BotReacting
     -- ** Advanced actions
     , extractAction, extractReaction
+    -- ** Misc
+    , Topic
     ) where
 
 
-import           Marvin.Adapter        (IsAdapter)
+import           Marvin.Adapter (IsAdapter)
 import           Marvin.Internal
 import           Marvin.Internal.Types hiding (getChannelName, getUsername, messageChannel)
