@@ -106,49 +106,35 @@ newtype ScriptInit a = ScriptInit (ScriptId, a -> C.Config -> RunnerM (Script a)
 
 
 -- | Class which says that there is a way to get to a 'Message' from this type @m@.
-class HasMessage m where
-    messageLens :: Lens' (m a) (Message a)
+class Get a b where
+    getLens :: Lens' a b
 
-instance HasMessageField (m a) (Message a) => HasMessage (m a) where
-    messageLens = messageField
+instance Get (a, Message) Message where
+    getLens = _2
 
--- | Class which says that there is a way to get to a 'Match' from this type @m@.
-class HasMatch m where
-    matchLens :: Lens' m Match
+instance Get (Match, b) Match where
+    getLens = _1
 
-instance HasMatchField m Match => HasMatch m where
-    matchLens = matchField
-
--- | Class which says that there is a way to get to a topic of type 'String' from this type @m@.
-class HasTopic m where
-    topicLens :: Lens' m L.Text
-
-instance HasTopic (Topic, a) where
-    topicLens = _1
+instance Get (Topic, a) Topic where
+    getLens = _1
 
 idLens :: Lens' a a
 idLens = lens id (flip const)
 
-class HasChannel a where
-    channelLens :: Lens' a Channel
+instance Get (b, Channel a) (Channel a) where
+    getLens = _2
 
-instance HasChannel (a, Channel) where
-    channelLens = _2
+instance Get (b, Message a) (Channel a) where
+    getLens = _2 . lens channel (\a b -> a {channel = b})
 
-instance HasChannel MessageReactionData where
-    channelLens = messageField . lens channel (\a b -> a {channel = b})
+instance Get a a where
+    getLens = idLens
 
-class HasUser a where
-    userLens :: Lens' a User
+instance Get (User a, b) (User a) where
+    getLens = _1
 
-instance HasUser User where
-    userLens = idLens
-
-instance HasUser (User, a) where
-    userLens = _1
-
-instance HasUser MessageReactionData where
-    userLens = messageField . lens sender (\a b -> a {sender = b})
+instance Get (b, Message a) (User a) where
+    getLens = _2 . lens sender (\a b -> a {sender = b})
 
 instance HasConfigAccess (ScriptDefinition a) where
     getConfigInternal = ScriptDefinition $ use config
@@ -258,27 +244,27 @@ customTrigger tr = addReaction (Custom tr)
 -- | Send a message to the channel the triggering message came from.
 --
 -- Equivalent to "robot.send" in hubot
-send :: (IsAdapter a, HasChannel m) => L.Text -> BotReacting a m ()
+send :: (IsAdapter a, Get m (Channel a)) => L.Text -> BotReacting a m ()
 send msg = do
     o <- getChannel
     messageChannel' o msg
 
 
 -- | Get the username of a registered user.
-getUsername :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User -> m L.Text
+getUsername :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User (AdapterT m) -> m L.Text
 getUsername usr = do
     a <- getAdapter
     A.liftAdapterAction $ A.getUsername a usr
 
 
-resolveChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => L.Text -> m (Maybe Channel)
+resolveChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => L.Text -> m (Maybe (Channel (AdapterT m)))
 resolveChannel name = do
     a <- getAdapter
     A.liftAdapterAction $ A.resolveChannel a name
 
 
 -- | Get the human readable name of a channel.
-getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel -> m L.Text
+getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> m L.Text
 getChannelName rm = do
     a <- getAdapter
     A.liftAdapterAction $ A.getChannelName a rm
@@ -287,7 +273,7 @@ getChannelName rm = do
 -- | Send a message to the channel the original message came from and address the user that sent the original message.
 --
 -- Equivalent to "robot.reply" in hubot
-reply :: (IsAdapter a, HasMessage m) => L.Text -> BotReacting a m ()
+reply :: (IsAdapter a, Get m (Message a)) => L.Text -> BotReacting a m ()
 reply msg = do
     om <- getMessage
     user <- getUsername $ sender om
@@ -301,7 +287,7 @@ messageChannel name msg = do
     maybe ($logError $(isT "No channel known with the name #{name}")) (`messageChannel'` msg) mchan
 
 
-messageChannel' :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel -> L.Text -> m ()
+messageChannel' :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> L.Text -> m ()
 messageChannel' chan msg = do
     a <- getAdapter
     A.liftAdapterAction $ A.messageChannel a chan msg
@@ -335,28 +321,28 @@ getData = view variable
 -- | Get the results from matching the regular expression.
 --
 -- Equivalent to "msg.match" in hubot.
-getMatch :: HasMatch m => BotReacting a m Match
+getMatch :: Get m Match => BotReacting a m Match
 getMatch = view (variable . matchLens)
 
 
 -- | Get the message that triggered this action
 -- Includes sender, target channel, as well as the full, untruncated text of the original message
-getMessage :: HasMessage m => BotReacting a m Message
+getMessage :: Get m (Message a) => BotReacting a m (Message a)
 getMessage = view (variable . messageLens)
 
 
 -- | Get the the new topic.
-getTopic :: HasTopic m => BotReacting a m Topic
+getTopic :: Get m Topic => BotReacting a m Topic
 getTopic = view (variable . topicLens)
 
 
 -- | Get the stored channel in which something happened.
-getChannel :: HasChannel m => BotReacting a m Channel
+getChannel :: Get m (Channel a) => BotReacting a m (Channel a)
 getChannel = view (variable . channelLens)
 
 
 -- | Get the user whihc was part of the triggered action.
-getUser :: HasUser m => BotReacting a m User
+getUser :: Get m (User a) => BotReacting a m (User a)
 getUser = view (variable . userLens)
 
 
