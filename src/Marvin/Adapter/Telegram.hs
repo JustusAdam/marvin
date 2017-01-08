@@ -27,7 +27,9 @@ import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text
 import           Marvin.Types
 import           Network.Wreq
-import           Unsafe.Coerce
+import Control.Concurrent.Lifted
+import Network.Wai
+import Network.Wai.Handler.Warp
 
 
 data APIResponse a
@@ -40,7 +42,7 @@ data TelegramAdapter updateType = TelegramAdapter
     }
 
 
-data InternalEvent any
+data TelegramUpdate any
     = Ev (Event (TelegramAdapter any))
     | Ignored
     | Unhandeled
@@ -99,7 +101,7 @@ instance FromJSON TelegramChat where
             <*> o .:? "first_name"
             <*> o .:? "last_name"
 
-instance FromJSON (InternalEvent any) where
+instance FromJSON (TelegramUpdate any) where
     parseJSON = withObject "expected object" inner
       where
         inner o = isMessage <|> isUnhandeled
@@ -160,24 +162,45 @@ messageChannelImpl ada chat msg = do
 
 runnerImpl :: forall a. MkTelegram a => RunWithAdapter (TelegramAdapter a)
 runnerImpl config initializer = do
-    token <- liftIO $ C.require config "token"
     loggingFn <- askLoggerIO
     msgChan <- newChan
     let ada = TelegramAdapter config
     handler <- liftIO $ initializer ada
-    async (eventGetter token msgChan)
+    let eventGetter = mkEventGetter ada msgChan
+    async eventGetter
 
     forever $ do
         d <- readChan msgChan
-        case eitherDecode d of
-            Left err -> logErrorN $(isT "Error parsing json: #{err} original data: #{L.decodeUtf8 d}")
-            Right (Ev ev) -> liftIO $ handler ev
-            Right event ->
-                case event of
-                    Ignored -> return ()
-                    Unhandeled -> logDebugN $(isT "Unhadeled event. Original data #{ L.decodeUtf8 d}")
+        case d of
+            Ev ev -> liftIO $ handler ev
+            Ignored -> return ()
+            Unhandeled -> logDebugN $(isT "Unhadeled event.")
+    
+
+
+pollEventGetter :: TelegramAdapter Poll -> Chan (TelegramUpdate Poll) -> RunnerM ()
+pollEventGetter ada msgChan =
+    forever $ do
+        response <- execAPIMethod parseJSON ada "getUpdates" []
+        case response of
+            Left err -> do
+                logErrorN $(isT "Unable to parse json: #{err}")
+                threadDelay 30000
+            Right (Error code desc) -> do
+                logErrorN $(isT "Sending message failed with #{code}: #{desc}")
+                threadDelay 30000
+            Right Success {result=updates} ->
+                writeList2Chan msgChan updates
+
+
+pushEventGetter :: TelegramAdapter Push -> Chan (TelegramUpdate Push) -> RunnerM ()
+pushEventGetter ada msgChan = 
+    -- port <- liftIO $ C.require cfg "port"
+    -- url <- liftIO $ C.require cfg "url"
+    return ()
   where
-    eventGetter = mkEventGetter (error "phantom value" :: a)
+    cfg = userConfig ada
+
 
 
 scriptIdImpl :: forall a. MkTelegram a => TelegramAdapter a -> AdapterId (TelegramAdapter a)
@@ -185,14 +208,14 @@ scriptIdImpl _ = mkAdapterId (error "phantom value" :: a)
 
 
 class MkTelegram a where
-    mkEventGetter :: a -> T.Text -> Chan BL.ByteString -> RunnerM ()
+    mkEventGetter :: TelegramAdapter a -> Chan (TelegramUpdate a) -> RunnerM ()
     mkAdapterId :: a -> AdapterId (TelegramAdapter a)
 
 
 instance MkTelegram a => IsAdapter (TelegramAdapter a) where
     type User (TelegramAdapter a) = TelegramUser
     type Channel (TelegramAdapter a) = TelegramChat
-    adapterId = scriptIdImpl (undefined :: TelegramAdapter a)
+    adapterId = scriptIdImpl (error "phantom value" :: TelegramAdapter a)
     runWithAdapter = runnerImpl
     getUsername = getUsernameImpl
     getChannelName = getChannelNameImpl
@@ -207,7 +230,7 @@ data Poll
 
 instance MkTelegram Poll where
     mkAdapterId _ = "telegram-poll"
-    mkEventGetter _ = error "not implemented"
+    mkEventGetter = pollEventGetter
 
 
 data Push
