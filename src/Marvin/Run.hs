@@ -87,23 +87,23 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
         wait generics
     handler (MessageEvent msg) = handleMessage msg
     -- TODO implement other handlers
-    handler (ChannelJoinEvent user chan) = changeHandlerHelper joinsV joinsInV user chan
-    handler (ChannelLeaveEvent user chan) = changeHandlerHelper leavesV leavesFromV user chan
+    handler (ChannelJoinEvent user chan) = changeHandlerHelper joinsV joinsInV (User' user) chan
+    handler (ChannelLeaveEvent user chan) = changeHandlerHelper leavesV leavesFromV (User' user) chan
     handler (TopicChangeEvent topic chan) = changeHandlerHelper topicsV topicsInV topic chan
 
-    changeHandlerHelper :: Vector ((b, Channel a) -> RunnerM ())
-                        -> HM.HashMap L.Text (Vector ((b, Channel a) -> RunnerM ()))
+    changeHandlerHelper :: Vector ((b, Channel' a) -> RunnerM ())
+                        -> HM.HashMap L.Text (Vector ((b, Channel' a) -> RunnerM ()))
                         -> b
                         -> Channel a
                         -> RunnerM ()
-    changeHandlerHelper wildcards specifics other chan@(Channel c) = do
-        cName <- A.getChannelName adapter c
+    changeHandlerHelper wildcards specifics other chan = do
+        cName <- A.getChannelName adapter chan
 
         let applicables = fromMaybe mempty $ specifics^?ix cName
 
-        wildcards <- for wildcards (async . ($ (other, chan)))
+        wildcards <- for wildcards (async . ($ (other, Channel' chan)))
 
-        applicablesRunning <- for applicables (async . ($ (other, chan)))
+        applicablesRunning <- for applicables (async . ($ (other, Channel' chan)))
 
         mapM_ wait $ wildcards `mappend` applicablesRunning
 

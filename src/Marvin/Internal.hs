@@ -31,6 +31,7 @@ import qualified Data.Vector as V
 import  Data.Vector (Vector)
 import qualified Data.HashMap.Strict as HM
 import Control.Exception.Lifted
+import Control.Arrow
 
 
 
@@ -53,12 +54,12 @@ declareFields [d|
         { handlersResponds :: Vector (Regex, Match -> Message a -> RunnerM ())
         , handlersHears :: Vector (Regex, Match -> Message a -> RunnerM ())
         , handlersCustoms :: Vector (Event a -> Maybe (RunnerM ()))
-        , handlersJoins :: Vector ((User a, Channel a) -> RunnerM ())
-        , handlersLeaves :: Vector ((User a, Channel a) -> RunnerM ())
-        , handlersTopicChange :: Vector ((Topic, Channel a) -> RunnerM ())
-        , handlersJoinsIn :: HM.HashMap L.Text (Vector ((User a, Channel a) -> RunnerM ()))
-        , handlersLeavesFrom :: HM.HashMap L.Text (Vector ((User a, Channel a) -> RunnerM ()))
-        , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((Topic, Channel a) -> RunnerM ()))
+        , handlersJoins :: Vector ((User' a, Channel' a) -> RunnerM ())
+        , handlersLeaves :: Vector ((User' a, Channel' a) -> RunnerM ())
+        , handlersTopicChange :: Vector ((Topic, Channel' a) -> RunnerM ())
+        , handlersJoinsIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a) -> RunnerM ()))
+        , handlersLeavesFrom :: HM.HashMap L.Text (Vector ((User' a, Channel' a) -> RunnerM ()))
+        , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((Topic, Channel' a) -> RunnerM ()))
         }
     |]
 
@@ -121,20 +122,20 @@ instance Get (Topic, a) Topic where
 idLens :: Lens' a a
 idLens = lens id (flip const)
 
-instance Get (b, Channel a) (Channel a) where
+instance Get (b, Channel' a) (Channel' a) where
     getLens = _2
 
-instance Get (b, Message a) (Channel a) where
-    getLens = _2 . lens channel (\a b -> a {channel = b})
+instance Get (b, Message a) (Channel' a) where
+    getLens = _2 . lens (Channel' . channel) (\a (Channel' b) -> a {channel = b})
 
 instance Get a a where
     getLens = idLens
 
-instance Get (User a, b) (User a) where
+instance Get (User' a, b) (User' a) where
     getLens = _1
 
-instance Get (b, Message a) (User a) where
-    getLens = _2 . lens sender (\a b -> a {sender = b})
+instance Get (b, Message a) (User' a) where
+    getLens = _2 . lens (User' . sender) (\a (User' b) -> a {sender = b})
 
 instance HasConfigAccess (ScriptDefinition a) where
     getConfigInternal = ScriptDefinition $ use config
@@ -219,7 +220,7 @@ respond !re ac = ScriptDefinition $ do
 enter :: BotReacting a (User a, Channel a) () -> ScriptDefinition a ()
 enter ac = ScriptDefinition $ do
     pac <- prepareAction (Just "enter event" :: Maybe T.Text) ac
-    actions . joins %= V.cons pac
+    actions . joins %= V.cons (pac . (unwrapUser' *** unwrapChannel'))
 
 
 -- | This handler runs whenever a user exits __any channel__ (which the bot is subscribed to)
@@ -228,7 +229,7 @@ enter ac = ScriptDefinition $ do
 exit :: BotReacting a (User a, Channel a) () -> ScriptDefinition a ()
 exit ac = ScriptDefinition $ do
     pac <- prepareAction (Just "exit event" :: Maybe T.Text) ac
-    actions . leaves %= V.cons pac
+    actions . leaves %= V.cons (pac . (unwrapUser' *** unwrapChannel'))
 
 
 alterHelper :: a -> Maybe (Vector a) -> Maybe (Vector a)
@@ -243,7 +244,7 @@ alterHelper v = return . maybe (return v) (V.cons v)
 enterIn :: L.Text -> BotReacting a (User a, Channel a) () -> ScriptDefinition a ()
 enterIn !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "anter event in #{chanName}")) ac
-    actions . joinsIn %= HM.alter (alterHelper pac) chanName
+    actions . joinsIn %= HM.alter (alterHelper (pac . (unwrapUser' *** unwrapChannel'))) chanName
 
 
 -- | This handler runs whenever a user exits __the specified channel__, provided the bot is subscribed to the channel in question.
@@ -254,7 +255,7 @@ enterIn !chanName ac = ScriptDefinition $ do
 exitFrom :: L.Text -> BotReacting a (User a, Channel a) () -> ScriptDefinition a ()
 exitFrom !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "exit event in #{chanName}")) ac
-    actions . leavesFrom %= HM.alter (alterHelper pac) chanName
+    actions . leavesFrom %= HM.alter (alterHelper (pac . (unwrapUser' *** unwrapChannel'))) chanName
 
 
 -- | This handler runs when the topic in __any channel__ the bot is subscribed to changes.
@@ -263,7 +264,7 @@ exitFrom !chanName ac = ScriptDefinition $ do
 topic :: BotReacting a (Topic, Channel a) () -> ScriptDefinition a ()
 topic ac = ScriptDefinition $ do
     pac <- prepareAction (Just "topic event" :: Maybe T.Text) ac
-    actions . topicChange %= V.cons pac
+    actions . topicChange %= V.cons (pac . second unwrapChannel')
 
 
 -- | This handler runs when the topic in __the specified channel__ is changed, provided the bot is subscribed to the channel in question.
@@ -272,7 +273,7 @@ topic ac = ScriptDefinition $ do
 topicIn :: L.Text -> BotReacting a (Topic, Channel a) () -> ScriptDefinition a ()
 topicIn !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "topic event in #{chanName}")) ac
-    actions . topicChangeIn %= HM.alter (alterHelper pac) chanName
+    actions . topicChangeIn %= HM.alter (alterHelper (pac . second unwrapChannel')) chanName
 
 
 -- | Extension point for the user
@@ -297,7 +298,7 @@ send msg = do
 
 -- | Get the username of a registered user.
 getUsername :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User (AdapterT m) -> m L.Text
-getUsername (User usr) = do
+getUsername usr = do
     a <- getAdapter
     A.liftAdapterAction $ A.getUsername a usr
 
@@ -305,12 +306,12 @@ getUsername (User usr) = do
 resolveChannel :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => L.Text -> m (Maybe (Channel (AdapterT m)))
 resolveChannel name = do
     a <- getAdapter
-    fmap Channel <$> A.liftAdapterAction (A.resolveChannel a name)
+    A.liftAdapterAction (A.resolveChannel a name)
 
 
 -- | Get the human readable name of a channel.
 getChannelName :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> m L.Text
-getChannelName (Channel rm) = do
+getChannelName rm = do
     a <- getAdapter
     A.liftAdapterAction $ A.getChannelName a rm
 
@@ -333,7 +334,7 @@ messageChannel name msg = do
 
 
 messageChannel' :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> L.Text -> m ()
-messageChannel' (Channel chan) msg = do
+messageChannel' chan msg = do
     a <- getAdapter
     A.liftAdapterAction $ A.messageChannel a chan msg
 

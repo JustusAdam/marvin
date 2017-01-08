@@ -35,24 +35,24 @@ type RunWithAdapter a = C.Config -> InitEventHandler a -> RunnerM ()
 
 -- | Basic functionality required of any adapter
 class IsAdapter a where
-    type UserT a
-    type ChannelT a
+    type User a
+    type Channel a
     -- | Used for scoping config and logging
     adapterId :: AdapterId a
     -- | Post a message to a channel given the internal channel identifier
-    messageChannel :: a -> ChannelT a -> L.Text -> RunnerM ()
+    messageChannel :: a -> Channel a -> L.Text -> RunnerM ()
     -- | Initialize and run the bot
     runWithAdapter :: RunWithAdapter a
     -- | Resolve a username given the internal user identifier
-    getUsername :: a -> UserT a -> RunnerM L.Text
+    getUsername :: a -> User a -> RunnerM L.Text
     -- | Resolve the human readable name for a channel given the  internal channel identifier
-    getChannelName :: a -> ChannelT a -> RunnerM L.Text
+    getChannelName :: a -> Channel a -> RunnerM L.Text
     -- | Resolve to the internal channel identifier given a human readable name
-    resolveChannel :: a -> L.Text -> RunnerM (Maybe (ChannelT a))
+    resolveChannel :: a -> L.Text -> RunnerM (Maybe (Channel a))
 
 
-newtype User a = User (UserT a)
-newtype Channel a = Channel (ChannelT a)
+newtype User' a = User' {unwrapUser' :: User a}
+newtype Channel' a = Channel' {unwrapChannel' :: Channel a}
 
 newtype TimeStamp = TimeStamp { unwrapTimeStamp :: Double } deriving Show
 

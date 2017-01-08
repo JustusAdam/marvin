@@ -74,18 +74,18 @@ data APIResponse a = APIResponse
     }
 
 -- | Identifier for a user (internal and not necessarily equal to the username)
-newtype SlackUser = SlackUser T.Text deriving (IsString, Eq, Hashable)
+newtype SlackUserId = SlackUserId T.Text deriving (IsString, Eq, Hashable)
 -- | Identifier for a channel (internal and not necessarily equal to the channel name)
-newtype SlackChannel = SlackChannel T.Text deriving (IsString, Eq, Show, Hashable)
+newtype SlackChannelId = SlackChannelId T.Text deriving (IsString, Eq, Show, Hashable)
 
 
-deriveJSON defaultOptions { unwrapUnaryRecords = True } ''SlackUser
-deriveJSON defaultOptions { unwrapUnaryRecords = True } ''SlackChannel
+deriveJSON defaultOptions { unwrapUnaryRecords = True } ''SlackUserId
+deriveJSON defaultOptions { unwrapUnaryRecords = True } ''SlackChannelId
 
 
 declareFields [d|
     data LimitedChannelInfo = LimitedChannelInfo
-        { limitedChannelInfoIdValue :: SlackChannel
+        { limitedChannelInfoIdValue :: SlackChannelId
         , limitedChannelInfoName :: L.Text
         , limitedChannelInfoTopic :: L.Text
         } deriving Show
@@ -94,15 +94,15 @@ declareFields [d|
 declareFields [d|
     data UserInfo = UserInfo
         { userInfoUsername :: L.Text
-        , userInfoIdValue  :: SlackUser
+        , userInfoIdValue  :: SlackUserId
         }
     |]
 
 
 declareFields [d|
     data ChannelCache = ChannelCache
-        { channelCacheInfoCache    :: HashMap SlackChannel LimitedChannelInfo
-        , channelCacheNameResolver :: HashMap L.Text SlackChannel
+        { channelCacheInfoCache    :: HashMap SlackChannelId LimitedChannelInfo
+        , channelCacheNameResolver :: HashMap L.Text SlackChannelId
         }
     |]
 
@@ -114,9 +114,9 @@ data InternalType
         }
     | Unhandeled String
     | Ignored
-    | ChannelArchiveStatusChange SlackChannel Bool
+    | ChannelArchiveStatusChange SlackChannelId Bool
     | ChannelCreated LimitedChannelInfo
-    | ChannelDeleted SlackChannel
+    | ChannelDeleted SlackChannelId
     | ChannelRename LimitedChannelInfo
     | UserChange UserInfo
 
@@ -126,8 +126,8 @@ deriveJSON defaultOptions { fieldLabelModifier = camelTo2 '_' } ''RTMData
 
 messageParser :: Value -> Parser (Types.Message SlackRTMAdapter)
 messageParser (Object o) = Message
-    <$> (User <$> o .: "user")
-    <*> (Channel <$> o .: "channel")
+    <$> o .: "user"
+    <*> o .: "channel"
     <*> o .: "text"
     <*> o .: "ts"
 messageParser _ = mzero
@@ -168,8 +168,8 @@ eventParser v@(Object o) = isErrParser <|> hasTypeParser
                     _ -> msgEv
               where
                 msgEv = Right . MessageEvent <$> messageParser v
-                user = User <$> o .: "user"
-                channel = Channel <$> o .: "channel"
+                user = o .: "user"
+                channel = o .: "channel"
                 cJoin = do
                     ev <- ChannelJoinEvent <$> user <*> channel
                     return $ Right ev
@@ -226,7 +226,7 @@ data SlackRTMAdapter = SlackRTMAdapter
     , userConfig    :: C.Config
     , midTracker    :: TMVar Int
     , channelChache :: IORef ChannelCache
-    , userInfoCache :: IORef (HashMap SlackUser UserInfo)
+    , userInfoCache :: IORef (HashMap SlackUserId UserInfo)
     }
 
 
@@ -333,8 +333,8 @@ newMid SlackRTMAdapter{midTracker} = liftIO $ atomically $ do
     return id
 
 
-messageChannelImpl :: SlackRTMAdapter -> SlackChannel -> L.Text -> RunnerM ()
-messageChannelImpl adapter (SlackChannel chan) msg = do
+messageChannelImpl :: SlackRTMAdapter -> SlackChannelId -> L.Text -> RunnerM ()
+messageChannelImpl adapter (SlackChannelId chan) msg = do
     mid <- newMid adapter
     sendMessage adapter $ encode $
         object [ "id" .= mid
@@ -344,14 +344,14 @@ messageChannelImpl adapter (SlackChannel chan) msg = do
                 ]
 
 
-getUserInfoImpl :: SlackRTMAdapter -> SlackUser -> RunnerM UserInfo
-getUserInfoImpl adapter user@(SlackUser user') = do
+getUserInfoImpl :: SlackRTMAdapter -> SlackUserId -> RunnerM UserInfo
+getUserInfoImpl adapter user@(SlackUserId user') = do
     uc <- readIORef $ userInfoCache adapter
     maybe (refreshUserInfo adapter user) return $ lookup user uc
 
 
-refreshUserInfo :: SlackRTMAdapter -> SlackUser -> RunnerM UserInfo
-refreshUserInfo adapter user@(SlackUser user') = do
+refreshUserInfo :: SlackRTMAdapter -> SlackUserId -> RunnerM UserInfo
+refreshUserInfo adapter user@(SlackUserId user') = do
     usr <- execAPIMethod userInfoParser adapter "users.info" ["user" := user']
     case usr of
         Left err -> error ("Parse error when getting user data " ++ err)
@@ -384,7 +384,7 @@ refreshChannels adapter = do
         Right (APIResponse False _) -> return $ Left "Server denied getting channel info request"
 
 
-resolveChannelImpl :: SlackRTMAdapter -> L.Text -> RunnerM (Maybe SlackChannel)
+resolveChannelImpl :: SlackRTMAdapter -> L.Text -> RunnerM (Maybe SlackChannelId)
 resolveChannelImpl adapter name' = do
     cc <- readIORef $ channelChache adapter
     case cc ^? nameResolver . ix name of
@@ -397,7 +397,7 @@ resolveChannelImpl adapter name' = do
   where name = L.tail name'
 
 
-getChannelNameImpl :: SlackRTMAdapter -> SlackChannel -> RunnerM L.Text
+getChannelNameImpl :: SlackRTMAdapter -> SlackChannelId -> RunnerM L.Text
 getChannelNameImpl adapter channel = do
     cc <- readIORef $ channelChache adapter
     L.cons '#' <$>
@@ -416,7 +416,7 @@ putChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id nam
                     & nameResolver . at name .~ Just id
 
 
-deleteChannel :: SlackRTMAdapter -> SlackChannel -> RunnerM ()
+deleteChannel :: SlackRTMAdapter -> SlackChannelId -> RunnerM ()
 deleteChannel SlackRTMAdapter{channelChache} channel =
     void $ atomicModifyIORef channelChache $ \cache ->
         case cache ^? infoCache . ix channel of
@@ -439,8 +439,8 @@ renameChannel SlackRTMAdapter{channelChache} channelInfo@(LimitedChannelInfo id 
 
 
 instance IsAdapter SlackRTMAdapter where
-    type UserT SlackRTMAdapter = SlackUser
-    type ChannelT SlackRTMAdapter = SlackChannel
+    type User SlackRTMAdapter = SlackUserId
+    type Channel SlackRTMAdapter = SlackChannelId
     adapterId = "slack-rtm"
     messageChannel = messageChannelImpl
     runWithAdapter = runnerImpl

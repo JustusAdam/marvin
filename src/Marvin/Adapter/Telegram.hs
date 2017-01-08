@@ -1,5 +1,5 @@
-{-# LANGUAGE ExplicitForAll, ScopedTypeVariables #-}
-module Marvin.Adapter.Telegram.Common where
+{-# LANGUAGE ExplicitForAll, ScopedTypeVariables, FunctionalDependencies, FlexibleInstances #-}
+module Marvin.Adapter.Telegram where
 
 import Marvin.Adapter
 import Network.Wreq
@@ -21,14 +21,19 @@ import Marvin.Interpolate.String
 import Control.Applicative
 import Marvin.Types
 import Control.Monad.IO.Class
-import Control.Lens
 import Control.Monad
 import Unsafe.Coerce
+import Control.Lens
 
 
 data APIResponse a
     = Success { description :: Maybe T.Text, result :: a}
     | Error { errorCode :: Int, errDescription :: T.Text}
+
+
+data TelegramAdapter updateType = TelegramAdapter
+    { userConfig :: C.Config
+    }
 
 
 data InternalEvent any 
@@ -37,11 +42,49 @@ data InternalEvent any
     | Unhandeled
 
 
-data TelegramUser
+data ChatType 
+    = PrivateChat
+    | GroupChat
+    | SupergroupChat
+    | ChannelChat
 
 
-data TelegramChannel
+declareFields [d|
+    data TelegramUser = TelegramUser
+        { telegramUserId_ :: Integer
+        , telegramUserFirstName :: L.Text
+        , telegramUserLastName :: Maybe L.Text
+        , telegramUserUserName :: Maybe L.Text
+        }
 
+    data TelegramChannel = TelegramChannel
+        { telegramChatId_ :: Integer
+        , telegramChatType_ :: ChatType
+        }
+    |]
+
+instance FromJSON ChatType where
+    parseJSON = withText "expected string" fromStr
+      where
+        fromStr "private" = pure PrivateChat
+        fromStr "group" = pure GroupChat
+        fromStr "supergroup" = pure SupergroupChat
+        fromStr "channel" = pure ChannelChat
+        fromStr _ = mzero
+
+instance FromJSON TelegramUser where
+    parseJSON = withObject "user must be object" $ \o ->
+        TelegramUser 
+            <$> o .: "id"
+            <*> o .: "first_name"
+            <*> o .:? "last_name"
+            <*> o .:? "username"
+
+instance FromJSON TelegramChannel where
+    parseJSON = withObject "channel must be object" $ \o ->
+        TelegramChannel
+            <$> o .: "id"
+            <*> o .: "type"
 
 instance FromJSON (InternalEvent any) where
     parseJSON = withObject "expected object" inner
@@ -80,8 +123,8 @@ execAPIMethod innerParser adapter methodName params = do
     cfg = userConfig adapter
 
 
-runnerImpl :: forall a. RunWithAdapter (TelegramAdapter a)
-runnerImpl eventGetter config initializer = do
+runnerImpl :: forall a. MkTelegram a => RunWithAdapter (TelegramAdapter a)
+runnerImpl config initializer = do
     token <- liftIO $ C.require config "token"
     loggingFn <- askLoggerIO
     msgChan <- newChan
@@ -102,22 +145,33 @@ runnerImpl eventGetter config initializer = do
     eventGetter = mkEventGetter (error "phantom value" :: a)
 
 
-scriptIdImpl :: forall a. TelegramAdapter a -> AdapterId a
+scriptIdImpl :: forall a. MkTelegram a => TelegramAdapter a -> AdapterId (TelegramAdapter a)
 scriptIdImpl _ = mkAdapterId (error "phantom value" :: a)
 
 
 class MkTelegram a where
     mkEventGetter :: a -> T.Text -> Chan BL.ByteString -> RunnerM ()
-    mkAdapterId :: a -> AdapterId a
+    mkAdapterId :: a -> AdapterId (TelegramAdapter a)
 
-
-data TelegramAdapter updateType = TelegramAdapter
-    { userConfig :: C.Config
-    }
 
 instance MkTelegram a => IsAdapter (TelegramAdapter a) where
-    type UserT (TelegramAdapter a) = TelegramUser
-    type ChannelT (TelegramAdapter a) = TelegramChannel
-    adapterId = scriptIdImpl
+    type User (TelegramAdapter a) = TelegramUser
+    type Channel (TelegramAdapter a) = TelegramChannel
+    adapterId = scriptIdImpl (undefined :: TelegramAdapter a)
     runWithAdapter = runnerImpl
 
+
+data Poll
+
+
+instance MkTelegram Poll where
+    mkAdapterId _ = "telegram-poll"
+    mkEventGetter _ = error "not implemented"
+
+
+data Push
+
+
+instance MkTelegram Push where
+    mkAdapterId _ = "telegram-push"
+    mkEventGetter _ = error "not implemented"
