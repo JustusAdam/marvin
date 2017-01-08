@@ -2,11 +2,17 @@
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
-module Marvin.Adapter.Telegram where
+module Marvin.Adapter.Telegram
+    ( TelegramAdapter, Push, Poll
+    , TelegramChat(..), ChatType(..)
+    , TelegramUser(..)
+    , HasId_(id_), HasUsername(username), HasFirstName(firstName), HasLastName(lastName), HasType_(type_)
+    ) where
 
 import           Control.Applicative
 import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
+import           Control.Concurrent.Lifted
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -26,10 +32,9 @@ import           Marvin.Adapter
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text
 import           Marvin.Types
+import           Network.Wai
+import           Network.Wai.Handler.Warp
 import           Network.Wreq
-import Control.Concurrent.Lifted
-import Network.Wai
-import Network.Wai.Handler.Warp
 
 
 data APIResponse a
@@ -175,7 +180,7 @@ runnerImpl config initializer = do
             Ev ev -> liftIO $ handler ev
             Ignored -> return ()
             Unhandeled -> logDebugN $(isT "Unhadeled event.")
-    
+
 
 
 pollEventGetter :: TelegramAdapter Poll -> Chan (TelegramUpdate Poll) -> RunnerM ()
@@ -194,7 +199,7 @@ pollEventGetter ada msgChan =
 
 
 pushEventGetter :: TelegramAdapter Push -> Chan (TelegramUpdate Push) -> RunnerM ()
-pushEventGetter ada msgChan = 
+pushEventGetter ada msgChan =
     -- port <- liftIO $ C.require cfg "port"
     -- url <- liftIO $ C.require cfg "url"
     return ()
