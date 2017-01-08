@@ -9,11 +9,8 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson
-import           Data.Aeson.TH
 import           Data.Char               (isAlphaNum, isLetter)
 import qualified Data.Configurator.Types as C
-import           Data.Hashable
-import qualified Data.HashMap.Strict     as HM
 import           Data.String
 import qualified Data.Text               as T
 import qualified Data.Text.Lazy          as L

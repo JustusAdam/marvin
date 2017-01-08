@@ -24,7 +24,6 @@ import qualified Data.Text.Lazy          as L
 import           Marvin.Internal.Types
 
 
-liftAdapterAction :: MonadLoggerIO m => RunnerM a -> m a
-liftAdapterAction ac = do
-    loggingFn <- askLoggerIO
-    liftIO $ runLoggingT ac loggingFn
+liftAdapterAction :: MonadIO m => RunnerM a -> m a
+liftAdapterAction ac =
+    liftIO $ runStderrLoggingT ac

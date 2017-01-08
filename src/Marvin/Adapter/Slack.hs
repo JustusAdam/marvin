@@ -19,7 +19,7 @@ import           Control.Applicative             ((<|>))
 import           Control.Arrow                   ((&&&))
 import           Control.Concurrent.Async.Lifted (async)
 import           Control.Concurrent.Chan.Lifted  (Chan, newChan, readChan, writeChan)
-import           Control.Concurrent.MVar.Lifted  (MVar, modifyMVar_, newEmptyMVar, newMVar, putMVar,
+import           Control.Concurrent.MVar.Lifted  (MVar, newEmptyMVar, putMVar,
                                                   readMVar, takeMVar)
 import           Control.Concurrent.STM          (TMVar, atomically, newTMVar, putTMVar, takeTMVar)
 import           Control.Exception.Lifted

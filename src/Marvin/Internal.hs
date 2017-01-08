@@ -52,7 +52,6 @@ import           Control.Monad.Logger
 import qualified Data.HashMap.Strict      as HM
 import           Data.Maybe              (fromMaybe)
 import           Data.Monoid             ((<>))
-import           Data.Sequences
 import qualified Data.Text                as T
 import qualified Data.Text.Lazy           as L
 import           Data.Vector              (Vector)
@@ -331,20 +330,20 @@ send msg = do
 
 
 -- | Get the username of a registered user.
-getUsername :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User (AdapterT m) -> m L.Text
+getUsername :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User (AdapterT m) -> m L.Text
 getUsername usr = do
     a <- getAdapter
     A.liftAdapterAction $ A.getUsername a usr
 
 
-resolveChannel :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => L.Text -> m (Maybe (Channel (AdapterT m)))
+resolveChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => L.Text -> m (Maybe (Channel (AdapterT m)))
 resolveChannel name = do
     a <- getAdapter
     A.liftAdapterAction (A.resolveChannel a name)
 
 
 -- | Get the human readable name of a channel.
-getChannelName :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> m L.Text
+getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> m L.Text
 getChannelName rm = do
     a <- getAdapter
     A.liftAdapterAction $ A.getChannelName a rm
@@ -361,13 +360,13 @@ reply msg = do
 
 
 -- | Send a message to a Channel (by name)
-messageChannel :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m, MonadLogger m) => L.Text -> L.Text -> m ()
+messageChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadLoggerIO m) => L.Text -> L.Text -> m ()
 messageChannel name msg = do
     mchan <- resolveChannel name
     maybe ($logError $(isT "No channel known with the name #{name}")) (`messageChannel'` msg) mchan
 
 
-messageChannel' :: (MonadLoggerIO m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> L.Text -> m ()
+messageChannel' :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> L.Text -> m ()
 messageChannel' chan msg = do
     a <- getAdapter
     A.liftAdapterAction $ A.messageChannel a chan msg

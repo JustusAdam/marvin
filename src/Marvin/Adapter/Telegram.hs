@@ -19,15 +19,11 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson                      hiding (Error, Success)
 import           Data.Aeson.Types                (Parser, parseEither)
-import qualified Data.ByteString                 as B
-import qualified Data.ByteString.Lazy            as BL
 import qualified Data.Configurator               as C
 import qualified Data.Configurator.Types         as C
 import           Data.Maybe
 import qualified Data.Text                       as T
-import qualified Data.Text.Encoding              as T
 import qualified Data.Text.Lazy                  as L
-import qualified Data.Text.Lazy.Encoding         as L
 import           Marvin.Adapter
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text
@@ -109,7 +105,7 @@ instance FromJSON TelegramChat where
 instance FromJSON (TelegramUpdate any) where
     parseJSON = withObject "expected object" inner
       where
-        inner o = isMessage <|> isUnhandeled
+        inner o = isMessage <|> isPost <|> isUnhandeled
           where
             isMessage = do
                 msg <- o .: "message" >>= msgParser
@@ -156,7 +152,7 @@ getChannelNameImpl _ c = return $ fromMaybe "<unnamed>" $
 
 messageChannelImpl :: TelegramAdapter a -> TelegramChat -> L.Text -> RunnerM ()
 messageChannelImpl ada chat msg = do
-    res <- execAPIMethod msgParser ada "sendMessage" ["text" := msg]
+    res <- execAPIMethod msgParser ada "sendMessage" ["chat_id" := (chat^.id_) , "text" := msg]
     case res of
         Left err -> error $(isS "Unparseable JSON #{err}")
         Right Success{} -> return ()
@@ -167,7 +163,6 @@ messageChannelImpl ada chat msg = do
 
 runnerImpl :: forall a. MkTelegram a => RunWithAdapter (TelegramAdapter a)
 runnerImpl config initializer = do
-    loggingFn <- askLoggerIO
     msgChan <- newChan
     let ada = TelegramAdapter config
     handler <- liftIO $ initializer ada
@@ -243,4 +238,4 @@ data Push
 
 instance MkTelegram Push where
     mkAdapterId _ = "telegram-push"
-    mkEventGetter _ = error "not implemented"
+    mkEventGetter = pushEventGetter

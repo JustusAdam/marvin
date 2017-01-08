@@ -31,10 +31,9 @@ import qualified Data.Configurator               as C
 import qualified Data.Configurator.Types         as C
 import           Data.Foldable                   (for_)
 import qualified Data.HashMap.Strict             as HM
-import           Data.Maybe                      (fromMaybe, mapMaybe)
+import           Data.Maybe                      (fromMaybe)
 import           Data.Monoid                     ((<>))
 import           Data.Sequences
-import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Data.Traversable                (for)
 import           Data.Vector                     (Vector)
@@ -97,11 +96,11 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
 
         let applicables = fromMaybe mempty $ specifics^?ix cName
 
-        wildcards <- for wildcards (async . ($ (other, Channel' chan)))
+        wildcardsRunning <- for wildcards (async . ($ (other, Channel' chan)))
 
         applicablesRunning <- for applicables (async . ($ (other, Channel' chan)))
 
-        mapM_ wait $ wildcards `mappend` applicablesRunning
+        mapM_ wait $ wildcardsRunning `mappend` applicablesRunning
 
 
 
@@ -135,7 +134,7 @@ application log inits config ada = flip runLoggingT log $ do
   where
     onInitExcept :: ScriptId -> SomeException -> RunnerM (Maybe a')
     onInitExcept (ScriptId id) e = do
-        err $(isT "Unhandled exception during initialization of script ${id}")
+        err $(isT "Unhandled exception during initialization of script #{id}")
         err $(isT "#{e}")
         return Nothing
       where err = logErrorNS $(isT "#{applicationScriptId}.init")
@@ -156,7 +155,7 @@ runMarvin s' = runStderrLoggingT $ do
                     ($logInfoS $(isT "${applicationScriptId}") "Using default config: config.cfg" >> return defaultConfigName)
                     return
                     (configPath args)
-    (cfg, cfgTid) <- liftIO $ C.autoReload C.autoConfig [C.Required cfgLoc]
+    (cfg, _) <- liftIO $ C.autoReload C.autoConfig [C.Required cfgLoc]
     loggingLevelFromCfg <- liftIO $ C.lookup cfg $(isT "#{applicationScriptId}.logging")
 
     let loggingLevel
