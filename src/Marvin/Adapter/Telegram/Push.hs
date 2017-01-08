@@ -6,5 +6,10 @@ import Marvin.Adapter
 import Marvin.Adapter.Telegram.Common
 
 
-instance IsAdapter (TelegramAdapter Push) where
-    adapterId = "telegram-push"
+
+data Push
+
+
+instance MkEventGetter Push where
+    mkScriptId _ = "telegram-push"
+    mkEventGetter _ = error "not implemented"

@@ -13,7 +13,7 @@ Portability : POSIX
 module Marvin.Adapter
     ( Event(..)
     , RunWithAdapter, EventHandler, InitEventHandler, RunnerM
-    , IsAdapter(..)
+    , IsAdapter(..), AdapterId
     , liftAdapterAction
     ) where
 

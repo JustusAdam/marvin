@@ -31,12 +31,12 @@ library
                      , Marvin.Util.HTTP
                      , Marvin.Adapter
                      , Marvin.Adapter.Slack
-                    --  , Marvin.Adapter.Telegram.Push
-                    --  , Marvin.Adapter.Telegram.Poll
+                     , Marvin.Adapter.Telegram.Push
+                     , Marvin.Adapter.Telegram.Poll
                      , Marvin.Internal
                      , Marvin.Internal.Types
   other-modules:       Util
-                    --  , Marvin.Adapter.Telegram.Common
+                     , Marvin.Adapter.Telegram.Common
   build-depends:       base >= 4.7 && < 5
                      , wreq
                      , aeson

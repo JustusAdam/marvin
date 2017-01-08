@@ -6,6 +6,9 @@ import Marvin.Adapter
 import Marvin.Adapter.Telegram.Common
 
 
-instance IsAdapter (TelegramAdapter Poll) where
-    adapterId = "telegram-poll"
+data Poll
 
+
+instance MkEventGetter Poll where
+    getScriptId _ = "telegram-poll"
+    mkEvenmkScriptId _ = error "not implemented"

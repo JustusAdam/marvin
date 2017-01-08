@@ -1,3 +1,4 @@
+{-# LANGUAGE ExplicitForAll, ScopedTypeVariables #-}
 module Marvin.Adapter.Telegram.Common where
 
 import Marvin.Adapter
@@ -25,10 +26,6 @@ import Control.Monad
 import Unsafe.Coerce
 
 
-data Push
-data Poll
-
-
 data APIResponse a
     = Success { description :: Maybe T.Text, result :: a}
     | Error { errorCode :: Int, errDescription :: T.Text}
@@ -38,6 +35,12 @@ data InternalEvent any
     = Ev (Event (TelegramAdapter any))
     | Ignored
     | Unhandeled
+
+
+data TelegramUser
+
+
+data TelegramChannel
 
 
 instance FromJSON (InternalEvent any) where
@@ -77,7 +80,7 @@ execAPIMethod innerParser adapter methodName params = do
     cfg = userConfig adapter
 
 
-runnerImpl :: (T.Text -> Chan BL.ByteString -> RunnerM ()) -> RunWithAdapter (TelegramAdapter a)
+runnerImpl :: forall a. RunWithAdapter (TelegramAdapter a)
 runnerImpl eventGetter config initializer = do
     token <- liftIO $ C.require config "token"
     loggingFn <- askLoggerIO
@@ -95,11 +98,26 @@ runnerImpl eventGetter config initializer = do
                 case event of
                     Ignored -> return ()
                     Unhandeled -> logDebugN $(isT "Unhadeled event. Original data #{ L.decodeUtf8 d}")
+  where
+    eventGetter = mkEventGetter (error "phantom value" :: a)
 
 
+scriptIdImpl :: forall a. TelegramAdapter a -> AdapterId a
+scriptIdImpl _ = mkAdapterId (error "phantom value" :: a)
 
+
+class MkTelegram a where
+    mkEventGetter :: a -> T.Text -> Chan BL.ByteString -> RunnerM ()
+    mkAdapterId :: a -> AdapterId a
 
 
 data TelegramAdapter updateType = TelegramAdapter
     { userConfig :: C.Config
     }
+
+instance MkTelegram a => IsAdapter (TelegramAdapter a) where
+    type UserT (TelegramAdapter a) = TelegramUser
+    type ChannelT (TelegramAdapter a) = TelegramChannel
+    adapterId = scriptIdImpl
+    runWithAdapter = runnerImpl
+
