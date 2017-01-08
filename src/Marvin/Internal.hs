@@ -31,15 +31,12 @@ module Marvin.Internal
     -- ** Functions
     , runDefinitions
     -- ** Types
-    , BotActionState(BotActionState), ActionData(..), WrappedAction(..)
-    , BotReacting(..), Script(..), ScriptDefinition(..), ScriptInit(..), ScriptId(..)
-    -- ** Lenses and lens classes
-    , HasScriptId(scriptId), HasConfig(config), HasAdapter(adapter)
-    , HasVariable(variable), HasActions(actions), HasMessage(messageLens)
-    , HasMatch(matchLens), HasTopic(topicLens), HasChannel(channelLens)
-    , HasUser(userLens) 
+    , BotActionState(BotActionState)
+    , BotReacting(..), Script(..), ScriptDefinition(..), ScriptInit(..), ScriptId(..), Handlers(..)
+    -- ** Helper lenses
+    , HasActions(actions), HasHears(hears), HasResponds(responds), HasJoins(joins), HasCustoms(customs), HasJoinsIn(joinsIn), HasLeaves(leaves), HasLeavesFrom(leavesFrom), HasTopicChange(topicChange), HasTopicChangeIn(topicChangeIn)
     -- ** HelperClasses
-    , AccessAdapter(AdapterT, getAdapter)
+    , AccessAdapter(AdapterT, getAdapter), Get(getLens)
     ) where
 
 
@@ -62,7 +59,7 @@ import           Data.Vector              (Vector)
 import qualified Data.Vector              as V
 import           Marvin.Adapter           (IsAdapter)
 import qualified Marvin.Adapter           as A
-import           Marvin.Internal.Types    hiding (getUsername, resolveChannel)
+import           Marvin.Internal.Types    hiding (getUsername, resolveChannel, messageChannel, getChannelName, resolveChannel)
 import           Marvin.Interpolate.Text
 import           Marvin.Util.Regex        (Match, Regex)
 import           Util
