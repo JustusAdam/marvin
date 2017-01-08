@@ -7,11 +7,11 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE NamedFieldPuns         #-}
-{-# LANGUAGE TypeSynonymInstances   #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NamedFieldPuns             #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
 module Marvin.Adapter.Slack (SlackRTMAdapter) where
 
 
@@ -35,10 +35,12 @@ import qualified Data.Configurator               as C
 import qualified Data.Configurator.Types         as C
 import           Data.Containers
 import           Data.Foldable                   (toList)
+import           Data.Hashable
 import           Data.HashMap.Strict             (HashMap)
 import           Data.IORef.Lifted
 import           Data.Maybe                      (fromMaybe)
 import           Data.Sequences
+import           Data.String                     (IsString (..))
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter
@@ -50,8 +52,6 @@ import           Network.Wreq
 import           Prelude                         hiding (lookup)
 import           Text.Read                       (readMaybe)
 import           Wuss
-import Data.String (IsString(..))
-import Data.Hashable
 
 instance FromJSON URI where
     parseJSON (String t) = maybe mzero return $ parseURI $ unpack t

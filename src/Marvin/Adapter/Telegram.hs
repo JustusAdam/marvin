@@ -1,29 +1,33 @@
-{-# LANGUAGE ExplicitForAll, ScopedTypeVariables, FunctionalDependencies, FlexibleInstances #-}
+{-# LANGUAGE ExplicitForAll         #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
 module Marvin.Adapter.Telegram where
 
-import Marvin.Adapter
-import Network.Wreq
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import qualified Data.Text.Lazy as L
-import qualified Data.Text.Lazy.Encoding as L
-import Data.Aeson hiding (Error, Success)
-import Data.Aeson.Types (Parser, parseEither)
-import Control.Concurrent.Chan.Lifted
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.Configurator as C
-import qualified Data.Configurator.Types as C
-import Control.Concurrent.Async.Lifted
-import Control.Monad.Logger
-import Marvin.Interpolate.Text
-import Marvin.Interpolate.String
-import Control.Applicative
-import Marvin.Types
-import Control.Monad.IO.Class
-import Control.Monad
-import Unsafe.Coerce
-import Control.Lens
+import           Control.Applicative
+import           Control.Concurrent.Async.Lifted
+import           Control.Concurrent.Chan.Lifted
+import           Control.Lens
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Data.Aeson                      hiding (Error, Success)
+import           Data.Aeson.Types                (Parser, parseEither)
+import qualified Data.ByteString                 as B
+import qualified Data.ByteString.Lazy            as BL
+import qualified Data.Configurator               as C
+import qualified Data.Configurator.Types         as C
+import           Data.Maybe
+import qualified Data.Text                       as T
+import qualified Data.Text.Encoding              as T
+import qualified Data.Text.Lazy                  as L
+import qualified Data.Text.Lazy.Encoding         as L
+import           Marvin.Adapter
+import           Marvin.Interpolate.String
+import           Marvin.Interpolate.Text
+import           Marvin.Types
+import           Network.Wreq
+import           Unsafe.Coerce
 
 
 data APIResponse a
@@ -36,13 +40,13 @@ data TelegramAdapter updateType = TelegramAdapter
     }
 
 
-data InternalEvent any 
+data InternalEvent any
     = Ev (Event (TelegramAdapter any))
     | Ignored
     | Unhandeled
 
 
-data ChatType 
+data ChatType
     = PrivateChat
     | GroupChat
     | SupergroupChat
@@ -54,12 +58,18 @@ declareFields [d|
         { telegramUserId_ :: Integer
         , telegramUserFirstName :: L.Text
         , telegramUserLastName :: Maybe L.Text
-        , telegramUserUserName :: Maybe L.Text
+        , telegramUserUsername :: Maybe L.Text
         }
+    |]
 
-    data TelegramChannel = TelegramChannel
+declareFields [d|
+
+    data TelegramChat = TelegramChat
         { telegramChatId_ :: Integer
         , telegramChatType_ :: ChatType
+        , telegramChatUsername :: Maybe L.Text
+        , telegramChatFirstName :: Maybe L.Text
+        , telegramChatLastName :: Maybe L.Text
         }
     |]
 
@@ -74,53 +84,78 @@ instance FromJSON ChatType where
 
 instance FromJSON TelegramUser where
     parseJSON = withObject "user must be object" $ \o ->
-        TelegramUser 
+        TelegramUser
             <$> o .: "id"
             <*> o .: "first_name"
             <*> o .:? "last_name"
             <*> o .:? "username"
 
-instance FromJSON TelegramChannel where
+instance FromJSON TelegramChat where
     parseJSON = withObject "channel must be object" $ \o ->
-        TelegramChannel
+        TelegramChat
             <$> o .: "id"
             <*> o .: "type"
+            <*> o .:? "username"
+            <*> o .:? "first_name"
+            <*> o .:? "last_name"
 
 instance FromJSON (InternalEvent any) where
     parseJSON = withObject "expected object" inner
       where
         inner o = isMessage <|> isUnhandeled
           where
-            isMessage = do 
+            isMessage = do
                 msg <- o .: "message" >>= msgParser
                 return $ Ev $ MessageEvent msg
             isPost = Ev . MessageEvent <$> (o .: "channel_post" >>= msgParser)
             isUnhandeled = return Unhandeled
 
-        msgParser = withObject "expected message object" $ \o -> 
-            Message
-                <$> (o .: "from" >>= withObject "expected user object" (.: "id"))
-                <*> (o .: "chat" >>= withObject "expected channel object" (.: "id"))
-                <*> o .: "text"
-                <*> o .: "date" 
+
+msgParser ::  Value -> Parser (Message (TelegramAdapter a))
+msgParser = withObject "expected message object" $ \o ->
+    Message
+        <$> o .: "from"
+        <*> o .: "chat"
+        <*> o .: "text"
+        <*> o .: "date"
 
 
 
-apiResponseParser :: (Object -> Parser a) -> Value -> Parser (APIResponse a)
+apiResponseParser :: (Value -> Parser a) -> Value -> Parser (APIResponse a)
 apiResponseParser innerParser = withObject "expected object" $ \o -> do
     ok <- o .: "ok"
     if ok
-        then Success <$> o .:? "description" <*> innerParser o
+        then Success <$> o .:? "description" <*> (o .: "result" >>= innerParser)
         else Error <$> o .: "error_code" <*> o .: "description"
 
 
-execAPIMethod :: (Object -> Parser a) -> TelegramAdapter b -> String -> [FormParam] -> RunnerM (Either String (APIResponse a))
+execAPIMethod :: (Value -> Parser a) -> TelegramAdapter b -> String -> [FormParam] -> RunnerM (Either String (APIResponse a))
 execAPIMethod innerParser adapter methodName params = do
     token <- liftIO $ C.require cfg "token"
     response <- liftIO $ post $(isS "https://api.telegram.org/bot#{token :: String}/#{methodName}") params
     return $ eitherDecode (response^.responseBody) >>= parseEither (apiResponseParser innerParser)
   where
     cfg = userConfig adapter
+
+
+getUsernameImpl :: TelegramAdapter a -> TelegramUser -> RunnerM L.Text
+getUsernameImpl _ u = return $ fromMaybe (u^.firstName) $ u^.username
+
+
+getChannelNameImpl :: TelegramAdapter a -> TelegramChat -> RunnerM L.Text
+getChannelNameImpl _ c = return $ fromMaybe "<unnamed>" $
+    c^.username <|> (L.unwords <$> sequence [c^.firstName, c^.lastName]) <|> c^.firstName
+
+
+messageChannelImpl :: TelegramAdapter a -> TelegramChat -> L.Text -> RunnerM ()
+messageChannelImpl ada chat msg = do
+    res <- execAPIMethod msgParser ada "sendMessage" ["text" := msg]
+    case res of
+        Left err -> error $(isS "Unparseable JSON #{err}")
+        Right Success{} -> return ()
+        Right (Error code desc) ->
+            logErrorN $(isT "Sending message failed with #{code}: #{desc}")
+
 
 
 runnerImpl :: forall a. MkTelegram a => RunWithAdapter (TelegramAdapter a)
@@ -156,9 +191,15 @@ class MkTelegram a where
 
 instance MkTelegram a => IsAdapter (TelegramAdapter a) where
     type User (TelegramAdapter a) = TelegramUser
-    type Channel (TelegramAdapter a) = TelegramChannel
+    type Channel (TelegramAdapter a) = TelegramChat
     adapterId = scriptIdImpl (undefined :: TelegramAdapter a)
     runWithAdapter = runnerImpl
+    getUsername = getUsernameImpl
+    getChannelName = getChannelNameImpl
+    resolveChannel _ _ = do
+        logErrorN "Channel resolving not supported"
+        return Nothing
+    messageChannel = messageChannelImpl
 
 
 data Poll

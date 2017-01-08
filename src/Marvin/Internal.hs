@@ -12,26 +12,26 @@ module Marvin.Internal where
 
 import           Control.Monad.Reader
 import           Control.Monad.State
-import qualified Data.Configurator       as C
-import qualified Data.Configurator.Types as C
+import qualified Data.Configurator        as C
+import qualified Data.Configurator.Types  as C
 
-import           Control.Lens            hiding (cons)
+import           Control.Arrow
+import           Control.Exception.Lifted
+import           Control.Lens             hiding (cons)
 import           Control.Monad.Logger
-import           Data.Monoid             ((<>))
+import qualified Data.HashMap.Strict      as HM
+import           Data.Monoid              ((<>))
 import           Data.Sequences
-import qualified Data.Text.Lazy          as L
-import qualified Data.Text as T
-import           Marvin.Adapter          (IsAdapter)
-import qualified Marvin.Adapter          as A
-import           Marvin.Internal.Types hiding (getUsername, resolveChannel)
+import qualified Data.Text                as T
+import qualified Data.Text.Lazy           as L
+import           Data.Vector              (Vector)
+import qualified Data.Vector              as V
+import           Marvin.Adapter           (IsAdapter)
+import qualified Marvin.Adapter           as A
+import           Marvin.Internal.Types    hiding (getUsername, resolveChannel)
 import           Marvin.Interpolate.Text
-import           Marvin.Util.Regex       (Match, Regex)
+import           Marvin.Util.Regex        (Match, Regex)
 import           Util
-import qualified Data.Vector as V
-import  Data.Vector (Vector)
-import qualified Data.HashMap.Strict as HM
-import Control.Exception.Lifted
-import Control.Arrow
 
 
 
@@ -41,7 +41,7 @@ declareFields [d|
         { botActionStateScriptId :: ScriptId
         , botActionStateConfig   :: C.Config
         , botActionStateAdapter :: a
-        , botActionStateVariable :: d
+        , botActionStatePayload :: d
         }
     |]
 
@@ -67,7 +67,7 @@ declareFields [d|
 instance Monoid (Handlers a) where
     mempty = Handlers mempty mempty mempty mempty mempty mempty mempty mempty mempty
     mappend (Handlers r1 h1 c1 j1 l1 t1 ji1 li1 ti1)
-            (Handlers r2 h2 c2 j2 l2 t2 ji2 li2 ti2) 
+            (Handlers r2 h2 c2 j2 l2 t2 ji2 li2 ti2)
         = Handlers (r1 <> r2) (h1 <> h2) (c1 <> c2) (j1 <> j2) (l1 <> l2) (t1 <> t2) (ji1 <> ji2) (li1 <> li2) (ti1 <> ti2)
 
 
@@ -90,7 +90,7 @@ newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState
 -- Internal structure is exposed for people wanting to extend this.
 declareFields [d|
     data Script a = Script
-        { scriptActions   :: Handlers a 
+        { scriptActions   :: Handlers a
         , scriptScriptId  :: ScriptId
         , scriptConfig    :: C.Config
         , scriptAdapter :: a
@@ -361,35 +361,35 @@ runDefinitions sid definitions ada cfg = execStateT (runScript definitions) (Scr
 -- For instance 'hear' and 'respond' will contain 'MessageReactionData'.
 -- The actual contents comes from the event itself and was put together by the trigger.
 getData :: BotReacting a d d
-getData = view variable
+getData = view payload
 
 
 -- | Get the results from matching the regular expression.
 --
 -- Equivalent to "msg.match" in hubot.
 getMatch :: Get m Match => BotReacting a m Match
-getMatch = view (variable . getLens)
+getMatch = view (payload . getLens)
 
 
 -- | Get the message that triggered this action
 -- Includes sender, target channel, as well as the full, untruncated text of the original message
 getMessage :: Get m (Message a) => BotReacting a m (Message a)
-getMessage = view (variable . getLens)
+getMessage = view (payload . getLens)
 
 
 -- | Get the the new topic.
 getTopic :: Get m Topic => BotReacting a m Topic
-getTopic = view (variable . getLens)
+getTopic = view (payload . getLens)
 
 
 -- | Get the stored channel in which something happened.
 getChannel :: Get m (Channel a) => BotReacting a m (Channel a)
-getChannel = view (variable . getLens)
+getChannel = view (payload . getLens)
 
 
 -- | Get the user whihc was part of the triggered action.
 getUser :: Get m (User a) => BotReacting a m (User a)
-getUser = view (variable . getLens)
+getUser = view (payload . getLens)
 
 
 -- | Get a value out of the config, returns 'Nothing' if the value didn't exist.

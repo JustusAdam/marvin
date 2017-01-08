@@ -28,4 +28,4 @@ module Marvin
 
 import           Marvin.Adapter        (IsAdapter)
 import           Marvin.Internal
-import           Marvin.Internal.Types hiding (messageChannel, getUsername, getChannelName)
+import           Marvin.Internal.Types hiding (getChannelName, getUsername, messageChannel)

@@ -127,7 +127,7 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
                         Just m  -> Just <$> async (action m msg))
 
     Handlers respondsV hearsV customsV joinsV leavesV topicsV joinsInV leavesFromV topicsInV =
-        foldMap (^.actions) scripts 
+        foldMap (^.actions) scripts
 
 
 -- | Create a wai compliant application
