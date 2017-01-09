@@ -251,19 +251,19 @@ respond !re ac = ScriptDefinition $ do
 -- | This handler runs whenever a user enters __any channel__ (which the bot is subscribed to)
 --
 -- The payload contains the entering user and the channel which was entered.
-enter :: BotReacting a (User a, Channel a) () -> ScriptDefinition a ()
+enter :: BotReacting a (User' a, Channel' a) () -> ScriptDefinition a ()
 enter ac = ScriptDefinition $ do
     pac <- prepareAction (Just "enter event" :: Maybe T.Text) ac
-    actions . joins %= V.cons (pac . (unwrapUser' *** unwrapChannel'))
+    actions . joins %= V.cons pac
 
 
 -- | This handler runs whenever a user exits __any channel__ (which the bot is subscribed to)
 --
 -- The payload contains the exiting user and the channel which was exited.
-exit :: BotReacting a (User a, Channel a) () -> ScriptDefinition a ()
+exit :: BotReacting a (User' a, Channel' a) () -> ScriptDefinition a ()
 exit ac = ScriptDefinition $ do
     pac <- prepareAction (Just "exit event" :: Maybe T.Text) ac
-    actions . leaves %= V.cons (pac . (unwrapUser' *** unwrapChannel'))
+    actions . leaves %= V.cons pac
 
 
 alterHelper :: a -> Maybe (Vector a) -> Maybe (Vector a)
@@ -275,10 +275,10 @@ alterHelper v = return . maybe (return v) (V.cons v)
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the entering user.
-enterIn :: L.Text -> BotReacting a (User a, Channel a) () -> ScriptDefinition a ()
+enterIn :: L.Text -> BotReacting a (User' a, Channel' a) () -> ScriptDefinition a ()
 enterIn !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "anter event in #{chanName}")) ac
-    actions . joinsIn %= HM.alter (alterHelper (pac . (unwrapUser' *** unwrapChannel'))) chanName
+    actions . joinsIn %= HM.alter (alterHelper pac) chanName
 
 
 -- | This handler runs whenever a user exits __the specified channel__, provided the bot is subscribed to the channel in question.
@@ -286,28 +286,28 @@ enterIn !chanName ac = ScriptDefinition $ do
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the exting user.
-exitFrom :: L.Text -> BotReacting a (User a, Channel a) () -> ScriptDefinition a ()
+exitFrom :: L.Text -> BotReacting a (User' a, Channel' a) () -> ScriptDefinition a ()
 exitFrom !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "exit event in #{chanName}")) ac
-    actions . leavesFrom %= HM.alter (alterHelper (pac . (unwrapUser' *** unwrapChannel'))) chanName
+    actions . leavesFrom %= HM.alter (alterHelper pac) chanName
 
 
 -- | This handler runs when the topic in __any channel__ the bot is subscribed to changes.
 --
 -- The payload contains the new topic and the channel in which it was set.
-topic :: BotReacting a (Topic, Channel a) () -> ScriptDefinition a ()
+topic :: BotReacting a (Topic, Channel' a) () -> ScriptDefinition a ()
 topic ac = ScriptDefinition $ do
     pac <- prepareAction (Just "topic event" :: Maybe T.Text) ac
-    actions . topicChange %= V.cons (pac . second unwrapChannel')
+    actions . topicChange %= V.cons pac
 
 
 -- | This handler runs when the topic in __the specified channel__ is changed, provided the bot is subscribed to the channel in question.
 --
 -- The argument is the human readable channel name.
-topicIn :: L.Text -> BotReacting a (Topic, Channel a) () -> ScriptDefinition a ()
+topicIn :: L.Text -> BotReacting a (Topic, Channel' a) () -> ScriptDefinition a ()
 topicIn !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "topic event in #{chanName}")) ac
-    actions . topicChangeIn %= HM.alter (alterHelper (pac . second unwrapChannel')) chanName
+    actions . topicChangeIn %= HM.alter (alterHelper pac) chanName
 
 
 -- | Extension point for the user
