@@ -102,7 +102,7 @@ instance Monoid (Handlers a) where
     mempty = Handlers mempty mempty mempty mempty mempty mempty mempty mempty mempty
     mappend (Handlers r1 h1 c1 j1 l1 t1 ji1 li1 ti1)
             (Handlers r2 h2 c2 j2 l2 t2 ji2 li2 ti2)
-        = Handlers (r1 <> r2) (h1 <> h2) (c1 <> c2) (j1 <> j2) (l1 <> l2) (t1 <> t2) (ji1 <> ji2) (li1 <> li2) (ti1 <> ti2)
+        = Handlers (r1 <> r2) (h1 <> h2) (c1 <> c2) (j1 <> j2) (l1 <> l2) (t1 <> t2) (HM.unionWith mappend ji1 ji2) (HM.unionWith mappend li1 li2) (HM.unionWith mappend ti1 ti2)
 
 
 -- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageChannel' as well as any arbitrary 'IO' action using 'liftIO'.
@@ -325,7 +325,7 @@ customTrigger tr ac = ScriptDefinition $ do
 -- | Send a message to the channel the triggering message came from.
 --
 -- Equivalent to "robot.send" in hubot
-send :: (IsAdapter a, Get m (Channel' a)) => L.Text -> BotReacting a m ()
+send :: (IsAdapter a, Get d (Channel' a)) => L.Text -> BotReacting a d ()
 send msg = do
     o <- getChannel
     messageChannel' o msg
@@ -354,11 +354,11 @@ getChannelName rm = do
 -- | Send a message to the channel the original message came from and address the user that sent the original message.
 --
 -- Equivalent to "robot.reply" in hubot
-reply :: (IsAdapter a, Get m (Message a)) => L.Text -> BotReacting a m ()
+reply :: (IsAdapter a, Get d (User' a), Get d (Channel' a)) => L.Text -> BotReacting a d ()
 reply msg = do
-    om <- getMessage
-    user <- getUsername $ sender om
-    messageChannel' (channel om) $ user <> " " <> msg
+    chan <- getChannel
+    user <- getUser >>= getUsername
+    messageChannel' chan $ user <> " " <> msg
 
 
 -- | Send a message to a Channel (by name)
@@ -483,17 +483,14 @@ getBotName = fromMaybe defaultBotName <$> getAppConfigVal "name"
 -- Useful for creating actions which can be scheduled to execute a certain time or asynchronous.
 -- The idea is that one can conveniently send messages from inside a schedulable action.
 extractReaction :: BotReacting a s o -> BotReacting a s (IO o)
-extractReaction reac = BotReacting $ do
-    s <- ask
-    return $ runStderrLoggingT $ runReaderT (runReaction reac) s
+extractReaction reac = BotReacting $
+    runStderrLoggingT . runReaderT (runReaction reac) <$> ask
 
 
 -- | Take an action and produce an IO action with the same effect.
 -- Useful for creating actions which can be scheduled to execute a certain time or asynchronous.
 -- The idea is that one can conveniently send messages from inside a schedulable action.
 extractAction :: BotReacting a () o -> ScriptDefinition a (IO o)
-extractAction ac = ScriptDefinition $ do
-    a <- use adapter
-    sid <- use scriptId
-    cfg <- use config
-    return $ runStderrLoggingT $ runReaderT (runReaction ac) (BotActionState sid cfg a ())
+extractAction ac = ScriptDefinition $ 
+    fmap (runStderrLoggingT . runReaderT (runReaction ac)) $ 
+        BotActionState <$> use scriptId <*> use config <*> use adapter <*> pure ()
