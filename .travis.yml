@@ -29,5 +29,4 @@ before_install:
 
 script:
 - stack install
-- stack haddock
 - cd test/integration && stack build

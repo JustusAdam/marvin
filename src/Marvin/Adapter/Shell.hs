@@ -18,6 +18,7 @@ import           Marvin.Internal.Types
 import           Marvin.Interpolate.String
 import           Marvin.Run                      (lookupFromAppConfig)
 import           System.Console.Haskeline
+import qualified Data.Configurator as C
 
 
 data ShellAdapter = ShellAdapter
@@ -36,10 +37,11 @@ instance IsAdapter ShellAdapter where
     resolveChannel _ _ = return $ Just ()
     runWithAdapter cfg initializer = do
         bot <- liftIO $ fromMaybe defaultBotName <$> lookupFromAppConfig cfg "name"
+        histfile <- liftIO $ C.lookup cfg "history-file"
         out <- liftIO newEmptyMVar
         let ada = ShellAdapter out
         handler <- liftIO $ initializer ada
-        liftIO $ runInputT defaultSettings $ forever $ do
+        liftIO $ runInputT defaultSettings {historyFile=histfile} $ forever $ do
             input <- getInputLine $(isS "#{bot}> ")
             case input of
                 Nothing -> return ()

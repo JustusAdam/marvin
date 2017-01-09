@@ -11,11 +11,9 @@ Portability : POSIX
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiWayIf             #-}
 {-# LANGUAGE NamedFieldPuns         #-}
 {-# LANGUAGE Rank2Types             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TemplateHaskell        #-}
 module Marvin.Run
     ( runMarvin, ScriptInit, IsAdapter
     , requireFromAppConfig, lookupFromAppConfig, defaultConfigName
@@ -130,16 +128,17 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
 -- | Create a wai compliant application
 application :: IsAdapter a => LoggingFn -> [ScriptInit a] -> C.Config -> InitEventHandler a
 application log inits config ada = flip runLoggingT log $ do
-    $logInfoS "bot" "Initializing scripts"
+    logInfoNS logSource "Initializing scripts"
     s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada config) (onInitExcept sid)) inits
     return $ mkApp log s config ada
   where
+    logSource = $(isT "#{applicationScriptId}.init")
     onInitExcept :: ScriptId -> SomeException -> RunnerM (Maybe a')
     onInitExcept (ScriptId id) e = do
         err $(isT "Unhandled exception during initialization of script #{id}")
         err $(isT "#{e}")
         return Nothing
-      where err = logErrorNS $(isT "#{applicationScriptId}.init")
+      where err = logErrorNS logSource
 
 
 setLoggingLevelIn :: LogLevel -> RunnerM a -> RunnerM a
@@ -154,7 +153,7 @@ runMarvin s' = runStderrLoggingT $ do
     args <- liftIO $ execParser infoParser
 
     cfgLoc <- maybe
-                    ($logInfoS $(isT "${applicationScriptId}") "Using default config: config.cfg" >> return defaultConfigName)
+                    ($logInfoS $(isT "#{applicationScriptId}") "Using default config: config.cfg" >> return defaultConfigName)
                     return
                     (configPath args)
     (cfg, _) <- liftIO $ C.autoReload C.autoConfig [C.Required cfgLoc]

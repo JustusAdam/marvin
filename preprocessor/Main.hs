@@ -35,6 +35,7 @@ adapters =
     [ ("slack-rtm", slackRtmData)
     , ("telegram-poll", ("Marvin.Adapter.Telegram", "(TelegramAdapter Poll)"))
     , ("telegram-push", ("Marvin.Adapter.Telegram", "(TelegramAdapter Push)"))
+    , ("shell", ("Marvin.Adapter.Shell", "ShellAdapter"))
     ]
 
 

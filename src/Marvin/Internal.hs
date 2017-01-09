@@ -62,6 +62,7 @@ import qualified Marvin.Adapter           as A
 import           Marvin.Internal.Types    hiding (getChannelName, getUsername, messageChannel,
                                            resolveChannel, resolveChannel)
 import           Marvin.Interpolate.Text
+import           Marvin.Interpolate.String
 import           Marvin.Util.Regex        (Match, Regex)
 import           Util
 
@@ -231,12 +232,12 @@ onScriptExcept :: ShowT t => ScriptId -> Maybe t -> SomeException -> RunnerM ()
 onScriptExcept id trigger e = do
     case trigger of
         Just t ->
-            err $(isT "Unhandled exception during execution of script #{id} with trigger #{t}")
+            err $(isT "Unhandled exception during execution of script \"#{id}\" with trigger \"#{t}\"")
         Nothing ->
-            err $(isT "Unhandled exception during execution of script #{id}")
+            err $(isT "Unhandled exception during execution of script \"#{id}\"")
     err $(isT "#{e}")
   where
-    err = logErrorNS "#{applicationScriptId}.dispatch"
+    err = logErrorNS $(isT "#{applicationScriptId}.dispatch")
 
 -- | Whenever any message matches the provided regex this handler gets run.
 --
@@ -284,7 +285,7 @@ alterHelper v = return . maybe (return v) (V.cons v)
 -- The payload contains the entering user.
 enterIn :: L.Text -> BotReacting a (User' a, Channel' a, TimeStamp) () -> ScriptDefinition a ()
 enterIn !chanName ac = ScriptDefinition $ do
-    pac <- prepareAction (Just $(isT "anter event in #{chanName}")) ac
+    pac <- prepareAction (Just $(isT "enter event in #{chanName}")) ac
     actions . joinsIn %= HM.alter (alterHelper pac) chanName
 
 
@@ -452,7 +453,12 @@ getConfigVal name = do
 requireConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m a
 requireConfigVal name = do
     cfg <- getConfig
-    liftIO $ C.require cfg name
+    l <- liftIO $ C.lookup cfg name
+    case l of
+        Just v -> return v
+        _ -> do
+            sid <- getScriptId
+            error $(isS "Could not find required config value \"#{name}\" in script \"#{sid}\"")
 
 
 -- | INTERNAL, USE WITH CARE
