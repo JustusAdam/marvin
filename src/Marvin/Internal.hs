@@ -417,7 +417,7 @@ getTopic = view (payload . getLens)
 
 
 -- | Get the stored channel in which something happened.
-getChannel :: forall a m. (IsAdapter a, Get m (Channel' a)) => BotReacting a m (Channel a)
+getChannel :: forall a m. Get m (Channel' a) => BotReacting a m (Channel a)
 getChannel = (unwrapChannel' :: Channel' a -> Channel a) <$> view (payload . getLens)
 
 
