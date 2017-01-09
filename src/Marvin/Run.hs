@@ -101,7 +101,7 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
 
         applicablesRunning <- for applicables (async . ($ other (Channel' chan)))
 
-        mapM_ wait wildcardsRunning 
+        mapM_ wait wildcardsRunning
         mapM_ wait applicablesRunning
 
 

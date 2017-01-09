@@ -30,10 +30,11 @@ import           Data.Aeson                      hiding (Error)
 import           Data.Aeson.TH
 import           Data.Aeson.Types                hiding (Error)
 import qualified Data.ByteString.Lazy.Char8      as BS
+import           Data.Char                       (isSpace)
 import qualified Data.Configurator               as C
 import qualified Data.Configurator.Types         as C
 import           Data.Containers
-import           Data.Foldable                   (toList, asum)
+import           Data.Foldable                   (asum, toList)
 import           Data.Hashable
 import           Data.HashMap.Strict             (HashMap)
 import           Data.IORef.Lifted
@@ -43,8 +44,10 @@ import           Data.String                     (IsString (..))
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter
+import           Marvin.Internal
+import           Marvin.Internal.Types           as Types
 import           Marvin.Interpolate.Text
-import           Marvin.Types                    as Types
+import           Marvin.Run
 import           Network.URI
 import           Network.Wai
 import           Network.Wai.Handler.Warp
@@ -53,9 +56,6 @@ import           Network.Wreq
 import           Prelude                         hiding (lookup)
 import           Text.Read                       (readMaybe)
 import           Wuss
-import Marvin.Run
-import Marvin.Internal
-import Data.Char (isSpace)
 
 instance FromJSON URI where
     parseJSON (String t) = maybe mzero return $ parseURI $ unpack t
@@ -133,7 +133,7 @@ messageParser (Object o) = MessageEvent
     <$> o .: "user"
     <*> o .: "channel"
     <*> o .: "text"
-    <*> o .: "ts"
+    <*> (o .: "ts" >>= timestampFromNumber)
 messageParser _ = mzero
 
 
@@ -171,7 +171,7 @@ eventParser v@(Object o) = isErrParser <|> hasTypeParser
 
                     _ -> msgEv
               where
-                ts = o .: "ts"
+                ts = o .: "ts" >>= timestampFromNumber
                 msgEv = Right <$> messageParser v
                 user = o .: "user"
                 channel = o .: "channel"
@@ -287,13 +287,13 @@ runHandlerLoop adapter messageChan handler =
         case eitherDecode d >>= parseEither eventParser of
             Left err -> logErrorN $(isT "Error parsing json: #{err} original data: #{rawBS d}")
             Right (Right ev@(MessageEvent u c m t)) -> do
-                
+
                 botname <- L.toLower . fromMaybe defaultBotName <$> liftIO (lookupFromAppConfig cfg "name")
                 let lmsg = L.stripStart $ L.toLower m
                 liftIO $ handler $ case asum $ map ((`L.stripPrefix` lmsg) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname] of
                     Nothing -> ev
                     Just m' -> CommandEvent u c m' t
-                
+
             Right (Right event) -> liftIO $ handler event
             Right (Left internalEvent) ->
                 case internalEvent of

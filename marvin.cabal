@@ -64,6 +64,7 @@ library
                      , haskeline
                      , monad-loops
                      , mono-traversable
+                     , time
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies

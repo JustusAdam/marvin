@@ -497,6 +497,6 @@ extractReaction reac = BotReacting $
 -- Useful for creating actions which can be scheduled to execute a certain time or asynchronous.
 -- The idea is that one can conveniently send messages from inside a schedulable action.
 extractAction :: BotReacting a () o -> ScriptDefinition a (IO o)
-extractAction ac = ScriptDefinition $ 
-    fmap (runStderrLoggingT . runReaderT (runReaction ac)) $ 
+extractAction ac = ScriptDefinition $
+    fmap (runStderrLoggingT . runReaderT (runReaction ac)) $
         BotActionState <$> use scriptId <*> use config <*> use adapter <*> pure ()

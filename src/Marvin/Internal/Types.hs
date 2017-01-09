@@ -9,11 +9,14 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson
+import           Data.Aeson.Types
 import           Data.Char               (isAlphaNum, isLetter)
 import qualified Data.Configurator.Types as C
 import           Data.String
 import qualified Data.Text               as T
 import qualified Data.Text.Lazy          as L
+import           Data.Time.Clock
+import           Data.Time.Clock.POSIX
 import           Marvin.Interpolate.Text
 import           Text.Read               (readMaybe)
 
@@ -55,15 +58,11 @@ class IsAdapter a where
 newtype User' a = User' {unwrapUser' :: User a}
 newtype Channel' a = Channel' {unwrapChannel' :: Channel a}
 
-newtype TimeStamp = TimeStamp { unwrapTimeStamp :: Double } deriving Show
+newtype TimeStamp = TimeStamp { unwrapTimeStamp :: UTCTime } deriving Show
 
 
-instance FromJSON TimeStamp where
-    parseJSON (String s) = maybe mzero (return . TimeStamp) $ readMaybe (T.unpack s)
-    parseJSON _          = mzero
-
-instance ToJSON TimeStamp where
-    toJSON = toJSON . show . unwrapTimeStamp
+timestampFromNumber :: Value -> Parser TimeStamp
+timestampFromNumber = withScientific "expected number type" $ return . TimeStamp . posixSecondsToUTCTime . realToFrac
 
 
 -- | A type, basically a String, which identifies a script to the config and the logging facilities.

@@ -25,9 +25,9 @@ import           Data.Maybe
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter
+import           Marvin.Internal.Types
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text
-import           Marvin.Types
 import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Network.Wreq
@@ -120,7 +120,7 @@ msgParser = withObject "expected message object" $ \o ->
         <$> o .: "from"
         <*> o .: "chat"
         <*> o .: "text"
-        <*> o .: "date"
+        <*> (o .: "date" >>= timestampFromNumber)
 
 
 
