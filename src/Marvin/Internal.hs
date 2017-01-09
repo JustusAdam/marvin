@@ -6,10 +6,10 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE Rank2Types                 #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE UndecidableInstances       #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-module Marvin.Internal 
-    ( 
+module Marvin.Internal
+    (
     -- * Exposed API
     defineScript
     -- ** Reacting
@@ -51,15 +51,16 @@ import           Control.Exception.Lifted
 import           Control.Lens             hiding (cons)
 import           Control.Monad.Logger
 import qualified Data.HashMap.Strict      as HM
-import           Data.Maybe              (fromMaybe)
-import           Data.Monoid             ((<>))
+import           Data.Maybe               (fromMaybe)
+import           Data.Monoid              ((<>))
 import qualified Data.Text                as T
 import qualified Data.Text.Lazy           as L
 import           Data.Vector              (Vector)
 import qualified Data.Vector              as V
 import           Marvin.Adapter           (IsAdapter)
 import qualified Marvin.Adapter           as A
-import           Marvin.Internal.Types    hiding (getUsername, resolveChannel, messageChannel, getChannelName, resolveChannel)
+import           Marvin.Internal.Types    hiding (getChannelName, getUsername, messageChannel,
+                                           resolveChannel, resolveChannel)
 import           Marvin.Interpolate.Text
 import           Marvin.Util.Regex        (Match, Regex)
 import           Util

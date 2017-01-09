@@ -115,7 +115,7 @@ class HasScriptId s a | s -> a where
 -- During script definition or when handling a request we can obtain the config with 'getConfigVal' or 'requireConfigVal'.
 class (IsScript m, MonadIO m) => HasConfigAccess m where
     -- | INTERNAL USE WITH CARE
-    -- 
+    --
     -- Obtain the entire config structure
     getConfigInternal :: m C.Config
 
