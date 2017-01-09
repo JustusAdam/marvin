@@ -7,6 +7,7 @@
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE UndecidableInstances       #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Internal 
     ( 
     -- * Exposed API
@@ -323,7 +324,7 @@ customTrigger tr ac = ScriptDefinition $ do
 -- | Send a message to the channel the triggering message came from.
 --
 -- Equivalent to "robot.send" in hubot
-send :: (IsAdapter a, Get m (Channel a)) => L.Text -> BotReacting a m ()
+send :: (IsAdapter a, Get m (Channel' a)) => L.Text -> BotReacting a m ()
 send msg = do
     o <- getChannel
     messageChannel' o msg
@@ -416,13 +417,13 @@ getTopic = view (payload . getLens)
 
 
 -- | Get the stored channel in which something happened.
-getChannel :: Get m (Channel a) => BotReacting a m (Channel a)
-getChannel = view (payload . getLens)
+getChannel :: forall a m. (IsAdapter a, Get m (Channel' a)) => BotReacting a m (Channel a)
+getChannel = (unwrapChannel' :: Channel' a -> Channel a) <$> view (payload . getLens)
 
 
 -- | Get the user whihc was part of the triggered action.
-getUser :: Get m (User a) => BotReacting a m (User a)
-getUser = view (payload . getLens)
+getUser :: forall m a. Get m (User' a) => BotReacting a m (User a)
+getUser = (unwrapUser' :: User' a -> User a) <$> view (payload . getLens)
 
 
 -- | Get a value out of the config, returns 'Nothing' if the value didn't exist.
