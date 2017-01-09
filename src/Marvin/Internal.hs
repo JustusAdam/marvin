@@ -80,20 +80,17 @@ declareFields [d|
     |]
 
 
-type Topic = L.Text
-
-
 declareFields [d|
     data Handlers a = Handlers
-        { handlersResponds :: Vector (Regex, Match -> Message a -> RunnerM ())
-        , handlersHears :: Vector (Regex, Match -> Message a -> RunnerM ())
+        { handlersResponds :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp) -> RunnerM ())
+        , handlersHears :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp) -> RunnerM ())
         , handlersCustoms :: Vector (Event a -> Maybe (RunnerM ()))
-        , handlersJoins :: Vector ((User' a, Channel' a) -> RunnerM ())
-        , handlersLeaves :: Vector ((User' a, Channel' a) -> RunnerM ())
-        , handlersTopicChange :: Vector ((Topic, Channel' a) -> RunnerM ())
-        , handlersJoinsIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a) -> RunnerM ()))
-        , handlersLeavesFrom :: HM.HashMap L.Text (Vector ((User' a, Channel' a) -> RunnerM ()))
-        , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((Topic, Channel' a) -> RunnerM ()))
+        , handlersJoins :: Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ())
+        , handlersLeaves :: Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ())
+        , handlersTopicChange :: Vector ((User' a, Channel' a, Topic, TimeStamp) -> RunnerM ())
+        , handlersJoinsIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ()))
+        , handlersLeavesFrom :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ()))
+        , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, Topic, TimeStamp) -> RunnerM ()))
         }
     |]
 
@@ -144,32 +141,41 @@ newtype ScriptInit a = ScriptInit (ScriptId, a -> C.Config -> RunnerM (Script a)
 class Get a b where
     getLens :: Lens' a b
 
-instance Get (b, Message a) (Message a) where
+instance Get (User' a, b, c) (User' a) where
+    getLens = _1
+
+instance Get (User' a, b, c, d) (User' a) where
+    getLens = _1
+
+instance Get (User' a, b, c, d, e) (User' a) where
+    getLens = _1
+
+instance Get (a, Channel' b, c) (Channel' b) where
     getLens = _2
 
-instance Get (Match, b) Match where
-    getLens = _1
-
-instance Get (Topic, a) Topic where
-    getLens = _1
-
-idLens :: Lens' a a
-idLens = lens id (flip const)
-
-instance Get (b, Channel' a) (Channel' a) where
+instance Get (a, Channel' b, c, d) (Channel' b) where
     getLens = _2
 
-instance Get (b, Message a) (Channel' a) where
-    getLens = _2 . lens (Channel' . channel) (\a (Channel' b) -> a {channel = b})
+instance Get (a, Channel' b, c, d, e) (Channel' b) where
+    getLens = _2
 
-instance Get a a where
-    getLens = idLens
+instance Get (a, b, TimeStamp) TimeStamp where
+    getLens = _3
 
-instance Get (User' a, b) (User' a) where
-    getLens = _1
+instance Get (a, b, c, TimeStamp) TimeStamp where
+    getLens = _4
 
-instance Get (b, Message a) (User' a) where
-    getLens = _2 . lens (User' . sender) (\a (User' b) -> a {sender = b})
+instance Get (a, b, c, d, TimeStamp) TimeStamp where
+    getLens = _5
+
+instance Get (a, b, Match, d, e) Match where
+    getLens = _3
+
+instance Get (a, b, c, Message, e) Message where
+    getLens = _4
+
+instance Get (a, b, Topic, d) Topic where
+    getLens = _3
 
 instance HasConfigAccess (ScriptDefinition a) where
     getConfigInternal = ScriptDefinition $ use config
@@ -235,24 +241,24 @@ onScriptExcept id trigger e = do
 -- | Whenever any message matches the provided regex this handler gets run.
 --
 -- Equivalent to "robot.hear" in hubot
-hear :: Regex -> BotReacting a (Match, Message a) () -> ScriptDefinition a ()
+hear :: Regex -> BotReacting a (User' a, Channel' a, Match, Message, TimeStamp) () -> ScriptDefinition a ()
 hear !re ac = ScriptDefinition $ do
     pac <- prepareAction (Just re) ac
-    actions . hears %= V.cons (re, curry pac)
+    actions . hears %= V.cons (re, pac)
 
 -- | Runs the handler only if the bot was directly addressed.
 --
 -- Equivalent to "robot.respond" in hubot
-respond :: Regex -> BotReacting a (Match, Message a) () -> ScriptDefinition a ()
+respond :: Regex -> BotReacting a (User' a, Channel' a, Match, Message, TimeStamp) () -> ScriptDefinition a ()
 respond !re ac = ScriptDefinition $ do
     pac <- prepareAction (Just re) ac
-    actions . responds %= V.cons (re, curry pac)
+    actions . responds %= V.cons (re, pac)
 
 
 -- | This handler runs whenever a user enters __any channel__ (which the bot is subscribed to)
 --
 -- The payload contains the entering user and the channel which was entered.
-enter :: BotReacting a (User' a, Channel' a) () -> ScriptDefinition a ()
+enter :: BotReacting a (User' a, Channel' a, TimeStamp) () -> ScriptDefinition a ()
 enter ac = ScriptDefinition $ do
     pac <- prepareAction (Just "enter event" :: Maybe T.Text) ac
     actions . joins %= V.cons pac
@@ -261,7 +267,7 @@ enter ac = ScriptDefinition $ do
 -- | This handler runs whenever a user exits __any channel__ (which the bot is subscribed to)
 --
 -- The payload contains the exiting user and the channel which was exited.
-exit :: BotReacting a (User' a, Channel' a) () -> ScriptDefinition a ()
+exit :: BotReacting a (User' a, Channel' a, TimeStamp) () -> ScriptDefinition a ()
 exit ac = ScriptDefinition $ do
     pac <- prepareAction (Just "exit event" :: Maybe T.Text) ac
     actions . leaves %= V.cons pac
@@ -276,7 +282,7 @@ alterHelper v = return . maybe (return v) (V.cons v)
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the entering user.
-enterIn :: L.Text -> BotReacting a (User' a, Channel' a) () -> ScriptDefinition a ()
+enterIn :: L.Text -> BotReacting a (User' a, Channel' a, TimeStamp) () -> ScriptDefinition a ()
 enterIn !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "anter event in #{chanName}")) ac
     actions . joinsIn %= HM.alter (alterHelper pac) chanName
@@ -287,7 +293,7 @@ enterIn !chanName ac = ScriptDefinition $ do
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the exting user.
-exitFrom :: L.Text -> BotReacting a (User' a, Channel' a) () -> ScriptDefinition a ()
+exitFrom :: L.Text -> BotReacting a (User' a, Channel' a, TimeStamp) () -> ScriptDefinition a ()
 exitFrom !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "exit event in #{chanName}")) ac
     actions . leavesFrom %= HM.alter (alterHelper pac) chanName
@@ -296,7 +302,7 @@ exitFrom !chanName ac = ScriptDefinition $ do
 -- | This handler runs when the topic in __any channel__ the bot is subscribed to changes.
 --
 -- The payload contains the new topic and the channel in which it was set.
-topic :: BotReacting a (Topic, Channel' a) () -> ScriptDefinition a ()
+topic :: BotReacting a (User' a, Channel' a, Topic, TimeStamp) () -> ScriptDefinition a ()
 topic ac = ScriptDefinition $ do
     pac <- prepareAction (Just "topic event" :: Maybe T.Text) ac
     actions . topicChange %= V.cons pac
@@ -305,7 +311,7 @@ topic ac = ScriptDefinition $ do
 -- | This handler runs when the topic in __the specified channel__ is changed, provided the bot is subscribed to the channel in question.
 --
 -- The argument is the human readable channel name.
-topicIn :: L.Text -> BotReacting a (Topic, Channel' a) () -> ScriptDefinition a ()
+topicIn :: L.Text -> BotReacting a (User' a, Channel' a, Topic, TimeStamp) () -> ScriptDefinition a ()
 topicIn !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "topic event in #{chanName}")) ac
     actions . topicChangeIn %= HM.alter (alterHelper pac) chanName
@@ -408,7 +414,7 @@ getMatch = view (payload . getLens)
 
 -- | Get the message that triggered this action
 -- Includes sender, target channel, as well as the full, untruncated text of the original message
-getMessage :: Get m (Message a) => BotReacting a m (Message a)
+getMessage :: Get m Message => BotReacting a m Message
 getMessage = view (payload . getLens)
 
 

@@ -43,7 +43,7 @@ instance IsAdapter ShellAdapter where
                 Nothing -> return ()
                 Just i -> do
                     h <- liftIO $ async $ do
-                        handler (MessageEvent (Message () () (L.pack i) (TimeStamp 0)))
+                        handler (MessageEvent () () (L.pack i) (TimeStamp 0))
                         putMVar out Nothing
                     whileJust_ (liftIO $ takeMVar out) $ outputStrLn . L.unpack
                     liftIO $ wait h

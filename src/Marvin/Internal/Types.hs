@@ -18,12 +18,16 @@ import           Marvin.Interpolate.Text
 import           Text.Read               (readMaybe)
 
 
+type Topic = L.Text
+type Message = L.Text
+
 -- | Representation for the types of events which can occur
 data Event a
-    = MessageEvent (Message a)
-    | ChannelJoinEvent (User a) (Channel a)
-    | ChannelLeaveEvent (User a) (Channel a)
-    | TopicChangeEvent L.Text (Channel a)
+    = MessageEvent (User a) (Channel a) Message TimeStamp
+    | CommandEvent (User a) (Channel a) Message TimeStamp
+    | ChannelJoinEvent (User a) (Channel a) TimeStamp
+    | ChannelLeaveEvent (User a) (Channel a) TimeStamp
+    | TopicChangeEvent (User a) (Channel a) Topic TimeStamp
 
 
 type EventHandler a = Event a -> IO ()
@@ -52,15 +56,6 @@ newtype User' a = User' {unwrapUser' :: User a}
 newtype Channel' a = Channel' {unwrapChannel' :: Channel a}
 
 newtype TimeStamp = TimeStamp { unwrapTimeStamp :: Double } deriving Show
-
-
--- | contents and meta information of a recieved message
-data Message a = Message
-    { sender    :: User a
-    , channel   :: Channel a
-    , content   :: L.Text
-    , timestamp :: TimeStamp
-    }
 
 
 instance FromJSON TimeStamp where

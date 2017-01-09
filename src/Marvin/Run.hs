@@ -80,15 +80,16 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
             for_ asyncs wait
         handler ev
         wait generics
-    handler (MessageEvent msg) = handleMessage msg
+    handler (MessageEvent user chan msg ts) = handleMessage user chan msg ts
+    handler (CommandEvent user chan msg ts) = handleCommand user chan msg ts
     -- TODO implement other handlers
-    handler (ChannelJoinEvent user chan) = changeHandlerHelper joinsV joinsInV (User' user) chan
-    handler (ChannelLeaveEvent user chan) = changeHandlerHelper leavesV leavesFromV (User' user) chan
-    handler (TopicChangeEvent topic chan) = changeHandlerHelper topicsV topicsInV topic chan
+    handler (ChannelJoinEvent user chan ts) = changeHandlerHelper joinsV joinsInV (User' user, , ts) chan
+    handler (ChannelLeaveEvent user chan ts) = changeHandlerHelper leavesV leavesFromV (User' user, , ts) chan
+    handler (TopicChangeEvent user chan topic ts) = changeHandlerHelper topicsV topicsInV (User' user, , topic, ts) chan
 
-    changeHandlerHelper :: Vector ((b, Channel' a) -> RunnerM ())
-                        -> HM.HashMap L.Text (Vector ((b, Channel' a) -> RunnerM ()))
-                        -> b
+    changeHandlerHelper :: Vector (d -> RunnerM ())
+                        -> HM.HashMap L.Text (Vector (d -> RunnerM ()))
+                        -> (Channel' a -> d)
                         -> Channel a
                         -> RunnerM ()
     changeHandlerHelper wildcards specifics other chan = do
@@ -96,30 +97,31 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
 
         let applicables = fromMaybe mempty $ specifics^?ix cName
 
-        wildcardsRunning <- for wildcards (async . ($ (other, Channel' chan)))
+        wildcardsRunning <- for wildcards (async . ($ other (Channel' chan)))
 
-        applicablesRunning <- for applicables (async . ($ (other, Channel' chan)))
+        applicablesRunning <- for applicables (async . ($ other (Channel' chan)))
 
-        mapM_ wait $ wildcardsRunning <> applicablesRunning
+        mapM_ wait wildcardsRunning 
+        mapM_ wait applicablesRunning
 
 
-
-    handleMessage msg = do
-        lDispatches <- doIfMatch hearsV text
-        botname <- fromMaybe defaultBotName <$> liftIO (lookupFromAppConfig cfg "name")
-        let (trimmed, remainder) = L.splitAt (fromIntegral $ succ $ L.length botname) $ L.stripStart text
-        -- TODO At some point this needs to support derivations of the name. Maybe make that configurable?
-        rDispatches <- if L.stripEnd (L.toLower trimmed) == L.strip (L.toLower botname)
-                            then doIfMatch respondsV remainder
-                            else return mempty
-        mapM_ wait $ lDispatches <> rDispatches
+    handleMessageLike :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp) -> RunnerM ())
+                      -> User a
+                      -> Channel a
+                      -> Message
+                      -> TimeStamp
+                      -> RunnerM ()
+    handleMessageLike v user chan msg ts = do
+        lDispatches <- doIfMatch v
+        mapM_ wait lDispatches
       where
-        text = content msg
-        doIfMatch things toMatch  =
+        doIfMatch things  =
             catMaybes <$> for things (\(trigger, action) ->
-                case match trigger toMatch of
+                case match trigger msg of
                         Nothing -> return Nothing
-                        Just m  -> Just <$> async (action m msg))
+                        Just m  -> Just <$> async (action (User' user, Channel' chan, m, msg, ts)))
+    handleCommand = handleMessageLike respondsV
+    handleMessage = handleMessageLike hearsV
 
     Handlers respondsV hearsV customsV joinsV leavesV topicsV joinsInV leavesFromV topicsInV =
         foldMap (^.actions) scripts

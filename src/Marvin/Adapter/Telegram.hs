@@ -109,14 +109,14 @@ instance FromJSON (TelegramUpdate any) where
           where
             isMessage = do
                 msg <- o .: "message" >>= msgParser
-                return $ Ev $ MessageEvent msg
-            isPost = Ev . MessageEvent <$> (o .: "channel_post" >>= msgParser)
+                return $ Ev msg
+            isPost = Ev <$> (o .: "channel_post" >>= msgParser)
             isUnhandeled = return Unhandeled
 
 
-msgParser ::  Value -> Parser (Message (TelegramAdapter a))
+msgParser ::  Value -> Parser (Event (TelegramAdapter a))
 msgParser = withObject "expected message object" $ \o ->
-    Message
+    MessageEvent
         <$> o .: "from"
         <*> o .: "chat"
         <*> o .: "text"
