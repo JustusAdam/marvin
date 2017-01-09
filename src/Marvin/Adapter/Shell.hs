@@ -2,20 +2,24 @@
 module Marvin.Adapter.Shell where
 
 
-import Marvin.Adapter
-import Control.Concurrent.STM
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as L
-import System.Console.Haskeline
-import Control.Monad
-import Control.Concurrent.Async.Lifted
-import Control.Monad.Loops
-import Control.Monad.IO.Class
-import Marvin.Internal.Types
+import           Control.Concurrent.Async.Lifted
+import           Control.Concurrent.MVar.Lifted
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Loops
+import           Data.Maybe                      (fromMaybe)
+import qualified Data.Text                       as T
+import qualified Data.Text.Lazy                  as L
+import           Marvin.Adapter
+import           Marvin.Internal                 (defaultBotName)
+import           Marvin.Internal.Types
+import           Marvin.Interpolate.String
+import           Marvin.Run                      (lookupFromAppConfig)
+import           System.Console.Haskeline
 
 
 data ShellAdapter = ShellAdapter
-    { outputChan :: TChan L.Text
+    { output :: MVar (Maybe L.Text)
     }
 
 
@@ -24,20 +28,23 @@ instance IsAdapter ShellAdapter where
     type Channel ShellAdapter = ()
 
     adapterId = "shell"
-    messageChannel ShellAdapter{outputChan} _ = liftIO . atomically . writeTChan outputChan
+    messageChannel ShellAdapter{output} _ = putMVar output . Just
     getUsername _ _ = return "shell"
     getChannelName _ _ = return "shell"
     resolveChannel _ _ = return $ Just ()
     runWithAdapter cfg initializer = do
-        outChan <- liftIO $ atomically newTChan
-        let ada = ShellAdapter outChan
+        bot <- liftIO $ fromMaybe defaultBotName <$> lookupFromAppConfig cfg "name"
+        out <- liftIO newEmptyMVar
+        let ada = ShellAdapter out
         handler <- liftIO $ initializer ada
         liftIO $ runInputT defaultSettings $ forever $ do
-            input <- getInputLine "> "
+            input <- getInputLine $(isS "#{bot}> ")
             case input of
                 Nothing -> return ()
                 Just i -> do
-                    liftIO $ handler (MessageEvent (Message () () (L.pack i) (TimeStamp 0)))
-                    whileM_ (fmap not $ liftIO $ atomically $ isEmptyTChan outChan) $ do
-                        msg <- liftIO $ atomically $ readTChan outChan
+                    h <- liftIO $ async $ do
+                        handler (MessageEvent (Message () () (L.pack i) (TimeStamp 0)))
+                        putMVar out Nothing
+                    whileJust_ (liftIO $ takeMVar out) $ \msg ->
                         outputStrLn (L.unpack msg)
+                    liftIO $ wait h

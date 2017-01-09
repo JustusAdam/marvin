@@ -100,7 +100,7 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
 
         applicablesRunning <- for applicables (async . ($ (other, Channel' chan)))
 
-        mapM_ wait $ wildcardsRunning `mappend` applicablesRunning
+        mapM_ wait $ wildcardsRunning <> applicablesRunning
 
 
 
@@ -112,7 +112,7 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
         rDispatches <- if L.stripEnd (L.toLower trimmed) == L.strip (L.toLower botname)
                             then doIfMatch respondsV remainder
                             else return mempty
-        mapM_ wait (lDispatches <> rDispatches)
+        mapM_ wait $ lDispatches <> rDispatches
       where
         text = content msg
         doIfMatch things toMatch  =
