@@ -65,6 +65,8 @@ library
                      , monad-loops
                      , mono-traversable
                      , time
+                     , transformers-base
+                     , monad-control
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies

@@ -65,6 +65,7 @@ import           Marvin.Interpolate.Text
 import           Marvin.Interpolate.String
 import           Marvin.Util.Regex        (Match, Regex)
 import           Util
+import           Control.Monad.Base
 
 
 defaultBotName :: L.Text
@@ -113,7 +114,7 @@ instance Monoid (Handlers a) where
 -- This is also a 'MonadReader' instance, there you can inspect the entire state of this reaction.
 -- This is typically only used in internal or utility functions and not necessary for the user.
 -- To inspect particular pieces of this state refer to the *Lenses* section.
-newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState a d) RunnerM r } deriving (Monad, MonadIO, Applicative, Functor, MonadReader (BotActionState a d), MonadLogger, MonadLoggerIO)
+newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState a d) RunnerM r } deriving (Monad, MonadIO, Applicative, Functor, MonadReader (BotActionState a d), MonadLogger, MonadLoggerIO, MonadBase IO)
 
 -- | An abstract type describing a marvin script.
 --
@@ -131,7 +132,7 @@ declareFields [d|
 
 
 -- | A monad for gradually defining a 'Script' using 'respond' and 'hear' as well as any 'IO' action.
-newtype ScriptDefinition a r = ScriptDefinition { runScript :: StateT (Script a) RunnerM r } deriving (Monad, MonadIO, Applicative, Functor, MonadLogger)
+newtype ScriptDefinition a r = ScriptDefinition { runScript :: StateT (Script a) RunnerM r } deriving (Monad, MonadIO, Applicative, Functor, MonadLogger, MonadBase IO)
 
 
 -- | Initializer for a script. This gets run by the server during startup and creates a 'Script'
@@ -189,10 +190,6 @@ instance IsScript (ScriptDefinition a) where
 
 instance IsScript (BotReacting a b) where
     getScriptId = view scriptId
-
-class AccessAdapter m where
-    type AdapterT m
-    getAdapter :: m (AdapterT m)
 
 instance AccessAdapter (ScriptDefinition a) where
     type AdapterT (ScriptDefinition a) = a
@@ -339,23 +336,17 @@ send msg = do
 
 
 -- | Get the username of a registered user.
-getUsername :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User (AdapterT m) -> m L.Text
-getUsername usr = do
-    a <- getAdapter
-    A.liftAdapterAction $ A.getUsername a usr
+getUsername :: (HasConfigAccess m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User (AdapterT m) -> m L.Text
+getUsername = A.liftAdapterAction . A.getUsername
 
 
-resolveChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => L.Text -> m (Maybe (Channel (AdapterT m)))
-resolveChannel name = do
-    a <- getAdapter
-    A.liftAdapterAction (A.resolveChannel a name)
+resolveChannel :: (HasConfigAccess m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => L.Text -> m (Maybe (Channel (AdapterT m)))
+resolveChannel =  A.liftAdapterAction . A.resolveChannel
 
 
 -- | Get the human readable name of a channel.
-getChannelName :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> m L.Text
-getChannelName rm = do
-    a <- getAdapter
-    A.liftAdapterAction $ A.getChannelName a rm
+getChannelName :: (HasConfigAccess m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> m L.Text
+getChannelName = A.liftAdapterAction . A.getChannelName
 
 
 -- | Send a message to the channel the original message came from and address the user that sent the original message.
@@ -369,16 +360,14 @@ reply msg = do
 
 
 -- | Send a message to a Channel (by name)
-messageChannel :: (AccessAdapter m, IsAdapter (AdapterT m), MonadLoggerIO m) => L.Text -> L.Text -> m ()
+messageChannel :: (HasConfigAccess m, AccessAdapter m, IsAdapter (AdapterT m), MonadLoggerIO m) => L.Text -> L.Text -> m ()
 messageChannel name msg = do
     mchan <- resolveChannel name
     maybe ($logError $(isT "No channel known with the name #{name}")) (`messageChannel'` msg) mchan
 
 
-messageChannel' :: (AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> L.Text -> m ()
-messageChannel' chan msg = do
-    a <- getAdapter
-    A.liftAdapterAction $ A.messageChannel a chan msg
+messageChannel' :: (HasConfigAccess m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> L.Text -> m ()
+messageChannel' chan = A.liftAdapterAction . A.messageChannel chan
 
 
 
@@ -506,3 +495,5 @@ extractAction :: BotReacting a () o -> ScriptDefinition a (IO o)
 extractAction ac = ScriptDefinition $
     fmap (runStderrLoggingT . runReaderT (runReaction ac)) $
         BotActionState <$> use scriptId <*> use config <*> use adapter <*> pure ()
+
+

@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Marvin.Internal.Types where
 
 
@@ -19,6 +20,9 @@ import           Data.Time.Clock
 import           Data.Time.Clock.POSIX
 import           Marvin.Interpolate.Text
 import           Text.Read               (readMaybe)
+import Control.Monad.Reader
+import Control.Monad.Base
+import Control.Monad.Trans.Control
 
 
 type Topic = L.Text
@@ -33,9 +37,19 @@ data Event a
     | TopicChangeEvent (User a) (Channel a) Topic TimeStamp
 
 
+newtype AdapterM a r = AdapterM { runAdapterAction :: ReaderT (C.Config, a) RunnerM r } deriving (MonadIO, Monad, Applicative, Functor, MonadLogger, MonadLoggerIO, MonadBase IO)
+
+instance MonadBaseControl IO (AdapterM a) where
+    type StM (AdapterM a) r = r
+    liftBaseWith f = AdapterM $ liftBaseWith $ \q -> f (q . runAdapterAction)
+    restoreM = AdapterM . restoreM
+
+instance AccessAdapter (AdapterM a) where
+    type AdapterT (AdapterM a) = a
+    getAdapter = AdapterM $ snd <$> ask
+
 type EventHandler a = Event a -> IO ()
-type InitEventHandler a = a -> IO (EventHandler a)
-type RunWithAdapter a = C.Config -> InitEventHandler a -> RunnerM ()
+type RunWithAdapter a = EventHandler a -> AdapterM a ()
 
 -- | Basic functionality required of any adapter
 class IsAdapter a where
@@ -44,15 +58,17 @@ class IsAdapter a where
     -- | Used for scoping config and logging
     adapterId :: AdapterId a
     -- | Post a message to a channel given the internal channel identifier
-    messageChannel :: a -> Channel a -> L.Text -> RunnerM ()
+    messageChannel :: Channel a -> L.Text -> AdapterM a ()
+    -- | Initialize the adapter state
+    initAdapter :: RunnerM a
     -- | Initialize and run the bot
     runWithAdapter :: RunWithAdapter a
     -- | Resolve a username given the internal user identifier
-    getUsername :: a -> User a -> RunnerM L.Text
+    getUsername :: User a -> AdapterM a L.Text
     -- | Resolve the human readable name for a channel given the  internal channel identifier
-    getChannelName :: a -> Channel a -> RunnerM L.Text
+    getChannelName :: Channel a -> AdapterM a L.Text
     -- | Resolve to the internal channel identifier given a human readable name
-    resolveChannel :: a -> L.Text -> RunnerM (Maybe (Channel a))
+    resolveChannel :: L.Text -> AdapterM a (Maybe (Channel a))
 
 
 newtype User' a = User' {unwrapUser' :: User a}
@@ -127,3 +143,6 @@ instance C.Configured LogLevel where
             _ -> Nothing
     convert _            = Nothing
 
+class AccessAdapter m where
+    type AdapterT m
+    getAdapter :: m (AdapterT m)

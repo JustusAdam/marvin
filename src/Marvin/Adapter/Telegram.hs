@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Marvin.Adapter.Telegram
     ( TelegramAdapter, Push, Poll
     , TelegramChat(..), ChatType(..)
@@ -39,8 +40,6 @@ data APIResponse a
 
 
 data TelegramAdapter updateType = TelegramAdapter
-    { userConfig :: C.Config
-    }
 
 
 data TelegramUpdate any
@@ -132,27 +131,25 @@ apiResponseParser innerParser = withObject "expected object" $ \o -> do
         else Error <$> o .: "error_code" <*> o .: "description"
 
 
-execAPIMethod :: (Value -> Parser a) -> TelegramAdapter b -> String -> [FormParam] -> RunnerM (Either String (APIResponse a))
-execAPIMethod innerParser adapter methodName params = do
-    token <- liftIO $ C.require cfg "token"
+execAPIMethod :: MkTelegram b => (Value -> Parser a) -> String -> [FormParam] -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
+execAPIMethod innerParser methodName params = do
+    token <- requireFromAdapterConfig "token"
     response <- liftIO $ post $(isS "https://api.telegram.org/bot#{token :: String}/#{methodName}") params
     return $ eitherDecode (response^.responseBody) >>= parseEither (apiResponseParser innerParser)
-  where
-    cfg = userConfig adapter
 
 
-getUsernameImpl :: TelegramAdapter a -> TelegramUser -> RunnerM L.Text
-getUsernameImpl _ u = return $ fromMaybe (u^.firstName) $ u^.username
+getUsernameImpl :: TelegramUser -> AdapterM (TelegramAdapter a) L.Text
+getUsernameImpl u = return $ fromMaybe (u^.firstName) $ u^.username
 
 
-getChannelNameImpl :: TelegramAdapter a -> TelegramChat -> RunnerM L.Text
-getChannelNameImpl _ c = return $ fromMaybe "<unnamed>" $
+getChannelNameImpl :: TelegramChat -> AdapterM (TelegramAdapter a) L.Text
+getChannelNameImpl c = return $ fromMaybe "<unnamed>" $
     c^.username <|> (L.unwords <$> sequence [c^.firstName, c^.lastName]) <|> c^.firstName
 
 
-messageChannelImpl :: TelegramAdapter a -> TelegramChat -> L.Text -> RunnerM ()
-messageChannelImpl ada chat msg = do
-    res <- execAPIMethod msgParser ada "sendMessage" ["chat_id" := (chat^.id_) , "text" := msg]
+messageChannelImpl :: MkTelegram a => TelegramChat -> L.Text -> AdapterM (TelegramAdapter a) ()
+messageChannelImpl chat msg = do
+    res <- execAPIMethod msgParser "sendMessage" ["chat_id" := (chat^.id_) , "text" := msg]
     case res of
         Left err -> error $(isS "Unparseable JSON #{err}")
         Right Success{} -> return ()
@@ -162,11 +159,9 @@ messageChannelImpl ada chat msg = do
 
 
 runnerImpl :: forall a. MkTelegram a => RunWithAdapter (TelegramAdapter a)
-runnerImpl config initializer = do
+runnerImpl handler = do
     msgChan <- newChan
-    let ada = TelegramAdapter config
-    handler <- liftIO $ initializer ada
-    let eventGetter = mkEventGetter ada msgChan
+    let eventGetter = mkEventGetter msgChan
     async eventGetter
 
     forever $ do
@@ -178,10 +173,10 @@ runnerImpl config initializer = do
 
 
 
-pollEventGetter :: TelegramAdapter Poll -> Chan (TelegramUpdate Poll) -> RunnerM ()
-pollEventGetter ada msgChan =
+pollEventGetter :: Chan (TelegramUpdate Poll) -> AdapterM (TelegramAdapter Poll) ()
+pollEventGetter msgChan =
     forever $ do
-        response <- execAPIMethod parseJSON ada "getUpdates" []
+        response <- execAPIMethod parseJSON "getUpdates" []
         case response of
             Left err -> do
                 logErrorN $(isT "Unable to parse json: #{err}")
@@ -193,13 +188,11 @@ pollEventGetter ada msgChan =
                 writeList2Chan msgChan updates
 
 
-pushEventGetter :: TelegramAdapter Push -> Chan (TelegramUpdate Push) -> RunnerM ()
-pushEventGetter ada msgChan =
+pushEventGetter :: Chan (TelegramUpdate Push) -> AdapterM (TelegramAdapter Push) ()
+pushEventGetter msgChan =
     -- port <- liftIO $ C.require cfg "port"
     -- url <- liftIO $ C.require cfg "url"
     return ()
-  where
-    cfg = userConfig ada
 
 
 
@@ -208,7 +201,7 @@ scriptIdImpl _ = mkAdapterId (error "phantom value" :: a)
 
 
 class MkTelegram a where
-    mkEventGetter :: TelegramAdapter a -> Chan (TelegramUpdate a) -> RunnerM ()
+    mkEventGetter :: Chan (TelegramUpdate a) -> AdapterM (TelegramAdapter a) ()
     mkAdapterId :: a -> AdapterId (TelegramAdapter a)
 
 
@@ -216,10 +209,11 @@ instance MkTelegram a => IsAdapter (TelegramAdapter a) where
     type User (TelegramAdapter a) = TelegramUser
     type Channel (TelegramAdapter a) = TelegramChat
     adapterId = scriptIdImpl (error "phantom value" :: TelegramAdapter a)
+    initAdapter = return TelegramAdapter
     runWithAdapter = runnerImpl
     getUsername = getUsernameImpl
     getChannelName = getChannelNameImpl
-    resolveChannel _ _ = do
+    resolveChannel _ = do
         logErrorN "Channel resolving not supported"
         return Nothing
     messageChannel = messageChannelImpl

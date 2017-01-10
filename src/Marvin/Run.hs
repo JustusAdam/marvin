@@ -35,7 +35,7 @@ import           Data.Sequences
 import qualified Data.Text.Lazy                  as L
 import           Data.Traversable                (for)
 import           Data.Vector                     (Vector)
-import           Marvin.Adapter                  as A
+import qualified Marvin.Adapter                  as A
 import           Marvin.Internal
 import           Marvin.Internal.Types           hiding (channel)
 import           Marvin.Interpolate.Text
@@ -67,6 +67,10 @@ requireFromAppConfig cfg = C.require (C.subconfig (unwrapScriptId applicationScr
 lookupFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO (Maybe a)
 lookupFromAppConfig cfg = C.lookup (C.subconfig (unwrapScriptId applicationScriptId) cfg)
 
+
+runWAda :: a -> C.Config -> AdapterM a r -> RunnerM r
+runWAda ada cfg ac = runReaderT (runAdapterAction ac) (cfg, ada)
+
 -- TODO add timeouts for handlers
 mkApp :: forall a. IsAdapter a => LoggingFn -> [Script a] -> C.Config -> a -> EventHandler a
 mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
@@ -91,7 +95,7 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
                         -> Channel a
                         -> RunnerM ()
     changeHandlerHelper wildcards specifics other chan = do
-        cName <- A.getChannelName adapter chan
+        cName <- runWAda adapter cfg $ A.getChannelName chan
 
         let applicables = fromMaybe mempty $ specifics^?ix cName
 
@@ -125,9 +129,8 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
         foldMap (^.actions) scripts
 
 
--- | Create a wai compliant application
-application :: IsAdapter a => LoggingFn -> [ScriptInit a] -> C.Config -> InitEventHandler a
-application log inits config ada = flip runLoggingT log $ do
+application :: IsAdapter a => LoggingFn -> [ScriptInit a] -> C.Config -> a -> RunnerM (EventHandler a)
+application log inits config ada = do
     logInfoNS logSource "Initializing scripts"
     s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada config) (onInitExcept sid)) inits
     return $ mkApp log s config ada
@@ -166,9 +169,10 @@ runMarvin s' = runStderrLoggingT $ do
 
     setLoggingLevelIn loggingLevel $ do
         oldLogFn <- askLoggerIO
-        liftIO $ flip runLoggingT (loggingAddSourcePrefix adapterPrefix oldLogFn) $ runWithAdapter
-            (C.subconfig adapterPrefix cfg)
-            $ application oldLogFn s' cfg
+        let runAdaLogging = liftIO . flip runLoggingT (loggingAddSourcePrefix adapterPrefix oldLogFn)
+        ada <- runAdaLogging initAdapter
+        handler <- application oldLogFn s' cfg ada
+        runWAda ada cfg $ runWithAdapter handler
   where
     adapterPrefix = $(isT "adapter.#{adapterId :: AdapterId a}")
     infoParser = info
