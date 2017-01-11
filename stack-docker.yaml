@@ -1,0 +1,7 @@
+flags: {}
+extra-deps:
+- marvin-interpolate-0.4.0
+resolver: lts-7.15
+docker:
+    enable: true
+    auto-pull: true

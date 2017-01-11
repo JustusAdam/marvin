@@ -1,0 +1,11 @@
+flags: {}
+extra-package-dbs: []
+packages:
+- '.'
+- ../..
+extra-deps:
+- marvin-interpolate-0.4.0
+resolver: lts-7.14
+docker:
+    enable: true
+    image: fpco/stack-build
