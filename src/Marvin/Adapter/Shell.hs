@@ -1,5 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
-module Marvin.Adapter.Shell where
+module Marvin.Adapter.Shell (ShellAdapter) where
 
 
 import           Control.Concurrent.Async.Lifted
@@ -45,6 +45,7 @@ instance IsAdapter ShellAdapter where
     getUsername = return
     getChannelName = return
     resolveChannel = return . Just
+    resolveUser = return . Just
     initAdapter = ShellAdapter <$> newEmptyMVar
     runWithAdapter handler = do
         bot <- getBotname

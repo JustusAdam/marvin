@@ -13,28 +13,27 @@ For the proper, verbose documentation see <https://marvin.readthedocs.org/en/lat
 module Marvin
     (
     -- * The Script
-      Script(..), defineScript, ScriptInit
+      Script, defineScript, ScriptInit
     , ScriptId
     , ScriptDefinition, IsAdapter
     -- * Reacting
     -- ** Reaction Functions
     , hear, respond, enter, exit, enterIn, exitFrom, topic, topicIn, customTrigger
     -- ** Getting data
-    , getData, getMessage, getMatch, getTopic, getChannel, getUser, getUsername, getChannelName, resolveChannel
+    , getData, getMessage, getMatch, getTopic, getChannel, getUser, getUsername, getChannelName, resolveUser, resolveChannel
     -- ** Sending messages
     , send, reply, messageChannel, messageChannel'
     -- ** Interaction with the config
     , getConfigVal, requireConfigVal, getBotName
     -- ** Handler Types
-    , Message(..), User, Channel, BotReacting
+    , Message, User, Channel, BotReacting
+    , Topic
     -- ** Advanced actions
     , extractAction, extractReaction
-    -- ** Misc
-    , Topic
     ) where
 
 
 import           Marvin.Adapter        (IsAdapter)
 import           Marvin.Internal
 import           Marvin.Internal.Types hiding (getChannelName, getUsername, messageChannel,
-                                        resolveChannel)
+                                        resolveChannel, resolveUser)

@@ -33,10 +33,10 @@ library
                      , Marvin.Adapter.Shell
                      , Marvin.Adapter.Slack
                      , Marvin.Adapter.Telegram
+  other-modules:       Util
                      , Marvin.Internal
                      , Marvin.Internal.Types
                      , Marvin.Internal.Values
-  other-modules:       Util
   build-depends:       base >= 4.7 && < 5
                      , wreq
                      , aeson

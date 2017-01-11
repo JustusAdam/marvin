@@ -5,9 +5,10 @@
 {-# LANGUAGE ScopedTypeVariables    #-}
 module Marvin.Adapter.Telegram
     ( TelegramAdapter, Push, Poll
-    , TelegramChat(..), ChatType(..)
-    , TelegramUser(..)
-    , HasId_(id_), HasUsername(username), HasFirstName(firstName), HasLastName(lastName), HasType_(type_)
+    , TelegramChat, ChatType(..)
+    , TelegramUser
+    , MkTelegram()
+    --, HasId_(id_), HasUsername(username), HasFirstName(firstName), HasLastName(lastName), HasType_(type_)
     ) where
 
 import           Control.Applicative
@@ -214,6 +215,9 @@ instance MkTelegram a => IsAdapter (TelegramAdapter a) where
     getChannelName = getChannelNameImpl
     resolveChannel _ = do
         logErrorN "Channel resolving not supported"
+        return Nothing
+    resolveUser _ = do
+        logErrorN "User resolving not supported"
         return Nothing
     messageChannel = messageChannelImpl
 

@@ -29,6 +29,7 @@ import           Marvin.Util.Regex
 type Topic = L.Text
 type Message = L.Text
 
+-- | A timestamp type. Supplied with most 'Event'\'s
 newtype TimeStamp = TimeStamp { unwrapTimeStamp :: UTCTime } deriving Show
 
 
@@ -40,9 +41,10 @@ data Event a
     | ChannelLeaveEvent (User a) (Channel a) TimeStamp
     | TopicChangeEvent (User a) (Channel a) Topic TimeStamp
 
-
+-- | Basic monad which most internal actions run in
 type RunnerM = LoggingT IO
 
+-- | Monad in which any adapter action runs in
 newtype AdapterM a r = AdapterM { runAdapterAction :: ReaderT (C.Config, a) RunnerM r } deriving (MonadIO, Monad, Applicative, Functor, MonadLogger, MonadLoggerIO, MonadBase IO)
 
 
@@ -51,7 +53,9 @@ type RunWithAdapter a = EventHandler a -> AdapterM a ()
 
 -- | Basic functionality required of any adapter
 class IsAdapter a where
+    -- | Concrete, adapter specific representation of a user. Could be an id string or a full object for instance
     type User a
+    -- | Concrete, adapter specific representation of a channel. Could be an id string or a full object for instance
     type Channel a
     -- | Used for scoping config and logging
     adapterId :: AdapterId a
@@ -59,17 +63,21 @@ class IsAdapter a where
     messageChannel :: Channel a -> L.Text -> AdapterM a ()
     -- | Initialize the adapter state
     initAdapter :: RunnerM a
-    -- | Initialize and run the bot
+    -- | Run the bot
     runWithAdapter :: RunWithAdapter a
     -- | Resolve a username given the internal user identifier
     getUsername :: User a -> AdapterM a L.Text
     -- | Resolve the human readable name for a channel given the  internal channel identifier
     getChannelName :: Channel a -> AdapterM a L.Text
-    -- | Resolve to the internal channel identifier given a human readable name
+    -- | Resolve to the internal channel structure given a human readable name
     resolveChannel :: L.Text -> AdapterM a (Maybe (Channel a))
+    -- | Resolve to the internal user structure given a human readable name
+    resolveUser :: L.Text -> AdapterM a (Maybe (User a))
 
 
+-- | Wrapping type for users. Only used to enable 'Get' typeclass instances.
 newtype User' a = User' {unwrapUser' :: User a}
+-- | Wrapping type for channels. Only used to enable 'Get' typeclass instances.
 newtype Channel' a = Channel' {unwrapChannel' :: Channel a}
 
 
@@ -161,7 +169,7 @@ instance MonadBaseControl IO (AdapterM a) where
 
 
 
--- | Class which says that there is a way to get to a 'Message' from this type @m@.
+-- | Class which says that there is a way to get to @b@ from this type @a@.
 class Get a b where
     getLens :: Lens' a b
 

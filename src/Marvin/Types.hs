@@ -10,7 +10,11 @@ Portability : POSIX
 module Marvin.Types
     ( User(..), Channel(..), Message(..), ScriptId(..)
     , applicationScriptId, IsScript, getScriptId
-    , HasConfigAccess
+    , HasConfigAccess, TimeStamp(..)
+    , AdapterM()
+    , AccessAdapter(AdapterT)
+    , User'(User'), Channel'(Channel')
+    , Get(getLens)
     ) where
 
 

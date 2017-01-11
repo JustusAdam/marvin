@@ -17,7 +17,7 @@ module Marvin.Internal
     -- ** Sending messages
     , send, reply, messageChannel, messageChannel'
     -- ** Getting Data
-    , getData, getUser, getMatch, getMessage, getChannel, getTopic, getBotName, getChannelName, resolveChannel, getUsername
+    , getData, getUser, getMatch, getMessage, getChannel, getTopic, getBotName, getChannelName, resolveChannel, getUsername, resolveUser
     -- ** Interacting with the config
     , getConfigVal, requireConfigVal
     -- *** Access config (advanced, internal)
@@ -58,7 +58,7 @@ import qualified Data.Vector               as V
 import           Marvin.Adapter            (IsAdapter)
 import qualified Marvin.Adapter            as A
 import           Marvin.Internal.Types     hiding (getChannelName, getUsername, messageChannel,
-                                            resolveChannel, resolveChannel)
+                                            resolveChannel, resolveChannel, resolveUser)
 import           Marvin.Internal.Values
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text
@@ -202,18 +202,28 @@ send msg = do
     messageChannel' o msg
 
 
--- | Get the username of a registered user.
-getUsername :: (HasConfigAccess m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => User (AdapterT m) -> m L.Text
+-- | Get the username of a registered user. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
+getUsername :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a) 
+            => User a -> m L.Text
 getUsername = A.liftAdapterAction . A.getUsername
 
 
-resolveChannel :: (HasConfigAccess m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => L.Text -> m (Maybe (Channel (AdapterT m)))
+-- | Try to get the channel with a particular human readable name. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
+resolveChannel :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)           
+               => L.Text -> m (Maybe (Channel a))
 resolveChannel =  A.liftAdapterAction . A.resolveChannel
 
 
--- | Get the human readable name of a channel.
-getChannelName :: (HasConfigAccess m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> m L.Text
+-- | Get the human readable name of a channel. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
+getChannelName :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)           
+               => Channel a -> m L.Text
 getChannelName = A.liftAdapterAction . A.getChannelName
+
+
+-- | Try to get the user with a particular username. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
+resolveUser :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a) 
+            => L.Text -> m (Maybe (User a))
+resolveUser = A.liftAdapterAction . A.resolveUser
 
 
 -- | Send a message to the channel the original message came from and address the user that sent the original message.
@@ -240,7 +250,7 @@ messageChannel' chan = A.liftAdapterAction . A.messageChannel chan
 
 -- | Define a new script for marvin
 --
--- You need to provide a ScriptId (which can simple be written as a non-empty string).
+-- You need to provide a ScriptId (which can be written as a non-empty string, needs the @OverloadedStrings@ language extension).
 -- This id is used as the key for the section in the bot config belonging to this script and in logging output.
 --
 -- Roughly equivalent to "module.exports" in hubot.
@@ -285,7 +295,7 @@ getChannel :: forall a m. Get m (Channel' a) => BotReacting a m (Channel a)
 getChannel = (unwrapChannel' :: Channel' a -> Channel a) <$> view (payload . getLens)
 
 
--- | Get the user whihc was part of the triggered action.
+-- | Get the user which was part of the triggered action.
 getUser :: forall m a. Get m (User' a) => BotReacting a m (User a)
 getUser = (unwrapUser' :: User' a -> User a) <$> view (payload . getLens)
 
