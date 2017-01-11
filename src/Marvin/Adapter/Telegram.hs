@@ -1,8 +1,8 @@
 {-# LANGUAGE ExplicitForAll         #-}
+{-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE FlexibleContexts #-}
 module Marvin.Adapter.Telegram
     ( TelegramAdapter, Push, Poll
     , TelegramChat(..), ChatType(..)
@@ -20,8 +20,6 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson                      hiding (Error, Success)
 import           Data.Aeson.Types                (Parser, parseEither)
-import qualified Data.Configurator               as C
-import qualified Data.Configurator.Types         as C
 import           Data.Maybe
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
@@ -32,6 +30,7 @@ import           Marvin.Interpolate.Text
 import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Network.Wreq
+import           Util
 
 
 data APIResponse a

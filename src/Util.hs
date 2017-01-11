@@ -1,9 +1,13 @@
 module Util where
 
 
-import           Control.Monad.Logger
+import           Control.Monad
+import           Data.Aeson.Types
 import qualified Data.Text               as T
+import           Data.Time.Clock.POSIX
+import           Marvin.Internal.Types
 import           Marvin.Interpolate.Text
+import           Text.Read               (readMaybe)
 
 
 notImplemented :: a
@@ -24,4 +28,7 @@ loggingAddSourcePrefix :: T.Text -> (a -> T.Text -> c) -> a -> T.Text -> c
 loggingAddSourcePrefix = adaptLoggingSource . addPrefix
 
 
-type LoggingFn = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
+timestampFromNumber :: Value -> Parser TimeStamp
+timestampFromNumber (Number n) = return $ TimeStamp $ posixSecondsToUTCTime $ realToFrac n
+timestampFromNumber (String s) = maybe mzero (return . TimeStamp . posixSecondsToUTCTime . realToFrac) (readMaybe (T.unpack s) :: Maybe Double)
+timestampFromNumber _ = mzero

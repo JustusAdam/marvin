@@ -8,17 +8,13 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Loops
 import           Data.Char                       (isSpace)
-import           Data.Maybe                      (fromMaybe)
-import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Data.Time.Clock                 (getCurrentTime)
 import           Marvin.Adapter
-import           Marvin.Internal                 (defaultBotName)
 import           Marvin.Internal.Types
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text.Lazy
 import           System.Console.Haskeline
-import qualified Data.Configurator as C
 
 
 data ShellAdapter = ShellAdapter
@@ -43,7 +39,7 @@ instance IsAdapter ShellAdapter where
     type Channel ShellAdapter = L.Text
 
     adapterId = "shell"
-    messageChannel _ chan = do 
+    messageChannel _ chan = do
         ShellAdapter{output} <- getAdapter
         putMVar output $ Just chan
     getUsername = return
@@ -51,7 +47,7 @@ instance IsAdapter ShellAdapter where
     resolveChannel = return . Just
     initAdapter = ShellAdapter <$> newEmptyMVar
     runWithAdapter handler = do
-        bot <- fromMaybe defaultBotName <$> lookupFromAppConfig "name"
+        bot <- getBotname
         histfile <- lookupFromAdapterConfig "history-file"
         ShellAdapter out <- getAdapter
         liftIO $ runInputT defaultSettings {historyFile=histfile} $ do

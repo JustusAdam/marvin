@@ -31,8 +31,6 @@ import           Data.Aeson.TH
 import           Data.Aeson.Types                hiding (Error)
 import qualified Data.ByteString.Lazy.Char8      as BS
 import           Data.Char                       (isSpace)
-import qualified Data.Configurator               as C
-import qualified Data.Configurator.Types         as C
 import           Data.Containers
 import           Data.Foldable                   (asum, toList)
 import           Data.Hashable
@@ -54,6 +52,7 @@ import           Network.WebSockets
 import           Network.Wreq
 import           Prelude                         hiding (lookup)
 import           Text.Read                       (readMaybe)
+import           Util
 import           Wuss
 
 instance FromJSON URI where
@@ -226,9 +225,9 @@ apiResponseParser f v@(Object o) = APIResponse <$> o .: "ok" <*> f v
 apiResponseParser _ _            = mzero
 
 data SlackAdapter a = SlackAdapter
-    { midTracker    :: TMVar Int
-    , channelChache :: IORef ChannelCache
-    , userInfoCache :: IORef (HashMap SlackUserId UserInfo)
+    { midTracker        :: TMVar Int
+    , channelChache     :: IORef ChannelCache
+    , userInfoCache     :: IORef (HashMap SlackUserId UserInfo)
     , connectionTracker :: MVar Connection
     }
 
@@ -286,7 +285,7 @@ runHandlerLoop messageChan handler =
             Left err -> logErrorN $(isT "Error parsing json: #{err} original data: #{rawBS d}")
             Right (Right ev@(MessageEvent u c m t)) -> do
 
-                botname <- L.toLower . fromMaybe defaultBotName <$> lookupFromAppConfig "name"
+                botname <- L.toLower <$> getBotname
                 let lmsg = L.stripStart $ L.toLower m
                 liftIO $ handler $ case asum $ map ((`L.stripPrefix` lmsg) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname] of
                     Nothing -> ev
@@ -311,7 +310,7 @@ runHandlerLoop messageChan handler =
 
 
 sendMessageImpl :: BS.ByteString -> AdapterM (SlackAdapter a) ()
-sendMessageImpl msg = do 
+sendMessageImpl msg = do
     SlackAdapter{connectionTracker} <- getAdapter
     let go 0 = logErrorN "Connection error, quitting retry."
         go n =
@@ -323,7 +322,7 @@ sendMessageImpl msg = do
                     logErrorN $(isT "#{e :: ConnectionException}")
                     go (n-1)
     go (3 :: Int)
-    
+
 
 
 runnerImpl :: MkSlack a => RunWithAdapter (SlackAdapter a)
@@ -341,7 +340,7 @@ execAPIMethod innerParser method params = do
 
 
 newMid :: AdapterM (SlackAdapter a) Int
-newMid = do 
+newMid = do
     SlackAdapter{midTracker} <- getAdapter
     liftIO $ atomically $ do
         id <- takeTMVar midTracker
@@ -351,7 +350,7 @@ newMid = do
 
 messageChannelImpl :: SlackChannelId -> L.Text -> AdapterM (SlackAdapter a) ()
 messageChannelImpl (SlackChannelId chan) msg = do
-    mid <- newMid   
+    mid <- newMid
     sendMessageImpl $ encode $
         object [ "id" .= mid
                 , "type" .= ("message" :: T.Text)

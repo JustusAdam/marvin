@@ -41,166 +41,33 @@ module Marvin.Internal
     ) where
 
 
+import           Control.Exception.Lifted
+import           Control.Lens              hiding (cons)
+import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
-import qualified Data.Configurator        as C
-import qualified Data.Configurator.Types  as C
-
-import           Control.Arrow
-import           Control.Exception.Lifted
-import           Control.Lens             hiding (cons)
-import           Control.Monad.Logger
-import qualified Data.HashMap.Strict      as HM
-import           Data.Maybe               (fromMaybe)
-import           Data.Monoid              ((<>))
-import qualified Data.Text                as T
-import qualified Data.Text.Lazy           as L
-import           Data.Vector              (Vector)
-import qualified Data.Vector              as V
-import           Marvin.Adapter           (IsAdapter)
-import qualified Marvin.Adapter           as A
-import           Marvin.Internal.Types    hiding (getChannelName, getUsername, messageChannel,
-                                           resolveChannel, resolveChannel)
-import           Marvin.Interpolate.Text
+import qualified Data.Configurator         as C
+import qualified Data.Configurator.Types   as C
+import qualified Data.HashMap.Strict       as HM
+import           Data.Maybe                (fromMaybe)
+import           Data.Monoid               ((<>))
+import qualified Data.Text                 as T
+import qualified Data.Text.Lazy            as L
+import           Data.Vector               (Vector)
+import qualified Data.Vector               as V
+import           Marvin.Adapter            (IsAdapter)
+import qualified Marvin.Adapter            as A
+import           Marvin.Internal.Types     hiding (getChannelName, getUsername, messageChannel,
+                                            resolveChannel, resolveChannel)
+import           Marvin.Internal.Values
 import           Marvin.Interpolate.String
-import           Marvin.Util.Regex        (Match, Regex)
+import           Marvin.Interpolate.Text
+import           Marvin.Util.Regex         (Match, Regex)
 import           Util
-import           Control.Monad.Base
 
-
-defaultBotName :: L.Text
-defaultBotName = "marvin"
-
--- | Read only data available to a handler when the bot reacts to an event.
-declareFields [d|
-    data BotActionState a d = BotActionState
-        { botActionStateScriptId :: ScriptId
-        , botActionStateConfig   :: C.Config
-        , botActionStateAdapter :: a
-        , botActionStatePayload :: d
-        }
-    |]
-
-
-declareFields [d|
-    data Handlers a = Handlers
-        { handlersResponds :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp) -> RunnerM ())
-        , handlersHears :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp) -> RunnerM ())
-        , handlersCustoms :: Vector (Event a -> Maybe (RunnerM ()))
-        , handlersJoins :: Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ())
-        , handlersLeaves :: Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ())
-        , handlersTopicChange :: Vector ((User' a, Channel' a, Topic, TimeStamp) -> RunnerM ())
-        , handlersJoinsIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ()))
-        , handlersLeavesFrom :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ()))
-        , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, Topic, TimeStamp) -> RunnerM ()))
-        }
-    |]
-
-
-instance Monoid (Handlers a) where
-    mempty = Handlers mempty mempty mempty mempty mempty mempty mempty mempty mempty
-    mappend (Handlers r1 h1 c1 j1 l1 t1 ji1 li1 ti1)
-            (Handlers r2 h2 c2 j2 l2 t2 ji2 li2 ti2)
-        = Handlers (r1 <> r2) (h1 <> h2) (c1 <> c2) (j1 <> j2) (l1 <> l2) (t1 <> t2) (HM.unionWith mappend ji1 ji2) (HM.unionWith mappend li1 li2) (HM.unionWith mappend ti1 ti2)
-
-
--- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageChannel' as well as any arbitrary 'IO' action using 'liftIO'.
---
--- The type parameter @d@ is the accessible data provided by the trigger for this action and can be obtained with 'getData' or other custom functions like 'getMessage' and 'getMatch' which typically depend on a particular type of data in @d@.
--- For message handlers like 'hear' and 'respond' this would be a regex 'Match' and a 'Message' for instance.
---
--- For completeness: @a@ is the adapter type and @r@ is the return type of the monadic computation.
---
--- This is also a 'MonadReader' instance, there you can inspect the entire state of this reaction.
--- This is typically only used in internal or utility functions and not necessary for the user.
--- To inspect particular pieces of this state refer to the *Lenses* section.
-newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState a d) RunnerM r } deriving (Monad, MonadIO, Applicative, Functor, MonadReader (BotActionState a d), MonadLogger, MonadLoggerIO, MonadBase IO)
-
--- | An abstract type describing a marvin script.
---
--- This is basically a collection of event handlers.
---
--- Internal structure is exposed for people wanting to extend this.
-declareFields [d|
-    data Script a = Script
-        { scriptActions   :: Handlers a
-        , scriptScriptId  :: ScriptId
-        , scriptConfig    :: C.Config
-        , scriptAdapter :: a
-        }
-    |]
-
-
--- | A monad for gradually defining a 'Script' using 'respond' and 'hear' as well as any 'IO' action.
-newtype ScriptDefinition a r = ScriptDefinition { runScript :: StateT (Script a) RunnerM r } deriving (Monad, MonadIO, Applicative, Functor, MonadLogger, MonadBase IO)
-
-
--- | Initializer for a script. This gets run by the server during startup and creates a 'Script'
-newtype ScriptInit a = ScriptInit (ScriptId, a -> C.Config -> RunnerM (Script a))
-
-
--- | Class which says that there is a way to get to a 'Message' from this type @m@.
-class Get a b where
-    getLens :: Lens' a b
-
-instance Get (User' a, b, c) (User' a) where
-    getLens = _1
-
-instance Get (User' a, b, c, d) (User' a) where
-    getLens = _1
-
-instance Get (User' a, b, c, d, e) (User' a) where
-    getLens = _1
-
-instance Get (a, Channel' b, c) (Channel' b) where
-    getLens = _2
-
-instance Get (a, Channel' b, c, d) (Channel' b) where
-    getLens = _2
-
-instance Get (a, Channel' b, c, d, e) (Channel' b) where
-    getLens = _2
-
-instance Get (a, b, TimeStamp) TimeStamp where
-    getLens = _3
-
-instance Get (a, b, c, TimeStamp) TimeStamp where
-    getLens = _4
-
-instance Get (a, b, c, d, TimeStamp) TimeStamp where
-    getLens = _5
-
-instance Get (a, b, Match, d, e) Match where
-    getLens = _3
-
-instance Get (a, b, c, Message, e) Message where
-    getLens = _4
-
-instance Get (a, b, Topic, d) Topic where
-    getLens = _3
-
-instance HasConfigAccess (ScriptDefinition a) where
-    getConfigInternal = ScriptDefinition $ use config
-
-instance HasConfigAccess (BotReacting a b) where
-    getConfigInternal = view config
-
-instance IsScript (ScriptDefinition a) where
-    getScriptId = ScriptDefinition $ use scriptId
-
-instance IsScript (BotReacting a b) where
-    getScriptId = view scriptId
-
-instance AccessAdapter (ScriptDefinition a) where
-    type AdapterT (ScriptDefinition a) = a
-    getAdapter = ScriptDefinition $ use adapter
-
-instance AccessAdapter (BotReacting a b) where
-    type AdapterT (BotReacting a b) = a
-    getAdapter = view adapter
 
 getSubConfFor :: HasConfigAccess m => ScriptId -> m C.Config
-getSubConfFor (ScriptId name) = C.subconfig ("script." <> name) <$> getConfigInternal
+getSubConfFor (ScriptId name) = C.subconfig $(isT "#{scriptConfigKey}.#{name}") <$> getConfigInternal
 
 
 -- | Get the config part for the currect script
@@ -212,7 +79,7 @@ runBotAction :: ShowT t => ScriptId -> C.Config -> a -> Maybe t -> d -> BotReact
 runBotAction scriptId config adapter trigger data_ action = do
     oldLogFn <- askLoggerIO
     catch
-        (liftIO $ flip runLoggingT (loggingAddSourcePrefix $(isT "script.#{scriptId}") oldLogFn) $ flip runReaderT actionState $ runReaction action)
+        (liftIO $ flip runLoggingT (loggingAddSourcePrefix $(isT "#{scriptConfigKey}.#{scriptId}") oldLogFn) $ flip runReaderT actionState $ runReaction action)
         (onScriptExcept scriptId trigger)
   where
     actionState = BotActionState scriptId config adapter data_

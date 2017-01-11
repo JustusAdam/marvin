@@ -38,6 +38,7 @@ import           Data.Vector                     (Vector)
 import qualified Marvin.Adapter                  as A
 import           Marvin.Internal
 import           Marvin.Internal.Types           hiding (channel)
+import           Marvin.Internal.Values
 import           Marvin.Interpolate.Text
 import           Marvin.Util.Regex
 import           Options.Applicative

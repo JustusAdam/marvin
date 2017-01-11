@@ -15,3 +15,4 @@ module Marvin.Types
 
 
 import           Marvin.Internal.Types
+import           Marvin.Internal.Values
