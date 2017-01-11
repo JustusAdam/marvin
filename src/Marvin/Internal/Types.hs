@@ -78,7 +78,10 @@ newtype TimeStamp = TimeStamp { unwrapTimeStamp :: UTCTime } deriving Show
 
 
 timestampFromNumber :: Value -> Parser TimeStamp
-timestampFromNumber = withScientific "expected number type" $ return . TimeStamp . posixSecondsToUTCTime . realToFrac
+timestampFromNumber (Number n) = return $ TimeStamp $ posixSecondsToUTCTime $ realToFrac n
+timestampFromNumber (String s) = maybe mzero (return . TimeStamp . posixSecondsToUTCTime . realToFrac) $ readMaybe (T.unpack s) 
+timestampFromNumber _ = mzero
+        
 
 
 -- | A type, basically a String, which identifies a script to the config and the logging facilities.
