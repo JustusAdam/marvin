@@ -79,7 +79,7 @@ newtype TimeStamp = TimeStamp { unwrapTimeStamp :: UTCTime } deriving Show
 
 timestampFromNumber :: Value -> Parser TimeStamp
 timestampFromNumber (Number n) = return $ TimeStamp $ posixSecondsToUTCTime $ realToFrac n
-timestampFromNumber (String s) = maybe mzero (return . TimeStamp . posixSecondsToUTCTime . realToFrac) $ readMaybe (T.unpack s) 
+timestampFromNumber (String s) = maybe mzero (return . TimeStamp . posixSecondsToUTCTime . realToFrac) (readMaybe (T.unpack s) :: Maybe Double)
 timestampFromNumber _ = mzero
         
 
