@@ -2,6 +2,7 @@
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances       #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Marvin.Internal.Types where
 
 
@@ -21,15 +22,18 @@ import qualified Data.Text                   as T
 import qualified Data.Text.Lazy              as L
 import           Data.Time.Clock
 import           Data.Vector                 (Vector)
+import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text
 import           Marvin.Util.Regex
+import Control.DeepSeq
+import GHC.Generics
 
 
 
 type Topic = L.Text
 type Message = L.Text
 
--- | A timestamp type. Supplied with most 'Event'\'s
+-- | A timestamp type. Supplied with most 'Event' types
 newtype TimeStamp = TimeStamp { unwrapTimeStamp :: UTCTime } deriving Show
 
 
@@ -44,7 +48,7 @@ data Event a
 -- | Basic monad which most internal actions run in
 type RunnerM = LoggingT IO
 
--- | Monad in which any adapter action runs in
+-- | Monad in which adapter actions run in
 newtype AdapterM a r = AdapterM { runAdapterAction :: ReaderT (C.Config, a) RunnerM r } deriving (MonadIO, Monad, Applicative, Functor, MonadLogger, MonadLoggerIO, MonadBase IO)
 
 
@@ -82,10 +86,14 @@ newtype Channel' a = Channel' {unwrapChannel' :: Channel a}
 
 
 -- | A type, basically a String, which identifies a script to the config and the logging facilities.
+-- 
+-- For conversion please use 'mkScriptId' and 'unwrapScriptId'. They will perform necessary checks.
 newtype ScriptId = ScriptId { unwrapScriptId :: T.Text } deriving (Show, Eq)
 
 
 -- | A type, basically a String, which identifies an adapter to the config and the logging facilities.
+-- 
+-- For conversion please use 'mkAdapterId' and 'unwrapAdapterId'. They will perform necessary checks.
 newtype AdapterId a = AdapterId { unwrapAdapterId :: T.Text } deriving (Show, Eq)
 
 
@@ -115,8 +123,11 @@ declareFields [d|
         , handlersJoinsIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ()))
         , handlersLeavesFrom :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ()))
         , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, Topic, TimeStamp) -> RunnerM ()))
-        }
+        } deriving Generic
     |]
+
+
+instance NFData (Handlers a)
 
 
 instance Monoid (Handlers a) where
@@ -170,6 +181,11 @@ instance MonadBaseControl IO (AdapterM a) where
 
 
 -- | Class which says that there is a way to get to @b@ from this type @a@.
+--
+-- This typeclass is used to allow handlers with different types of payload to share common
+-- accessor functions such as 'getUser' and 'getMessage'.
+--
+-- The instances specify for each type of payload which pieces of data can be extracted and how.
 class Get a b where
     getLens :: Lens' a b
 
@@ -215,7 +231,7 @@ instance HasConfigAccess (ScriptDefinition a) where
 instance HasConfigAccess (BotReacting a b) where
     getConfigInternal = view config
 
-
+-- | Similar to 'AccessAdapter', this class says there is a 'ScriptId' reachable from the type (usually a monad) @m@.
 class IsScript m where
     getScriptId :: m ScriptId
 
@@ -226,7 +242,12 @@ instance IsScript (BotReacting a b) where
     getScriptId = view scriptId
 
 
+-- | Similar to 'IsScript', this class says that there is an adapter 'AdapterT' available from this type (usually a monad) @m@.
+--
+-- The type of adapter depends on the monad itself.
+-- This class can be thought of as 'MonadReader' specified to 'AdapterT'.
 class AccessAdapter m where
+    -- | The concrete type of adapter accessible from @m@.
     type AdapterT m
     getAdapter :: m (AdapterT m)
 
@@ -251,19 +272,28 @@ instance ShowT (AdapterId a) where showT = unwrapAdapterId
 type LoggingFn = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 
 
-verifyIdString :: String -> (String -> a) -> String -> a
-verifyIdString name _ "" = error $ name ++ " must not be empty"
-verifyIdString name f s@(x:xs)
-    | isLetter x && all (\c -> isAlphaNum c || c == '-' || c == '_' ) xs = f s
-    | otherwise = error $ "first character of " ++ name ++ " must be a letter, all other characters can be alphanumeric, '-' or '_'"
+verifyIdString :: String -> (T.Text -> a) -> T.Text -> Either String a
+verifyIdString name _ "" = Left $(isS "#{name} must not be empty")
+verifyIdString name f s
+    | isLetter x && T.all (\c -> isAlphaNum c || c == '-' || c == '_' ) xs = Right $ f s
+    | otherwise = Left $(isS "first character of #{name} must be a letter, all other characters can be alphanumeric, '-' or '_'")
+  where Just (x, xs) = T.uncons s
 
 
 instance IsString ScriptId where
-    fromString = verifyIdString "script id" (ScriptId . fromString)
+    fromString = either error id . verifyIdString "script id" ScriptId . fromString
 
 
 instance IsString (AdapterId a) where
-    fromString = verifyIdString "adapter id" (AdapterId . fromString)
+    fromString = either error id . verifyIdString "adapter id" AdapterId . fromString
+
+
+mkScriptId :: T.Text -> Either String ScriptId
+mkScriptId = verifyIdString "script id" ScriptId
+
+
+mkAdapterId :: T.Text -> Either String (AdapterId a)
+mkAdapterId = verifyIdString "adapter id" AdapterId
 
 
 -- | Denotes a place from which we may access the configuration.

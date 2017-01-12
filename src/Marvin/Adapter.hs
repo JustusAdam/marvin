@@ -12,9 +12,9 @@ Portability : POSIX
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Adapter
-    ( Event(..)
-    , RunWithAdapter, EventHandler, RunnerM
-    , IsAdapter(..), AdapterId
+    ( RunWithAdapter, EventHandler
+    , IsAdapter(..), AdapterId, mkAdapterId, unwrapAdapterId
+    , AdapterM
     , lookupFromAdapterConfig, requireFromAdapterConfig
     , lookupFromAppConfig, requireFromAppConfig, getBotname
     , getAdapterConfig, getAppConfig

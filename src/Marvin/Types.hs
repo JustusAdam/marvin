@@ -8,13 +8,13 @@ Stability   : experimental
 Portability : POSIX
 -}
 module Marvin.Types
-    ( User(..), Channel(..), Message(..), ScriptId(..)
+    ( User(..), Channel(..), Message(..), ScriptId, mkScriptId, unwrapScriptId
     , applicationScriptId, IsScript, getScriptId
     , HasConfigAccess, TimeStamp(..)
-    , AdapterM()
     , AccessAdapter(AdapterT)
-    , User'(User'), Channel'(Channel')
+    , User'(..), Channel'(..)
     , Get(getLens)
+    , Event(..), RunnerM
     ) where
 
 

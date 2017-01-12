@@ -24,8 +24,8 @@ import           Data.Aeson.Types                (Parser, parseEither)
 import           Data.Maybe
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
-import           Marvin.Adapter
-import           Marvin.Internal.Types
+import           Marvin.Adapter                  hiding (mkAdapterId)
+import           Marvin.Internal.Types           hiding (mkAdapterId)
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text
 import           Network.Wai

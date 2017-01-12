@@ -14,6 +14,7 @@ Portability : POSIX
 {-# LANGUAGE NamedFieldPuns         #-}
 {-# LANGUAGE Rank2Types             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE BangPatterns #-}
 module Marvin.Run
     ( runMarvin, ScriptInit, IsAdapter
     , requireFromAppConfig, lookupFromAppConfig, defaultConfigName
@@ -44,6 +45,7 @@ import           Marvin.Util.Regex
 import           Options.Applicative
 import           Prelude                         hiding (dropWhile, splitAt)
 import           Util
+import Control.DeepSeq
 
 
 data CmdOptions = CmdOptions
@@ -73,8 +75,8 @@ runWAda :: a -> C.Config -> AdapterM a r -> RunnerM r
 runWAda ada cfg ac = runReaderT (runAdapterAction ac) (cfg, ada)
 
 -- TODO add timeouts for handlers
-mkApp :: forall a. IsAdapter a => LoggingFn -> [Script a] -> C.Config -> a -> EventHandler a
-mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
+mkApp :: forall a. IsAdapter a => LoggingFn -> Handlers a -> C.Config -> a -> EventHandler a
+mkApp log handlers cfg adapter = flip runLoggingT log . genericHandler
   where
     genericHandler ev = do
         generics <- async $ do
@@ -126,14 +128,13 @@ mkApp log scripts cfg adapter = flip runLoggingT log . genericHandler
     handleCommand = handleMessageLike respondsV
     handleMessage = handleMessageLike hearsV
 
-    Handlers respondsV hearsV customsV joinsV leavesV topicsV joinsInV leavesFromV topicsInV =
-        foldMap (^.actions) scripts
+    Handlers respondsV hearsV customsV joinsV leavesV topicsV joinsInV leavesFromV topicsInV = handlers
 
 
 application :: IsAdapter a => LoggingFn -> [ScriptInit a] -> C.Config -> a -> RunnerM (EventHandler a)
 application log inits config ada = do
     logInfoNS logSource "Initializing scripts"
-    s <- catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada config) (onInitExcept sid)) inits
+    !s <- force . foldMap (^.actions) . catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada config) (onInitExcept sid)) inits
     return $ mkApp log s config ada
   where
     logSource = $(isT "#{applicationScriptId}.init")
@@ -157,13 +158,13 @@ runMarvin s' = runStderrLoggingT $ do
     args <- liftIO $ execParser infoParser
 
     cfgLoc <- maybe
-                    ($logInfoS $(isT "#{applicationScriptId}") "Using default config: config.cfg" >> return defaultConfigName)
+                    (logInfoNS $(isT "#{applicationScriptId}") $(isT "Using default config: #{defaultConfigName}") >> return defaultConfigName)
                     return
                     (configPath args)
     (cfg, _) <- liftIO $ C.autoReload C.autoConfig [C.Required cfgLoc]
     loggingLevelFromCfg <- liftIO $ C.lookup cfg $(isT "#{applicationScriptId}.logging")
 
-    let loggingLevel
+    let !loggingLevel
             | debug args = LevelDebug
             | verbose args = LevelInfo
             | otherwise = fromMaybe defaultLoggingLevel loggingLevelFromCfg

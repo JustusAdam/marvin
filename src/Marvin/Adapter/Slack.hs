@@ -12,7 +12,7 @@ Portability : POSIX
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
-module Marvin.Adapter.Slack 
+module Marvin.Adapter.Slack
     ( SlackAdapter, RTM
     , SlackUserId, SlackChannelId
     , MkSlack()
@@ -45,9 +45,9 @@ import           Data.Sequences
 import           Data.String                     (IsString (..))
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
-import           Marvin.Adapter
+import           Marvin.Adapter                  hiding (mkAdapterId)
 import           Marvin.Internal
-import           Marvin.Internal.Types           as Types
+import           Marvin.Internal.Types           as Types hiding (mkAdapterId)
 import           Marvin.Interpolate.Text
 import           Network.URI
 import           Network.Wai
@@ -136,7 +136,7 @@ instance FromJSON RTMData where
 
 
 messageParser :: Value -> Parser (Event (SlackAdapter a))
-messageParser = withObject "expected object" $ \o -> 
+messageParser = withObject "expected object" $ \o ->
     MessageEvent
         <$> o .: "user"
         <*> o .: "channel"

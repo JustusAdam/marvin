@@ -187,7 +187,7 @@ topicIn !chanName ac = ScriptDefinition $ do
 -- Allows you to handle the raw event yourself.
 -- Returning 'Nothing' from the trigger function means you dont want to react to the event.
 -- The value returned inside the 'Just' is available in the handler later using 'getData'.
-customTrigger :: (A.Event a -> Maybe d) -> BotReacting a d () -> ScriptDefinition a ()
+customTrigger :: (Event a -> Maybe d) -> BotReacting a d () -> ScriptDefinition a ()
 customTrigger tr ac = ScriptDefinition $ do
     pac <- prepareAction (Nothing :: Maybe T.Text) ac
     actions . customs %= V.cons (maybe Nothing (return . pac) . tr)
@@ -203,25 +203,25 @@ send msg = do
 
 
 -- | Get the username of a registered user. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
-getUsername :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a) 
+getUsername :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
             => User a -> m L.Text
 getUsername = A.liftAdapterAction . A.getUsername
 
 
 -- | Try to get the channel with a particular human readable name. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
-resolveChannel :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)           
+resolveChannel :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
                => L.Text -> m (Maybe (Channel a))
 resolveChannel =  A.liftAdapterAction . A.resolveChannel
 
 
 -- | Get the human readable name of a channel. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
-getChannelName :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)           
+getChannelName :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
                => Channel a -> m L.Text
 getChannelName = A.liftAdapterAction . A.getChannelName
 
 
 -- | Try to get the user with a particular username. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
-resolveUser :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a) 
+resolveUser :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
             => L.Text -> m (Maybe (User a))
 resolveUser = A.liftAdapterAction . A.resolveUser
 

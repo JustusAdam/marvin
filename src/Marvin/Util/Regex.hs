@@ -7,6 +7,7 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
+{-# LANGUAGE DeriveGeneric #-}
 module Marvin.Util.Regex
     ( Regex, Match, r, match
     , Re.MatchOption(..)
@@ -15,11 +16,16 @@ module Marvin.Util.Regex
 import           Data.String
 import qualified Data.Text.ICU  as Re
 import qualified Data.Text.Lazy as L
+import Control.DeepSeq
+import GHC.Generics
 
 
 -- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'.
 -- Alternatively use 'r' to create one with custom options.
 newtype Regex = Regex Re.Regex
+
+instance NFData Regex where
+    rnf (Regex a) = a `seq` ()
 
 -- Warning: This exposes the underlying repreentation of a 'Regex' and under no curcumstances should be considered stable.
 unwrapRegex :: Regex -> Re.Regex

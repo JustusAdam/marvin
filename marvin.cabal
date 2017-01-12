@@ -68,6 +68,7 @@ library
                      , time
                      , transformers-base
                      , monad-control
+                     , deepseq
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies
