@@ -1,25 +1,25 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE FunctionalDependencies     #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
 module Marvin.Adapter.Slack.Types where
 
-import           Data.Aeson                      hiding (Error)
+import           Control.Concurrent.MVar.Lifted (MVar)
+import           Control.Concurrent.STM         (TMVar)
+import           Control.Lens                   hiding ((.=))
+import           Data.Aeson                     hiding (Error)
 import           Data.Aeson.TH
-import           Data.Aeson.Types                hiding (Error)
-import qualified Data.ByteString.Lazy.Char8      as BS
-import           Data.HashMap.Strict             (HashMap)
-import           Control.Lens                    hiding ((.=))
-import           Control.Concurrent.MVar.Lifted  (MVar)
-import           Control.Concurrent.STM          (TMVar)
-import qualified Data.Text                       as T
-import qualified Data.Text.Lazy                  as L
-import           Data.String                     (IsString (..))
-import           Network.URI
+import           Data.Aeson.Types               hiding (Error)
+import qualified Data.ByteString.Lazy.Char8     as BS
+import           Data.Foldable                  (toList)
 import           Data.Hashable
-import           Data.Foldable                   (toList)
-import           Network.WebSockets
+import           Data.HashMap.Strict            (HashMap)
 import           Data.Sequences
+import           Data.String                    (IsString (..))
+import qualified Data.Text                      as T
+import qualified Data.Text.Lazy                 as L
+import           Network.URI
+import           Network.WebSockets
 
 
 jsonParseURI :: Value -> Parser URI
@@ -130,7 +130,7 @@ userInfoListParser = withArray "expected array" (fmap toList . mapM userInfoPars
 
 
 apiResponseParser :: (Object -> Parser a) -> Value -> Parser (APIResponse a)
-apiResponseParser f = withObject "expected object" $ \o -> do 
+apiResponseParser f = withObject "expected object" $ \o -> do
     succ <- o .: "ok"
     if succ
         then Right <$> f o
@@ -138,10 +138,10 @@ apiResponseParser f = withObject "expected object" $ \o -> do
 
 
 lciParser :: Value -> Parser LimitedChannelInfo
-lciParser = withObject "expected object" $ \o -> 
-    LimitedChannelInfo 
-        <$> o .: "id" 
-        <*> o .: "name" 
+lciParser = withObject "expected object" $ \o ->
+    LimitedChannelInfo
+        <$> o .: "id"
+        <*> o .: "name"
         <*> (o .: "topic" >>= withObject "object" (.: "value"))
 
 lciListParser :: Value -> Parser [LimitedChannelInfo]

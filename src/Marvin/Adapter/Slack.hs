@@ -7,8 +7,8 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE NamedFieldPuns             #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NamedFieldPuns    #-}
 module Marvin.Adapter.Slack
     ( SlackAdapter, RTM
     , SlackUserId, SlackChannelId
@@ -20,8 +20,8 @@ import           Control.Applicative             ((<|>))
 import           Control.Arrow                   ((&&&))
 import           Control.Concurrent.Async.Lifted (async)
 import           Control.Concurrent.Chan.Lifted  (Chan, newChan, readChan, writeChan)
-import           Control.Concurrent.MVar.Lifted  (modifyMVar, modifyMVar_, newEmptyMVar,
-                                                  newMVar, putMVar, readMVar, takeMVar)
+import           Control.Concurrent.MVar.Lifted  (modifyMVar, modifyMVar_, newEmptyMVar, newMVar,
+                                                  putMVar, readMVar, takeMVar)
 import           Control.Concurrent.STM          (atomically, newTMVar, putTMVar, takeTMVar)
 import           Control.Exception.Lifted
 import           Control.Lens                    hiding ((.=))
@@ -290,7 +290,7 @@ refreshSingleChannelInfo chan = do
         Right v -> do
             adapter <- getAdapter
             modifyMVar_ (channelCache adapter) (return . (infoCache %~ insertMap chan v))
-            return v            
+            return v
 
 
 resolveChannelImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe SlackChannelId)
@@ -336,7 +336,7 @@ getChannelNameImpl :: MkSlack a => SlackChannelId -> AdapterM (SlackAdapter a) L
 getChannelNameImpl channel = do
     adapter <- getAdapter
     cc <- readMVar $ channelCache adapter
-    L.cons '#' <$> 
+    L.cons '#' <$>
         case cc ^? infoCache . ix channel of
             Nothing -> (^.name) <$> refreshSingleChannelInfo channel
             Just found -> return $ found ^. name
@@ -397,10 +397,10 @@ instance MkSlack EventsAPI where
 instance MkSlack a => IsAdapter (SlackAdapter a) where
     type User (SlackAdapter a) = SlackUserId
     type Channel (SlackAdapter a) = SlackChannelId
-    initAdapter = SlackAdapter 
+    initAdapter = SlackAdapter
         <$> liftIO (atomically $ newTMVar 0)
         <*> newMVar (ChannelCache mempty mempty)
-        <*> newMVar (UserCache mempty mempty) 
+        <*> newMVar (UserCache mempty mempty)
         <*> newEmptyMVar
     adapterId = mkAdapterId
     messageChannel = messageChannelImpl

@@ -305,6 +305,7 @@ class (IsScript m, MonadIO m) => HasConfigAccess m where
     -- Obtain the entire config structure
     getConfigInternal :: m C.Config
 
+
 instance C.Configured LogLevel where
     convert (C.String s) =
         case T.strip $ T.toLower s of
