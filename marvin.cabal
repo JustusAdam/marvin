@@ -37,6 +37,7 @@ library
                      , Marvin.Internal
                      , Marvin.Internal.Types
                      , Marvin.Internal.Values
+                     , Marvin.Adapter.Slack.Types
   build-depends:       base >= 4.7 && < 5
                      , wreq
                      , aeson
