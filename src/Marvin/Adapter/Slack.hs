@@ -70,10 +70,7 @@ data RTMData = RTMData
     -- , self :: BotData
     }
 
-data APIResponse a = APIResponse
-    { responseOk :: Bool
-    , payload    :: a
-    }
+type APIResponse a = Either String a
 
 -- | Identifier for a user (internal and not necessarily equal to the username)
 newtype SlackUserId = SlackUserId T.Text deriving (IsString, Eq, Hashable)
@@ -230,7 +227,12 @@ userInfoListParser = withArray "expected array" (fmap toList . mapM userInfoPars
 
 
 apiResponseParser :: (Object -> Parser a) -> Value -> Parser (APIResponse a)
-apiResponseParser f = withObject "expected object" $ \o -> APIResponse <$> o .: "ok" <*> f o
+apiResponseParser f = withObject "expected object" $ \o -> do 
+    succ <- o .: "ok"
+    if succ
+        then Right <$> f o
+        else Left <$> o .: "error"
+
 
 data SlackAdapter a = SlackAdapter
     { midTracker        :: TMVar Int
@@ -244,7 +246,7 @@ runConnectionLoop :: Chan BS.ByteString -> AdapterM (SlackAdapter RTM) ()
 runConnectionLoop messageChan = forever $ do
     SlackAdapter{connectionTracker} <- getAdapter
     token <- requireFromAdapterConfig "token"
-    $logDebug "initializing socket"
+    logDebugN "initializing socket"
     r <- liftIO $ post "https://slack.com/api/rtm.start" [ "token" := (token :: T.Text) ]
     case eitherDecode (r^.responseBody) of
         Left err -> logErrorN $(isT "Error decoding rtm json #{err}")
@@ -259,14 +261,14 @@ runConnectionLoop messageChan = forever $ do
             port <- case uriPort authority of
                         v@(':':r) -> maybe (portOnErr v) return $ readMaybe r
                         v         -> portOnErr v
-            $logDebug $(isT "connecting to socket '#{uri}'")
+            logDebugN $(isT "connecting to socket '#{uri}'")
             logFn <- askLoggerIO
             catch
                 (liftIO $ runSecureClient host port path $ \conn -> flip runLoggingT logFn $ do
                     logInfoN "Connection established"
                     d <- liftIO $ receiveData conn
                     case eitherDecode d >>= parseEither helloParser of
-                        Right True -> $logDebug "Recieved hello packet"
+                        Right True -> logDebugN "Recieved hello packet"
                         Left _ -> error $ "Hello packet not readable: " ++ BS.unpack d
                         _ -> error $ "First packet was not hello packet: " ++ BS.unpack d
                     putMVar connectionTracker conn
@@ -303,7 +305,7 @@ runHandlerLoop messageChan handler =
             Right (Left internalEvent) ->
                 case internalEvent of
                     Unhandeled type_ ->
-                        $logDebug $(isT "Unhandeled event type #{type_} payload: #{rawBS d}")
+                        logDebugN $(isT "Unhandeled event type #{type_} payload: #{rawBS d}")
                     Error code msg ->
                         logErrorN $(isT "Error from remote code: #{code} msg: #{msg}")
                     Ignored -> return ()
@@ -340,11 +342,11 @@ runnerImpl handler = do
     runHandlerLoop messageChan handler
 
 
-execAPIMethod :: MkSlack a => (Object -> Parser v) -> String -> [FormParam] -> AdapterM (SlackAdapter a) (Either String (APIResponse v))
+execAPIMethod :: MkSlack a => (Object -> Parser v) -> String -> [FormParam] -> AdapterM (SlackAdapter a) (Either String v)
 execAPIMethod innerParser method params = do
     token <- requireFromAdapterConfig "token"
     response <- liftIO $ post ("https://slack.com/api/" ++ method) (("token" := (token :: T.Text)):params)
-    return $ eitherDecode (response^.responseBody) >>= parseEither (apiResponseParser innerParser)
+    return $ eitherDecode (response^.responseBody) >>= join . parseEither (apiResponseParser innerParser)
 
 
 newMid :: AdapterM (SlackAdapter a) Int
@@ -380,16 +382,13 @@ refreshSingleUserInfo user@(SlackUserId user') = do
     usr <- execAPIMethod (\o -> o .: "user" >>= userInfoParser) "users.info" ["user" := user']
     case usr of
         Left err -> error ("Parse error when getting user data " ++ err)
-        Right (APIResponse True v) -> do
+        Right v -> do
             modifyMVar_ (userInfoCache adapter) (return . (infoCache %~ insertMap user v))
             return v
-        Right (APIResponse False _) -> error "Server denied getting user info request"
 
 
 lciParser :: Value -> Parser LimitedChannelInfo
-lciParser (Object o) = LimitedChannelInfo <$> o .: "id" <*> o .: "name" <*> (o .: "topic" >>= withObject "object" (.: "value"))
-lciParser _ = mzero
-
+lciParser = withObject "expected object" $ \o -> LimitedChannelInfo <$> o .: "id" <*> o .: "name" <*> (o .: "topic" >>= withObject "object" (.: "value"))
 
 lciListParser :: Value -> Parser [LimitedChannelInfo]
 lciListParser = withArray "array" $ fmap toList . mapM lciParser
@@ -399,13 +398,21 @@ refreshChannels :: MkSlack a => AdapterM (SlackAdapter a) (Either String Channel
 refreshChannels = do
     chans <- execAPIMethod (\o -> o .: "channels" >>= lciListParser) "channels.list" []
     case chans of
-        Left err -> return $ Left $ "Parse error when getting channel data " ++ err
-        Right (APIResponse True v) -> do
+        Left err -> return $ Left $ "Error when getting channel data " ++ err
+        Right v -> do
             let cmap = mapFromList $ map ((^. idValue) &&& id) v
                 nmap = mapFromList $ map ((^. name) &&& (^. idValue)) v
                 cache = ChannelCache cmap nmap
             return $ Right cache
-        Right (APIResponse False _) -> return $ Left "Server denied getting channel info request"
+
+
+-- refreshSingleChannelInfo :: MkSlack a => AdapterM (SlackAdapter a) LimitedChannelInfo
+-- refreshSingleChannelInfo = do
+--     chan <- execAPIMethod (\o -> o .: "channel" >>= lciParser) "channels.info" []
+--     case chan of
+--         Left err -> return $ Left $ "Parse error when getting channel data " ++ err
+--         Right (APIResponse True v) -> do
+            
 
 
 resolveChannelImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe SlackChannelId)
@@ -426,13 +433,12 @@ refreshUserInfo ::  MkSlack a => AdapterM (SlackAdapter a) (Either String UserCa
 refreshUserInfo = do
     users <- execAPIMethod (\o -> o .: "members" >>= userInfoListParser) "users.list" []
     case users of
-        Left err -> return $ Left $ "Parse error when getting channel data " ++ err
-        Right (APIResponse True v) -> do
+        Left err -> return $ Left $ "Error when getting channel data " ++ err
+        Right v -> do
             let cmap = mapFromList $ map ((^. idValue) &&& id) v
                 nmap = mapFromList $ map ((^. username) &&& (^. idValue)) v
                 cache = UserCache cmap nmap
             return $ Right cache
-        Right (APIResponse False _) -> return $ Left "Server denied getting channel info request"
 
 
 resolveUserImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe SlackUserId)
