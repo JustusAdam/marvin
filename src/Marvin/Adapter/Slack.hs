@@ -221,12 +221,12 @@ helloParser _ = mzero
 
 
 userInfoParser :: Value -> Parser UserInfo
-userInfoParser (Object o) = do
-    usr <- o .: "user"
-    case usr of
-        (Object o) -> UserInfo <$> o .: "name" <*> o .: "id"
-        _          -> mzero
-userInfoParser _ = mzero
+userInfoParser = withObject "expected object" $ \o -> do
+    o .: "user" >>= withObject "expected object" (\o' -> UserInfo <$> o' .: "name" <*> o' .: "id")
+
+
+userInfoListParser :: Value -> Parser [UserInfo]
+userInfoListParser = withArray "expected array" (fmap toList . mapM userInfoParser)
 
 
 apiResponseParser :: (Value -> Parser a) -> Value -> Parser (APIResponse a)
@@ -398,9 +398,8 @@ lciListParser = withArray "array" $ fmap toList . mapM lciParser
 
 refreshChannels :: MkSlack a => AdapterM (SlackAdapter a) (Either String ChannelCache)
 refreshChannels = do
-    usr <- execAPIMethod (withObject "object" (\o -> o .: "channels" >>= lciListParser)) "channels.list" []
-    adapter <- getAdapter
-    case usr of
+    chans <- execAPIMethod (withObject "object" (\o -> o .: "channels" >>= lciListParser)) "channels.list" []
+    case chans of
         Left err -> return $ Left $ "Parse error when getting channel data " ++ err
         Right (APIResponse True v) -> do
             let cmap = mapFromList $ map ((^. idValue) &&& id) v
@@ -425,7 +424,16 @@ resolveChannelImpl name' = do
 
 
 refreshUserInfo ::  MkSlack a => AdapterM (SlackAdapter a) (Either String UserCache)
-refreshUserInfo = notImplemented
+refreshUserInfo = do
+    users <- execAPIMethod (withObject "object" (\o -> o .: "members" >>= userInfoListParser)) "users.list" []
+    case users of
+        Left err -> return $ Left $ "Parse error when getting channel data " ++ err
+        Right (APIResponse True v) -> do
+            let cmap = mapFromList $ map ((^. idValue) &&& id) v
+                nmap = mapFromList $ map ((^. username) &&& (^. idValue)) v
+                cache = UserCache cmap nmap
+            return $ Right cache
+        Right (APIResponse False _) -> return $ Left "Server denied getting channel info request"
 
 
 resolveUserImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe SlackUserId)
