@@ -154,6 +154,7 @@ language_extensions:
   - TypeFamilies
   - MultiParamTypeClasses
   - TupleSections
+  - LambdaCase
   - GADTs
   - NoImplicitPrelude
   - ExistentialQuantification

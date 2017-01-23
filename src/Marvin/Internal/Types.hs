@@ -29,8 +29,9 @@ import           Marvin.Interpolate.Text
 import           Marvin.Util.Regex
 
 
-
+-- | The topic in a channel
 type Topic = L.Text
+-- | The contents of a recieved message
 type Message = L.Text
 
 -- | A timestamp type. Supplied with most 'Event' types
@@ -233,6 +234,7 @@ instance HasConfigAccess (BotReacting a b) where
 
 -- | Similar to 'AccessAdapter', this class says there is a 'ScriptId' reachable from the type (usually a monad) @m@.
 class IsScript m where
+    -- | Retrieve the script id out of @m@, ususally a monad.
     getScriptId :: m ScriptId
 
 instance IsScript (ScriptDefinition a) where
@@ -288,10 +290,12 @@ instance IsString (AdapterId a) where
     fromString = either error id . verifyIdString "adapter id" AdapterId . fromString
 
 
+-- | Attempt to create a script id from 'Text'
 mkScriptId :: T.Text -> Either String ScriptId
 mkScriptId = verifyIdString "script id" ScriptId
 
 
+-- | Attempt to create an adapter id from 'Text'
 mkAdapterId :: T.Text -> Either String (AdapterId a)
 mkAdapterId = verifyIdString "adapter id" AdapterId
 

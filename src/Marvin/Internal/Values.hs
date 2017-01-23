@@ -6,7 +6,7 @@ import qualified Data.Text.Lazy        as L
 import           Marvin.Internal.Types
 
 
-
+-- | Script id sed for the bot itself
 applicationScriptId :: ScriptId
 applicationScriptId = ScriptId "bot"
 

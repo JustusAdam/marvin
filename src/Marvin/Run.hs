@@ -31,12 +31,12 @@ import qualified Data.Configurator               as C
 import qualified Data.Configurator.Types         as C
 import           Data.Foldable                   (for_)
 import qualified Data.HashMap.Strict             as HM
-import           Data.Maybe                      (fromMaybe)
+import           Data.Maybe                      (catMaybes, fromJust, fromMaybe, isJust)
 import           Data.Monoid                     ((<>))
-import           Data.Sequences
 import qualified Data.Text.Lazy                  as L
 import           Data.Traversable                (for)
 import           Data.Vector                     (Vector)
+import qualified Data.Vector                     as V
 import qualified Marvin.Adapter                  as A
 import           Marvin.Internal
 import           Marvin.Internal.Types           hiding (channel)
@@ -48,6 +48,9 @@ import           Prelude                         hiding (dropWhile, splitAt)
 import           Util
 
 
+vcatMaybes = V.map fromJust . V.filter isJust
+
+
 data CmdOptions = CmdOptions
     { configPath :: Maybe FilePath
     , verbose    :: Bool
@@ -55,6 +58,7 @@ data CmdOptions = CmdOptions
     }
 
 
+-- | Default name for the config file
 defaultConfigName :: FilePath
 defaultConfigName = "config.cfg"
 
@@ -63,10 +67,12 @@ defaultLoggingLevel :: LogLevel
 defaultLoggingLevel = LevelWarn
 
 
+-- | Retrieve a value from the application config, given the whole config structure. Fails if value not parseable as @a@ or not present.
 requireFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO a
 requireFromAppConfig cfg = C.require (C.subconfig (unwrapScriptId applicationScriptId) cfg)
 
 
+-- | Retrieve a value from the application config, given the whole config structure. Returns 'Nothing' if value not parseable as @a@ or not present.
 lookupFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO (Maybe a)
 lookupFromAppConfig cfg = C.lookup (C.subconfig (unwrapScriptId applicationScriptId) cfg)
 
@@ -80,7 +86,7 @@ mkApp log handlers cfg adapter = flip runLoggingT log . genericHandler
   where
     genericHandler ev = do
         generics <- async $ do
-            let applicables = catMaybes $ fmap ($ ev) customsV
+            let applicables = vcatMaybes $ fmap ($ ev) customsV
             asyncs <- for applicables async
             for_ asyncs wait
         handler ev
@@ -121,7 +127,7 @@ mkApp log handlers cfg adapter = flip runLoggingT log . genericHandler
         mapM_ wait lDispatches
       where
         doIfMatch things  =
-            catMaybes <$> for things (\(trigger, action) ->
+            vcatMaybes <$> for things (\(trigger, action) ->
                 case match trigger msg of
                         Nothing -> return Nothing
                         Just m  -> Just <$> async (action (User' user, Channel' chan, m, msg, ts)))

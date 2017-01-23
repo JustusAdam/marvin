@@ -243,6 +243,7 @@ messageChannel name msg = do
     maybe ($logError $(isT "No channel known with the name #{name}")) (`messageChannel'` msg) mchan
 
 
+-- | Send a message to a channel (by adapter dependent channel object)
 messageChannel' :: (HasConfigAccess m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> L.Text -> m ()
 messageChannel' chan = A.liftAdapterAction . A.messageChannel chan
 

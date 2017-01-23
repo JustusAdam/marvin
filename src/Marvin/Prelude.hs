@@ -9,23 +9,23 @@ Portability : POSIX
 -}
 module Marvin.Prelude
     (
-    -- | Common functions and Types for scripts
+    -- ** Common functions and Types for scripts
       module Marvin
-    -- | Mutable references in marvin scripts
+    -- ** Mutable references in marvin scripts
     , module Marvin.Util.Mutable
-    -- | Logging in Scripts
+    -- ** Logging in Scripts
     , module Control.Monad.Logger
-    -- | Random numbers and convenience functions
+    -- ** Random numbers and convenience functions
     , module Marvin.Util.Random
-    -- | Marvins regex type and how to work with it
+    -- ** Marvins regex type and how to work with it
     , module Marvin.Util.Regex
-    -- | Dealing with JSON
+    -- ** Dealing with JSON
     , module Marvin.Util.JSON
-    -- | Interpolated strings a la Scala and CoffeeScript
+    -- ** Interpolated strings a la Scala and CoffeeScript
     , isL, isT, isS
-    -- | Arbitrary IO in scripts
+    -- ** Arbitrary IO in scripts
     , MonadIO, liftIO
-    -- | Useful functions not in the normal Prelude
+    -- ** Useful functions not in the normal Prelude
     , when, unless, for, for_, fromMaybe
     ) where
 

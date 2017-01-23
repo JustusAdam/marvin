@@ -1,3 +1,12 @@
+{-|
+Module      : $Header$
+Description : Adapter for communicating with a shell prompt.
+Copyright   : (c) Justus Adam, 2017
+License     : BSD3
+Maintainer  : dev@justus.science
+Stability   : experimental
+Portability : POSIX
+-}
 {-# LANGUAGE NamedFieldPuns #-}
 module Marvin.Adapter.Shell (ShellAdapter) where
 
@@ -17,6 +26,7 @@ import           Marvin.Interpolate.Text.Lazy
 import           System.Console.Haskeline
 
 
+-- | Adapter for a shell prompt
 data ShellAdapter = ShellAdapter
     { output :: MVar (Maybe L.Text)
     }
@@ -35,16 +45,22 @@ help = L.unlines
 
 
 instance IsAdapter ShellAdapter where
+    -- | Stores the username
     type User ShellAdapter = L.Text
+    -- | Stores channel name
     type Channel ShellAdapter = L.Text
 
     adapterId = "shell"
     messageChannel _ chan = do
         ShellAdapter{output} <- getAdapter
         putMVar output $ Just chan
+    -- | Just returns the value again
     getUsername = return
+    -- | Just returns the value again
     getChannelName = return
+    -- | Just returns the value again
     resolveChannel = return . Just
+    -- | Just returns the value again
     resolveUser = return . Just
     initAdapter = ShellAdapter <$> newEmptyMVar
     runWithAdapter handler = do

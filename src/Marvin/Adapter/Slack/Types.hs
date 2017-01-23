@@ -14,7 +14,6 @@ import qualified Data.ByteString.Lazy.Char8     as BS
 import           Data.Foldable                  (toList)
 import           Data.Hashable
 import           Data.HashMap.Strict            (HashMap)
-import           Data.Sequences
 import           Data.String                    (IsString (..))
 import qualified Data.Text                      as T
 import qualified Data.Text.Lazy                 as L
@@ -23,7 +22,7 @@ import           Network.WebSockets
 
 
 jsonParseURI :: Value -> Parser URI
-jsonParseURI =  withText "expected text" $ maybe (fail "string not parseable as uri") return . parseURI . unpack
+jsonParseURI =  withText "expected text" $ maybe (fail "string not parseable as uri") return . parseURI . T.unpack
 
 
 data RTMData = RTMData
@@ -92,6 +91,7 @@ data InternalType
     | UserChange UserInfo
 
 
+-- | Adapter for interacting with Slack API\'s. Polymorphic over the method for retrieving events.
 data SlackAdapter a = SlackAdapter
     { midTracker        :: TMVar Int
     , channelCache      :: MVar ChannelCache
@@ -100,7 +100,9 @@ data SlackAdapter a = SlackAdapter
     }
 
 
+-- | Recieve events as a server via HTTP webhook (not implemented yet)
 data EventsAPI
+-- | Recieve events by opening a websocket to the Real Time Messaging API
 data RTM
 
 

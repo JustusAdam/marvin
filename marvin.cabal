@@ -65,7 +65,6 @@ library
                      , warp
                      , haskeline
                      , monad-loops
-                     , mono-traversable
                      , time
                      , transformers-base
                      , monad-control
@@ -75,6 +74,7 @@ library
                      , TypeFamilies
                      , MultiParamTypeClasses
                      , TupleSections
+                     , LambdaCase
                      , GADTs
                      , TemplateHaskell
                      , QuasiQuotes

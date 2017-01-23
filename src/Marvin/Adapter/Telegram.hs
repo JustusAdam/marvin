@@ -14,8 +14,8 @@ Portability : POSIX
 {-# LANGUAGE ScopedTypeVariables    #-}
 module Marvin.Adapter.Telegram
     ( TelegramAdapter, Push, Poll
-    , TelegramChat, ChatType(..)
-    , TelegramUser
+    , TelegramChat(..), ChatType(..)
+    , TelegramUser(..)
     , MkTelegram
     --, HasId_(id_), HasUsername(username), HasFirstName(firstName), HasLastName(lastName), HasType_(type_)
     ) where
@@ -48,7 +48,7 @@ data APIResponse a
     | Error { errorCode :: Int, errDescription :: T.Text}
 
 
--- | The telegram adapter type for a particular update type. Either 'Push' or 'Pull'
+-- | The telegram adapter type for a particular update type. Either 'Push' or 'Poll'
 data TelegramAdapter updateType = TelegramAdapter
 
 
@@ -88,13 +88,13 @@ declareFields [d|
     |]
 
 instance FromJSON ChatType where
-    parseJSON = withText "expected string" fromStr
-      where
-        fromStr "private" = pure PrivateChat
-        fromStr "group" = pure GroupChat
-        fromStr "supergroup" = pure SupergroupChat
-        fromStr "channel" = pure ChannelChat
-        fromStr _ = mzero
+    parseJSON = withText "expected string" $
+        \case
+            "private" -> pure PrivateChat
+            "group" -> pure GroupChat
+            "supergroup" -> pure SupergroupChat
+            "channel" -> pure ChannelChat
+            a -> fail $(isS "Unknown chat type #{a}")
 
 instance FromJSON TelegramUser where
     parseJSON = withObject "user must be object" $ \o ->
@@ -207,28 +207,25 @@ pushEventGetter msgChan =
     return ()
 
 
-
-scriptIdImpl :: forall a. MkTelegram a => TelegramAdapter a -> AdapterId (TelegramAdapter a)
-scriptIdImpl _ = mkAdapterId (error "phantom value" :: a)
-
-
 -- | Class to enable polymorphism over update mechanics for 'TelegramAdapter'
 class MkTelegram a where
     mkEventGetter :: Chan (TelegramUpdate a) -> AdapterM (TelegramAdapter a) ()
-    mkAdapterId :: a -> AdapterId (TelegramAdapter a)
+    mkAdapterId :: AdapterId (TelegramAdapter a)
 
 
 instance MkTelegram a => IsAdapter (TelegramAdapter a) where
     type User (TelegramAdapter a) = TelegramUser
     type Channel (TelegramAdapter a) = TelegramChat
-    adapterId = scriptIdImpl (error "phantom value" :: TelegramAdapter a)
+    adapterId = mkAdapterId
     initAdapter = return TelegramAdapter
     runWithAdapter = runnerImpl
     getUsername = getUsernameImpl
     getChannelName = getChannelNameImpl
+    -- | Not supported in this adapter and always returns 'Nothing'
     resolveChannel _ = do
         logErrorN "Channel resolving not supported"
         return Nothing
+    -- | Not supported in this adapter and always returns 'Nothing'
     resolveUser _ = do
         logErrorN "User resolving not supported"
         return Nothing
@@ -240,7 +237,7 @@ data Poll
 
 
 instance MkTelegram Poll where
-    mkAdapterId _ = "telegram-poll"
+    mkAdapterId = "telegram-poll"
     mkEventGetter = pollEventGetter
 
 
@@ -251,5 +248,5 @@ data Push
 
 
 instance MkTelegram Push where
-    mkAdapterId _ = "telegram-push"
+    mkAdapterId = "telegram-push"
     mkEventGetter = pushEventGetter

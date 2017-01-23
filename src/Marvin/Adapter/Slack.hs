@@ -10,7 +10,7 @@ Portability : POSIX
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 module Marvin.Adapter.Slack
-    ( SlackAdapter, RTM
+    ( SlackAdapter, RTM, EventsAPI
     , SlackUserId, SlackChannelId
     , MkSlack
     ) where
@@ -32,8 +32,8 @@ import           Data.Aeson                      hiding (Error)
 import           Data.Aeson.Types                hiding (Error)
 import qualified Data.ByteString.Lazy.Char8      as BS
 import           Data.Char                       (isSpace)
-import           Data.Containers
 import           Data.Foldable                   (asum)
+import qualified Data.HashMap.Strict             as HM
 import           Data.Maybe                      (fromMaybe)
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
@@ -47,7 +47,6 @@ import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Network.WebSockets
 import           Network.Wreq
-import           Prelude                         hiding (lookup)
 import           Text.Read                       (readMaybe)
 import           Util
 import           Wuss
@@ -256,7 +255,7 @@ getUserInfoImpl :: MkSlack a => SlackUserId -> AdapterM (SlackAdapter a) UserInf
 getUserInfoImpl user = do
     adapter <- getAdapter
     uc <- readMVar $ userInfoCache adapter
-    maybe (refreshSingleUserInfo user) return $ lookup user (uc^.infoCache)
+    maybe (refreshSingleUserInfo user) return $ uc ^? infoCache. ix user
 
 
 refreshSingleUserInfo :: MkSlack a => SlackUserId -> AdapterM (SlackAdapter a) UserInfo
@@ -266,7 +265,7 @@ refreshSingleUserInfo user@(SlackUserId user') = do
     case usr of
         Left err -> error ("Parse error when getting user data " ++ err)
         Right v -> do
-            modifyMVar_ (userInfoCache adapter) (return . (infoCache %~ insertMap user v))
+            modifyMVar_ (userInfoCache adapter) (return . (infoCache . at user .~ Just v))
             return v
 
 
@@ -276,8 +275,8 @@ refreshChannels = do
     case chans of
         Left err -> return $ Left $ "Error when getting channel data " ++ err
         Right v -> do
-            let cmap = mapFromList $ map ((^. idValue) &&& id) v
-                nmap = mapFromList $ map ((^. name) &&& (^. idValue)) v
+            let cmap = HM.fromList $ map ((^. idValue) &&& id) v
+                nmap = HM.fromList $ map ((^. name) &&& (^. idValue)) v
                 cache = ChannelCache cmap nmap
             return $ Right cache
 
@@ -289,7 +288,7 @@ refreshSingleChannelInfo chan = do
         Left err -> error $ "Parse error when getting channel data " ++ err
         Right v -> do
             adapter <- getAdapter
-            modifyMVar_ (channelCache adapter) (return . (infoCache %~ insertMap chan v))
+            modifyMVar_ (channelCache adapter) (return . (infoCache . at chan .~ Just v))
             return v
 
 
@@ -313,8 +312,8 @@ refreshUserInfo = do
     case users of
         Left err -> return $ Left $ "Error when getting channel data " ++ err
         Right v -> do
-            let cmap = mapFromList $ map ((^. idValue) &&& id) v
-                nmap = mapFromList $ map ((^. username) &&& (^. idValue)) v
+            let cmap = HM.fromList $ map ((^. idValue) &&& id) v
+                nmap = HM.fromList $ map ((^. username) &&& (^. idValue)) v
                 cache = UserCache cmap nmap
             return $ Right cache
 
@@ -378,6 +377,7 @@ renameChannel channelInfo@(LimitedChannelInfo id name _) = do
                 _ -> inserted
 
 
+-- | Class to enable polymorphism for 'SlackAdapter' over the method used for retrieving updates. ('RTM' or 'EventsAPI')
 class MkSlack a where
     mkAdapterId :: AdapterId (SlackAdapter a)
     mkEventGetter :: Chan BS.ByteString -> AdapterM (SlackAdapter a) ()
