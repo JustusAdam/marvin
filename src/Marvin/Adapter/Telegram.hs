@@ -1,3 +1,12 @@
+{-|
+Module      : $Header$
+Description : Adapter for communicating with Telegram via its pull and push API.
+Copyright   : (c) Justus Adam, 2017
+License     : BSD3
+Maintainer  : dev@justus.science
+Stability   : experimental
+Portability : POSIX
+-}
 {-# LANGUAGE ExplicitForAll         #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
@@ -7,7 +16,7 @@ module Marvin.Adapter.Telegram
     ( TelegramAdapter, Push, Poll
     , TelegramChat, ChatType(..)
     , TelegramUser
-    , MkTelegram()
+    , MkTelegram
     --, HasId_(id_), HasUsername(username), HasFirstName(firstName), HasLastName(lastName), HasType_(type_)
     ) where
 
@@ -39,6 +48,7 @@ data APIResponse a
     | Error { errorCode :: Int, errDescription :: T.Text}
 
 
+-- | The telegram adapter type for a particular update type. Either 'Push' or 'Pull'
 data TelegramAdapter updateType = TelegramAdapter
 
 
@@ -48,6 +58,7 @@ data TelegramUpdate any
     | Unhandeled
 
 
+-- | Chat type as defined by the telegram api
 data ChatType
     = PrivateChat
     | GroupChat
@@ -55,23 +66,24 @@ data ChatType
     | ChannelChat
 
 
+-- | A user object as contained in the telegram update objects
 declareFields [d|
     data TelegramUser = TelegramUser
-        { telegramUserId_ :: Integer
+        { telegramUserId_       :: Integer
         , telegramUserFirstName :: L.Text
-        , telegramUserLastName :: Maybe L.Text
-        , telegramUserUsername :: Maybe L.Text
+        , telegramUserLastName  :: Maybe L.Text
+        , telegramUserUsername  :: Maybe L.Text
         }
     |]
 
+-- | A telegram chat object as contained in telegram updates
 declareFields [d|
-
     data TelegramChat = TelegramChat
-        { telegramChatId_ :: Integer
-        , telegramChatType_ :: ChatType
-        , telegramChatUsername :: Maybe L.Text
+        { telegramChatId_       :: Integer
+        , telegramChatType_     :: ChatType
+        , telegramChatUsername  :: Maybe L.Text
         , telegramChatFirstName :: Maybe L.Text
-        , telegramChatLastName :: Maybe L.Text
+        , telegramChatLastName  :: Maybe L.Text
         }
     |]
 
@@ -200,6 +212,7 @@ scriptIdImpl :: forall a. MkTelegram a => TelegramAdapter a -> AdapterId (Telegr
 scriptIdImpl _ = mkAdapterId (error "phantom value" :: a)
 
 
+-- | Class to enable polymorphism over update mechanics for 'TelegramAdapter'
 class MkTelegram a where
     mkEventGetter :: Chan (TelegramUpdate a) -> AdapterM (TelegramAdapter a) ()
     mkAdapterId :: a -> AdapterId (TelegramAdapter a)
@@ -222,6 +235,7 @@ instance MkTelegram a => IsAdapter (TelegramAdapter a) where
     messageChannel = messageChannelImpl
 
 
+-- | Use the telegram API by fetching updates via HTTP
 data Poll
 
 
@@ -230,6 +244,9 @@ instance MkTelegram Poll where
     mkEventGetter = pollEventGetter
 
 
+-- | Use the telegram API by recieving updates as a server via webhook
+--
+-- Note: The initialization for this adapter _includes_ registering or clearing its own webhook.
 data Push
 
 
