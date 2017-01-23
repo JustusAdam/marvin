@@ -23,7 +23,8 @@ import           Control.Applicative             ((<|>))
 import           Control.Arrow                   ((&&&))
 import           Control.Concurrent.Async.Lifted (async)
 import           Control.Concurrent.Chan.Lifted  (Chan, newChan, readChan, writeChan)
-import           Control.Concurrent.MVar.Lifted  (MVar, newEmptyMVar, putMVar, readMVar, takeMVar, newMVar, modifyMVar_, modifyMVar)
+import           Control.Concurrent.MVar.Lifted  (MVar, modifyMVar, modifyMVar_, newEmptyMVar,
+                                                  newMVar, putMVar, readMVar, takeMVar)
 import           Control.Concurrent.STM          (TMVar, atomically, newTMVar, putTMVar, takeTMVar)
 import           Control.Exception.Lifted
 import           Control.Lens                    hiding ((.=))
@@ -358,7 +359,7 @@ newMid = do
 messageChannelImpl :: SlackChannelId -> L.Text -> AdapterM (SlackAdapter a) ()
 messageChannelImpl (SlackChannelId chan) msg = do
     mid <- newMid
-    sendMessageImpl $ encode $ object 
+    sendMessageImpl $ encode $ object
         [ "id" .= mid
         , "type" .= ("message" :: T.Text)
         , "channel" .= chan
@@ -465,7 +466,7 @@ putChannel :: LimitedChannelInfo -> AdapterM (SlackAdapter a) ()
 putChannel  channelInfo@(LimitedChannelInfo id name _) = do
     SlackAdapter{channelChache} <- getAdapter
     modifyMVar_ channelChache $ \cache ->
-        return $ cache 
+        return $ cache
             & infoCache . at id .~ Just channelInfo
             & nameResolver . at name .~ Just id
 
@@ -477,7 +478,7 @@ deleteChannel channel = do
         return $ case cache ^? infoCache . ix channel of
             Nothing -> cache
             Just (LimitedChannelInfo _ name _) ->
-                cache 
+                cache
                     & infoCache . at channel .~ Nothing
                     & nameResolver . at name .~ Nothing
 
@@ -486,8 +487,8 @@ renameChannel :: LimitedChannelInfo -> AdapterM (SlackAdapter a) ()
 renameChannel channelInfo@(LimitedChannelInfo id name _) = do
     SlackAdapter{channelChache} <- getAdapter
     modifyMVar_ channelChache $ \cache ->
-        return $ 
-            let inserted = cache 
+        return $
+            let inserted = cache
                                 & infoCache . at id .~ Just channelInfo
                                 & nameResolver . at name .~ Just id
             in case cache ^? infoCache . ix id of

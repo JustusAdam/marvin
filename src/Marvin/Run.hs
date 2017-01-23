@@ -7,6 +7,7 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
+{-# LANGUAGE BangPatterns           #-}
 {-# LANGUAGE ExplicitForAll         #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
@@ -14,7 +15,6 @@ Portability : POSIX
 {-# LANGUAGE NamedFieldPuns         #-}
 {-# LANGUAGE Rank2Types             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE BangPatterns #-}
 module Marvin.Run
     ( runMarvin, ScriptInit, IsAdapter
     , requireFromAppConfig, lookupFromAppConfig, defaultConfigName
@@ -22,6 +22,7 @@ module Marvin.Run
 
 
 import           Control.Concurrent.Async.Lifted (async, wait)
+import           Control.DeepSeq
 import           Control.Exception.Lifted
 import           Control.Lens                    hiding (cons)
 import           Control.Monad.Logger
@@ -45,7 +46,6 @@ import           Marvin.Util.Regex
 import           Options.Applicative
 import           Prelude                         hiding (dropWhile, splitAt)
 import           Util
-import Control.DeepSeq
 
 
 data CmdOptions = CmdOptions

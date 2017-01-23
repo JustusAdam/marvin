@@ -1,11 +1,12 @@
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances       #-}
-{-# LANGUAGE DeriveGeneric #-}
 module Marvin.Internal.Types where
 
 
+import           Control.DeepSeq
 import           Control.Lens
 import           Control.Monad.Base
 import           Control.Monad.IO.Class
@@ -22,11 +23,10 @@ import qualified Data.Text                   as T
 import qualified Data.Text.Lazy              as L
 import           Data.Time.Clock
 import           Data.Vector                 (Vector)
+import           GHC.Generics
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text
 import           Marvin.Util.Regex
-import Control.DeepSeq
-import GHC.Generics
 
 
 
@@ -86,13 +86,13 @@ newtype Channel' a = Channel' {unwrapChannel' :: Channel a}
 
 
 -- | A type, basically a String, which identifies a script to the config and the logging facilities.
--- 
+--
 -- For conversion please use 'mkScriptId' and 'unwrapScriptId'. They will perform necessary checks.
 newtype ScriptId = ScriptId { unwrapScriptId :: T.Text } deriving (Show, Eq)
 
 
 -- | A type, basically a String, which identifies an adapter to the config and the logging facilities.
--- 
+--
 -- For conversion please use 'mkAdapterId' and 'unwrapAdapterId'. They will perform necessary checks.
 newtype AdapterId a = AdapterId { unwrapAdapterId :: T.Text } deriving (Show, Eq)
 
