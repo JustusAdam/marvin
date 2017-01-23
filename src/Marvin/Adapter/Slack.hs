@@ -214,14 +214,13 @@ rawBS bs = "\"" ++ BS.unpack bs ++ "\""
 
 
 helloParser :: Value -> Parser Bool
-helloParser (Object o) = do
+helloParser = withObject "expected object" $ \o -> do
     t <- o .: "type"
     return $ (t :: T.Text) == "hello"
-helloParser _ = mzero
 
 
 userInfoParser :: Value -> Parser UserInfo
-userInfoParser = withObject "expected object" $ \o -> do
+userInfoParser = withObject "expected object" $ \o ->
     o .: "user" >>= withObject "expected object" (\o' -> UserInfo <$> o' .: "name" <*> o' .: "id")
 
 
@@ -229,14 +228,13 @@ userInfoListParser :: Value -> Parser [UserInfo]
 userInfoListParser = withArray "expected array" (fmap toList . mapM userInfoParser)
 
 
-apiResponseParser :: (Value -> Parser a) -> Value -> Parser (APIResponse a)
-apiResponseParser f v@(Object o) = APIResponse <$> o .: "ok" <*> f v
-apiResponseParser _ _            = mzero
+apiResponseParser :: (Object -> Parser a) -> Value -> Parser (APIResponse a)
+apiResponseParser f = withObject "expected object" $ \o -> APIResponse <$> o .: "ok" <*> f o
 
 data SlackAdapter a = SlackAdapter
     { midTracker        :: TMVar Int
     , channelChache     :: MVar ChannelCache
-    , userInfoCache     :: IORef UserCache
+    , userInfoCache     :: MVar UserCache
     , connectionTracker :: MVar Connection
     }
 
@@ -341,7 +339,7 @@ runnerImpl handler = do
     runHandlerLoop messageChan handler
 
 
-execAPIMethod :: MkSlack a => (Value -> Parser v) -> String -> [FormParam] -> AdapterM (SlackAdapter a) (Either String (APIResponse v))
+execAPIMethod :: MkSlack a => (Object -> Parser v) -> String -> [FormParam] -> AdapterM (SlackAdapter a) (Either String (APIResponse v))
 execAPIMethod innerParser method params = do
     token <- requireFromAdapterConfig "token"
     response <- liftIO $ post ("https://slack.com/api/" ++ method) (("token" := (token :: T.Text)):params)
@@ -360,29 +358,29 @@ newMid = do
 messageChannelImpl :: SlackChannelId -> L.Text -> AdapterM (SlackAdapter a) ()
 messageChannelImpl (SlackChannelId chan) msg = do
     mid <- newMid
-    sendMessageImpl $ encode $
-        object [ "id" .= mid
-                , "type" .= ("message" :: T.Text)
-                , "channel" .= chan
-                , "text" .= msg
-                ]
+    sendMessageImpl $ encode $ object 
+        [ "id" .= mid
+        , "type" .= ("message" :: T.Text)
+        , "channel" .= chan
+        , "text" .= msg
+        ]
 
 
 getUserInfoImpl :: MkSlack a => SlackUserId -> AdapterM (SlackAdapter a) UserInfo
 getUserInfoImpl user@(SlackUserId user') = do
     adapter <- getAdapter
-    uc <- readIORef $ userInfoCache adapter
+    uc <- readMVar $ userInfoCache adapter
     maybe (refreshSingleUserInfo user) return $ lookup user (uc^.infoCache)
 
 
 refreshSingleUserInfo :: MkSlack a => SlackUserId -> AdapterM (SlackAdapter a) UserInfo
 refreshSingleUserInfo user@(SlackUserId user') = do
     adapter <- getAdapter
-    usr <- execAPIMethod userInfoParser "users.info" ["user" := user']
+    usr <- execAPIMethod (\o -> o .: "user" >>= userInfoParser) "users.info" ["user" := user']
     case usr of
         Left err -> error ("Parse error when getting user data " ++ err)
         Right (APIResponse True v) -> do
-            atomicModifyIORef (userInfoCache adapter) ((, ()) . (infoCache %~ insertMap user v))
+            modifyMVar_ (userInfoCache adapter) (return . (infoCache %~ insertMap user v))
             return v
         Right (APIResponse False _) -> error "Server denied getting user info request"
 
@@ -398,7 +396,7 @@ lciListParser = withArray "array" $ fmap toList . mapM lciParser
 
 refreshChannels :: MkSlack a => AdapterM (SlackAdapter a) (Either String ChannelCache)
 refreshChannels = do
-    chans <- execAPIMethod (withObject "object" (\o -> o .: "channels" >>= lciListParser)) "channels.list" []
+    chans <- execAPIMethod (\o -> o .: "channels" >>= lciListParser) "channels.list" []
     case chans of
         Left err -> return $ Left $ "Parse error when getting channel data " ++ err
         Right (APIResponse True v) -> do
@@ -425,7 +423,7 @@ resolveChannelImpl name' = do
 
 refreshUserInfo ::  MkSlack a => AdapterM (SlackAdapter a) (Either String UserCache)
 refreshUserInfo = do
-    users <- execAPIMethod (withObject "object" (\o -> o .: "members" >>= userInfoListParser)) "users.list" []
+    users <- execAPIMethod (\o -> o .: "members" >>= userInfoListParser) "users.list" []
     case users of
         Left err -> return $ Left $ "Parse error when getting channel data " ++ err
         Right (APIResponse True v) -> do
@@ -439,14 +437,14 @@ refreshUserInfo = do
 resolveUserImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe SlackUserId)
 resolveUserImpl name = do
     adapter <- getAdapter
-    cc <- readIORef $ userInfoCache adapter
-    case cc ^? nameResolver . ix name of
-        Nothing -> do
-            refreshed <- refreshUserInfo
-            case refreshed of
-                Left err -> logErrorN $(isT "#{err}") >> return Nothing
-                Right ncc -> return $ ncc ^? nameResolver . ix name
-        Just found -> return (Just found)
+    modifyMVar (userInfoCache adapter) $ \cc ->
+        case cc ^? nameResolver . ix name of
+            Nothing -> do
+                refreshed <- refreshUserInfo
+                case refreshed of
+                    Left err -> logErrorN $(isT "#{err}") >> return (cc, Nothing)
+                    Right ncc -> return (ncc, ncc ^? nameResolver . ix name)
+            Just found -> return (cc, Just found)
 
 
 getChannelNameImpl :: MkSlack a => SlackChannelId -> AdapterM (SlackAdapter a) L.Text
@@ -523,7 +521,7 @@ instance MkSlack a => IsAdapter (SlackAdapter a) where
     type User (SlackAdapter a) = SlackUserId
     type Channel (SlackAdapter a) = SlackChannelId
     initAdapter =
-        SlackAdapter <$> liftIO (atomically $ newTMVar 0) <*> newMVar (ChannelCache mempty mempty) <*> newIORef (UserCache mempty mempty) <*> newEmptyMVar
+        SlackAdapter <$> liftIO (atomically $ newTMVar 0) <*> newMVar (ChannelCache mempty mempty) <*> newMVar (UserCache mempty mempty) <*> newEmptyMVar
     adapterId = mkAdapterId (error "phantom value" :: SlackAdapter a)
     messageChannel = messageChannelImpl
     runWithAdapter = runnerImpl
