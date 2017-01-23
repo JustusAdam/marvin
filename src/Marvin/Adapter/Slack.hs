@@ -23,7 +23,7 @@ import           Control.Applicative             ((<|>))
 import           Control.Arrow                   ((&&&))
 import           Control.Concurrent.Async.Lifted (async)
 import           Control.Concurrent.Chan.Lifted  (Chan, newChan, readChan, writeChan)
-import           Control.Concurrent.MVar.Lifted  (MVar, newEmptyMVar, putMVar, readMVar, takeMVar)
+import           Control.Concurrent.MVar.Lifted  (MVar, newEmptyMVar, putMVar, readMVar, takeMVar, newMVar, modifyMVar_, modifyMVar)
 import           Control.Concurrent.STM          (TMVar, atomically, newTMVar, putTMVar, takeTMVar)
 import           Control.Exception.Lifted
 import           Control.Lens                    hiding ((.=))
@@ -235,7 +235,7 @@ apiResponseParser _ _            = mzero
 
 data SlackAdapter a = SlackAdapter
     { midTracker        :: TMVar Int
-    , channelChache     :: IORef ChannelCache
+    , channelChache     :: MVar ChannelCache
     , userInfoCache     :: IORef UserCache
     , connectionTracker :: MVar Connection
     }
@@ -406,7 +406,6 @@ refreshChannels = do
             let cmap = mapFromList $ map ((^. idValue) &&& id) v
                 nmap = mapFromList $ map ((^. name) &&& (^. idValue)) v
                 cache = ChannelCache cmap nmap
-            atomicWriteIORef (channelChache adapter) cache
             return $ Right cache
         Right (APIResponse False _) -> return $ Left "Server denied getting channel info request"
 
@@ -414,14 +413,14 @@ refreshChannels = do
 resolveChannelImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe SlackChannelId)
 resolveChannelImpl name' = do
     adapter <- getAdapter
-    cc <- readIORef $ channelChache adapter
-    case cc ^? nameResolver . ix name of
-        Nothing -> do
-            refreshed <- refreshChannels
-            case refreshed of
-                Left err -> logErrorN $(isT "#{err}") >> return Nothing
-                Right ncc -> return $ ncc ^? nameResolver . ix name
-        Just found -> return (Just found)
+    modifyMVar (channelChache adapter) $ \cc ->
+        case cc ^? nameResolver . ix name of
+            Nothing -> do
+                refreshed <- refreshChannels
+                case refreshed of
+                    Left err -> logErrorN $(isT "#{err}") >> return (cc, Nothing)
+                    Right ncc -> return (ncc, ncc ^? nameResolver . ix name)
+            Just found -> return (cc, Just found)
   where name = L.tail name'
 
 
@@ -445,45 +444,50 @@ resolveUserImpl name = do
 getChannelNameImpl :: MkSlack a => SlackChannelId -> AdapterM (SlackAdapter a) L.Text
 getChannelNameImpl channel = do
     adapter <- getAdapter
-    cc <- readIORef $ channelChache adapter
-    L.cons '#' <$>
+    fmap (L.cons '#' . either error id) $ modifyMVar (channelChache adapter) $ \cc ->
         case cc ^? infoCache . ix channel of
             Nothing -> do
-                ncc <- either error id <$> refreshChannels
-                return $ (^.name) $ fromMaybe (error "Channel not found") $ ncc ^? infoCache . ix channel
-            Just found -> return $ found ^. name
+                refreshed <- refreshChannels
+                return $ case refreshed of
+                    Right ncc -> (ncc, maybe (Left "Channel not found") Right $ ncc ^? infoCache . ix channel . name)
+                    Left e -> (cc, Left e)
+            Just found -> return (cc, Right $ found ^. name)
+
 
 
 putChannel :: LimitedChannelInfo -> AdapterM (SlackAdapter a) ()
 putChannel  channelInfo@(LimitedChannelInfo id name _) = do
     SlackAdapter{channelChache} <- getAdapter
-    void $ atomicModifyIORef channelChache $ \cache ->
-        (, ()) $ cache
-                    & infoCache . at id .~ Just channelInfo
-                    & nameResolver . at name .~ Just id
+    modifyMVar_ channelChache $ \cache ->
+        return $ cache 
+            & infoCache . at id .~ Just channelInfo
+            & nameResolver . at name .~ Just id
 
 
 deleteChannel :: SlackChannelId -> AdapterM (SlackAdapter a) ()
 deleteChannel channel = do
     SlackAdapter{channelChache} <- getAdapter
-    void $ atomicModifyIORef channelChache $ \cache ->
-        case cache ^? infoCache . ix channel of
-            Nothing -> (cache, ())
+    modifyMVar_ channelChache $ \cache ->
+        return $ case cache ^? infoCache . ix channel of
+            Nothing -> cache
             Just (LimitedChannelInfo _ name _) ->
-                (, ()) $ cache & infoCache . at channel .~ Nothing
-                               & nameResolver . at name .~ Nothing
+                cache 
+                    & infoCache . at channel .~ Nothing
+                    & nameResolver . at name .~ Nothing
 
 
 renameChannel :: LimitedChannelInfo -> AdapterM (SlackAdapter a) ()
 renameChannel channelInfo@(LimitedChannelInfo id name _) = do
     SlackAdapter{channelChache} <- getAdapter
-    void $ atomicModifyIORef channelChache $ \cache ->
-        let inserted = cache & infoCache . at id .~ Just channelInfo
-                             & nameResolver . at name .~ Just id
-        in case cache ^? infoCache . ix id of
-               Just (LimitedChannelInfo _ oldName _) | oldName /= name ->
-                   (, ()) $ inserted & nameResolver . at oldName .~ Nothing
-               _ -> (inserted, ())
+    modifyMVar_ channelChache $ \cache ->
+        return $ 
+            let inserted = cache 
+                                & infoCache . at id .~ Just channelInfo
+                                & nameResolver . at name .~ Just id
+            in case cache ^? infoCache . ix id of
+                Just (LimitedChannelInfo _ oldName _) | oldName /= name ->
+                    inserted & nameResolver . at oldName .~ Nothing
+                _ -> inserted
 
 
 class MkSlack a where
@@ -511,7 +515,7 @@ instance MkSlack a => IsAdapter (SlackAdapter a) where
     type User (SlackAdapter a) = SlackUserId
     type Channel (SlackAdapter a) = SlackChannelId
     initAdapter =
-        SlackAdapter <$> liftIO (atomically $ newTMVar 0) <*> newIORef (ChannelCache mempty mempty) <*> newIORef (UserCache mempty mempty) <*> newEmptyMVar
+        SlackAdapter <$> liftIO (atomically $ newTMVar 0) <*> newMVar (ChannelCache mempty mempty) <*> newIORef (UserCache mempty mempty) <*> newEmptyMVar
     adapterId = mkAdapterId (error "phantom value" :: SlackAdapter a)
     messageChannel = messageChannelImpl
     runWithAdapter = runnerImpl
