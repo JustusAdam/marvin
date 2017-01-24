@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK not-home #-}
 {-|
 Module      : $Header$
 Description : Common types in marvin.
@@ -8,7 +9,8 @@ Stability   : experimental
 Portability : POSIX
 -}
 module Marvin.Types
-    ( User(..), Channel(..), Message(..), ScriptId, mkScriptId, unwrapScriptId
+    ( User(..), Channel(..), Message(..), Script(..)
+    , ScriptId, mkScriptId, unwrapScriptId
     , applicationScriptId, IsScript, getScriptId
     , HasConfigAccess, TimeStamp(..)
     , AccessAdapter(AdapterT)

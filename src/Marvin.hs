@@ -17,6 +17,7 @@ module Marvin
     , ScriptId
     , ScriptDefinition, IsAdapter
     -- * Reacting
+    , BotReacting
     -- ** Reaction Functions
     , hear, respond, enter, exit, enterIn, exitFrom, topic, topicIn, customTrigger
     -- ** Getting data
@@ -26,8 +27,7 @@ module Marvin
     -- ** Interaction with the config
     , getConfigVal, requireConfigVal, getBotName
     -- ** Handler Types
-    , Message, User, Channel, BotReacting
-    , Topic
+    , Message, User, Channel, Topic
     -- ** Advanced actions
     , extractAction, extractReaction
     ) where

@@ -139,10 +139,9 @@ instance Monoid (Handlers a) where
 
 
 
--- | Monad for reacting in the bot. Allows use of functions like 'send', 'reply' and 'messageChannel' as well as any arbitrary 'IO' action using 'liftIO'.
+-- | Monad for reacting in the bot. Allows use of functions like 'Marvin.send', 'Marvin.reply' and 'Marvin.messageChannel' as well as any arbitrary 'IO' action using 'liftIO'.
 --
--- The type parameter @d@ is the accessible data provided by the trigger for this action and can be obtained with 'getData' or other custom functions like 'getMessage' and 'getMatch' which typically depend on a particular type of data in @d@.
--- For message handlers like 'hear' and 'respond' this would be a regex 'Match' and a 'Message' for instance.
+-- The type parameter @d@ is the accessible data provided by the trigger for this action and can be obtained with 'Marvin.getData' or other custom functions like 'Marvin.getMessage' and 'Marvin.getMatch' which typically depend on a particular type of data in @d@.
 --
 -- For completeness: @a@ is the adapter type and @r@ is the return type of the monadic computation.
 --
@@ -166,7 +165,7 @@ declareFields [d|
     |]
 
 
--- | A monad for gradually defining a 'Script' using 'respond' and 'hear' as well as any 'IO' action.
+-- | A monad for gradually defining a 'Script' using 'Marvin.respond' and 'Marvin.hear' as well as any 'IO' action.
 newtype ScriptDefinition a r = ScriptDefinition { runScript :: StateT (Script a) RunnerM r } deriving (Monad, MonadIO, Applicative, Functor, MonadLogger, MonadBase IO)
 
 
@@ -184,7 +183,7 @@ instance MonadBaseControl IO (AdapterM a) where
 -- | Class which says that there is a way to get to @b@ from this type @a@.
 --
 -- This typeclass is used to allow handlers with different types of payload to share common
--- accessor functions such as 'getUser' and 'getMessage'.
+-- accessor functions such as 'Marvin.getUser' and 'Marvin.getMessage'.
 --
 -- The instances specify for each type of payload which pieces of data can be extracted and how.
 class Get a b where
