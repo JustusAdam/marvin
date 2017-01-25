@@ -52,7 +52,7 @@ modifyMutable m = liftIO . modifyIORef m
 -- @
 --   val <- takeSynchronized -- obtain the value and leave it empty to block concurrent reads
 --   let mod = modify val -- modify the value
---   writeSynchronized val -- write back the result
+--   writeSynchronized mod -- write back the result
 -- @
 --
 -- Another use for this type is as a message channel, where we have a producer and a consumer,

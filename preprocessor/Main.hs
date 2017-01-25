@@ -27,14 +27,15 @@ data Opts = Opts
 
 
 slackRtmData :: (String, String)
-slackRtmData = ("Marvin.Adapter.Slack", "(SlackAdapter RTM)")
+slackRtmData = ("Marvin.Adapter.Slack.RTM", "(SlackAdapter RTM)")
 
 
 adapters :: [(String, (String, String))]
 adapters =
     [ ("slack-rtm", slackRtmData)
-    , ("telegram-poll", ("Marvin.Adapter.Telegram", "(TelegramAdapter Poll)"))
-    , ("telegram-push", ("Marvin.Adapter.Telegram", "(TelegramAdapter Push)"))
+    , ("slack-events", ("Marvin.Adapter.Slack.EventsAPI", "(SlackAdapter EventsAPI)"))
+    , ("telegram-poll", ("Marvin.Adapter.Telegram.Poll", "(TelegramAdapter Poll)"))
+    , ("telegram-push", ("Marvin.Adapter.Telegram.Push", "(TelegramAdapter Push)"))
     , ("shell", ("Marvin.Adapter.Shell", "ShellAdapter"))
     ]
 

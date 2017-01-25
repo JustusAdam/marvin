@@ -1,24 +1,9 @@
-{-|
-Module      : $Header$
-Description : Adapter for communicating with Telegram via its pull and push API.
-Copyright   : (c) Justus Adam, 2017
-License     : BSD3
-Maintainer  : dev@justus.science
-Stability   : experimental
-Portability : POSIX
--}
 {-# LANGUAGE ExplicitForAll         #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
-module Marvin.Adapter.Telegram
-    ( TelegramAdapter, Push, Poll
-    , TelegramChat(..), ChatType(..)
-    , TelegramUser(..)
-    , MkTelegram
-    --, HasId_(id_), HasUsername(username), HasFirstName(firstName), HasLastName(lastName), HasType_(type_)
-    ) where
+module Marvin.Adapter.Telegram.Common where
 
 import           Control.Applicative
 import           Control.Concurrent.Async.Lifted
@@ -184,29 +169,6 @@ runnerImpl handler = do
             Unhandeled -> logDebugN $(isT "Unhadeled event.")
 
 
-
-pollEventGetter :: Chan (TelegramUpdate Poll) -> AdapterM (TelegramAdapter Poll) ()
-pollEventGetter msgChan =
-    forever $ do
-        response <- execAPIMethod parseJSON "getUpdates" []
-        case response of
-            Left err -> do
-                logErrorN $(isT "Unable to parse json: #{err}")
-                threadDelay 30000
-            Right (Error code desc) -> do
-                logErrorN $(isT "Sending message failed with #{code}: #{desc}")
-                threadDelay 30000
-            Right Success {result=updates} ->
-                writeList2Chan msgChan updates
-
-
-pushEventGetter :: Chan (TelegramUpdate Push) -> AdapterM (TelegramAdapter Push) ()
-pushEventGetter msgChan =
-    -- port <- liftIO $ C.require cfg "port"
-    -- url <- liftIO $ C.require cfg "url"
-    return ()
-
-
 -- | Class to enable polymorphism over update mechanics for 'TelegramAdapter'
 class MkTelegram a where
     mkEventGetter :: Chan (TelegramUpdate a) -> AdapterM (TelegramAdapter a) ()
@@ -230,23 +192,3 @@ instance MkTelegram a => IsAdapter (TelegramAdapter a) where
         logErrorN "User resolving not supported"
         return Nothing
     messageChannel = messageChannelImpl
-
-
--- | Use the telegram API by fetching updates via HTTP
-data Poll
-
-
-instance MkTelegram Poll where
-    mkAdapterId = "telegram-poll"
-    mkEventGetter = pollEventGetter
-
-
--- | Use the telegram API by recieving updates as a server via webhook
---
--- Note: The initialization for this adapter _includes_ registering or clearing its own webhook.
-data Push
-
-
-instance MkTelegram Push where
-    mkAdapterId = "telegram-push"
-    mkEventGetter = pushEventGetter

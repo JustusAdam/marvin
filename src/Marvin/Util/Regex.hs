@@ -7,7 +7,6 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
-{-# LANGUAGE DeriveGeneric #-}
 module Marvin.Util.Regex
     ( Regex, Match, r, match
     , Re.MatchOption(..)
@@ -36,7 +35,7 @@ instance Show Regex where
     show = show . unwrapRegex
 
 
--- | A match to a 'Regex'. Index 0 is the full match, all other indexes are match groups.
+-- | A match to a 'Regex'. Index 0 is the full match, all other indices are match groups.
 type Match = [L.Text]
 
 -- | Compile a regex with options

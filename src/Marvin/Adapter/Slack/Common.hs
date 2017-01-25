@@ -1,19 +1,6 @@
-{-|
-Module      : $Header$
-Description : Adapter for communicating with Slack via its real time event API and the Events API
-Copyright   : (c) Justus Adam, 2016
-License     : BSD3
-Maintainer  : dev@justus.science
-Stability   : experimental
-Portability : POSIX
--}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NamedFieldPuns    #-}
-module Marvin.Adapter.Slack
-    ( SlackAdapter, RTM, EventsAPI
-    , SlackUserId, SlackChannelId
-    , MkSlack
-    ) where
+module Marvin.Adapter.Slack.Common where
 
 
 import           Control.Applicative             ((<|>))
@@ -22,7 +9,6 @@ import           Control.Concurrent.Async.Lifted (async)
 import           Control.Concurrent.Chan.Lifted  (Chan, newChan, readChan, writeChan)
 import           Control.Concurrent.MVar.Lifted  (modifyMVar, modifyMVar_, newEmptyMVar, newMVar,
                                                   putMVar, readMVar, takeMVar)
-import           Control.Concurrent.STM          (atomically, newTMVar, putTMVar, takeTMVar)
 import           Control.Exception.Lifted
 import           Control.Lens                    hiding ((.=))
 import           Control.Monad
@@ -43,13 +29,10 @@ import           Marvin.Internal
 import           Marvin.Internal.Types           as Types hiding (mkAdapterId)
 import           Marvin.Interpolate.Text
 import           Network.URI
-import           Network.Wai
-import           Network.Wai.Handler.Warp
-import           Network.WebSockets
 import           Network.Wreq
 import           Text.Read                       (readMaybe)
 import           Util
-import           Wuss
+
 
 
 messageParser :: Value -> Parser (Event (SlackAdapter a))
@@ -123,45 +106,6 @@ eventParser v@(Object o) = isErrParser <|> hasTypeParser
 eventParser _ = fail "expected object"
 
 
-
-runConnectionLoop :: Chan BS.ByteString -> AdapterM (SlackAdapter RTM) ()
-runConnectionLoop messageChan = forever $ do
-    SlackAdapter{connectionTracker} <- getAdapter
-    token <- requireFromAdapterConfig "token"
-    logDebugN "initializing socket"
-    r <- liftIO $ post "https://slack.com/api/rtm.start" [ "token" := (token :: T.Text) ]
-    case eitherDecode (r^.responseBody) of
-        Left err -> logErrorN $(isT "Error decoding rtm json #{err}")
-        Right js -> do
-            let uri = url js
-                authority = fromMaybe (error "URI lacks authority") (uriAuthority uri)
-                host = uriUserInfo authority ++ uriRegName authority
-                path = uriPath uri
-                portOnErr v = do
-                    logErrorN $(isT "Unreadable port #{v}")
-                    return 443
-            port <- case uriPort authority of
-                        v@(':':r) -> maybe (portOnErr v) return $ readMaybe r
-                        v         -> portOnErr v
-            logDebugN $(isT "connecting to socket '#{uri}'")
-            logFn <- askLoggerIO
-            catch
-                (liftIO $ runSecureClient host port path $ \conn -> flip runLoggingT logFn $ do
-                    logInfoN "Connection established"
-                    d <- liftIO $ receiveData conn
-                    case eitherDecode d >>= parseEither helloParser of
-                        Right True -> logDebugN "Recieved hello packet"
-                        Left _ -> error $ "Hello packet not readable: " ++ BS.unpack d
-                        _ -> error $ "First packet was not hello packet: " ++ BS.unpack d
-                    putMVar connectionTracker conn
-                    forever $ do
-                        d <- liftIO $ receiveData conn
-                        writeChan messageChan d)
-                $ \e -> do
-                    void $ takeMVar connectionTracker
-                    logErrorN $(isT "#{e :: ConnectionException}")
-
-
 stripWhiteSpaceMay :: L.Text -> Maybe L.Text
 stripWhiteSpaceMay t =
     case L.uncons t of
@@ -201,26 +145,10 @@ runHandlerLoop messageChan handler =
                     UserChange ui -> void $ refreshSingleUserInfo (ui^.idValue)
 
 
-sendMessageImpl :: BS.ByteString -> AdapterM (SlackAdapter a) ()
-sendMessageImpl msg = do
-    SlackAdapter{connectionTracker} <- getAdapter
-    let go 0 = logErrorN "Connection error, quitting retry."
-        go n =
-            catch
-                (do
-                    conn <- readMVar connectionTracker
-                    liftIO $ sendTextData conn msg)
-                $ \e -> do
-                    logErrorN $(isT "#{e :: ConnectionException}")
-                    go (n-1)
-    go (3 :: Int)
-
-
-
 runnerImpl :: MkSlack a => RunWithAdapter (SlackAdapter a)
 runnerImpl handler = do
     messageChan <- newChan
-    void $ async $ mkEventGetter messageChan
+    void $ async $ initIOConnections messageChan
     runHandlerLoop messageChan handler
 
 
@@ -231,24 +159,10 @@ execAPIMethod innerParser method params = do
     return $ eitherDecode (response^.responseBody) >>= join . parseEither (apiResponseParser innerParser)
 
 
-newMid :: AdapterM (SlackAdapter a) Int
-newMid = do
-    SlackAdapter{midTracker} <- getAdapter
-    liftIO $ atomically $ do
-        id <- takeTMVar midTracker
-        putTMVar midTracker  (id + 1)
-        return id
-
-
 messageChannelImpl :: SlackChannelId -> L.Text -> AdapterM (SlackAdapter a) ()
-messageChannelImpl (SlackChannelId chan) msg = do
-    mid <- newMid
-    sendMessageImpl $ encode $ object
-        [ "id" .= mid
-        , "type" .= ("message" :: T.Text)
-        , "channel" .= chan
-        , "text" .= msg
-        ]
+messageChannelImpl cid msg = do
+    SlackAdapter{outChannel} <- getAdapter
+    writeChan outChannel (cid, msg)
 
 
 getUserInfoImpl :: MkSlack a => SlackUserId -> AdapterM (SlackAdapter a) UserInfo
@@ -380,28 +294,16 @@ renameChannel channelInfo@(LimitedChannelInfo id name _) = do
 -- | Class to enable polymorphism for 'SlackAdapter' over the method used for retrieving updates. ('RTM' or 'EventsAPI')
 class MkSlack a where
     mkAdapterId :: AdapterId (SlackAdapter a)
-    mkEventGetter :: Chan BS.ByteString -> AdapterM (SlackAdapter a) ()
-
-
-
-instance MkSlack RTM where
-    mkAdapterId = "slack-rtm"
-    mkEventGetter = runConnectionLoop
-
-
-instance MkSlack EventsAPI where
-    mkAdapterId = "slack-events"
-    mkEventGetter = error "not implemented"
+    initIOConnections :: Chan BS.ByteString -> AdapterM (SlackAdapter a) ()
 
 
 instance MkSlack a => IsAdapter (SlackAdapter a) where
     type User (SlackAdapter a) = SlackUserId
     type Channel (SlackAdapter a) = SlackChannelId
     initAdapter = SlackAdapter
-        <$> liftIO (atomically $ newTMVar 0)
-        <*> newMVar (ChannelCache mempty mempty)
+        <$> newMVar (ChannelCache mempty mempty)
         <*> newMVar (UserCache mempty mempty)
-        <*> newEmptyMVar
+        <*> newChan
     adapterId = mkAdapterId
     messageChannel = messageChannelImpl
     runWithAdapter = runnerImpl

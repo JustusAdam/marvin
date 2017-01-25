@@ -4,6 +4,7 @@
 {-# LANGUAGE TypeSynonymInstances       #-}
 module Marvin.Adapter.Slack.Types where
 
+import           Control.Concurrent.Chan.Lifted (Chan)
 import           Control.Concurrent.MVar.Lifted (MVar)
 import           Control.Concurrent.STM         (TMVar)
 import           Control.Lens                   hiding ((.=))
@@ -93,18 +94,10 @@ data InternalType
 
 -- | Adapter for interacting with Slack API\'s. Polymorphic over the method for retrieving events.
 data SlackAdapter a = SlackAdapter
-    { midTracker        :: TMVar Int
-    , channelCache      :: MVar ChannelCache
-    , userInfoCache     :: MVar UserCache
-    , connectionTracker :: MVar Connection
+    { channelCache  :: MVar ChannelCache
+    , userInfoCache :: MVar UserCache
+    , outChannel    :: Chan (SlackChannelId, L.Text)
     }
-
-
--- | Recieve events as a server via HTTP webhook (not implemented yet)
-data EventsAPI
--- | Recieve events by opening a websocket to the Real Time Messaging API
-data RTM
-
 
 
 instance FromJSON RTMData where

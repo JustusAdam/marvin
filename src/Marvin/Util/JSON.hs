@@ -22,9 +22,11 @@ import           Data.Aeson.TH
 import qualified Data.ByteString.Lazy   as B
 
 
+-- | Read a file containing JSON encoded data
 readJSON :: (MonadIO m, FromJSON a) => FilePath -> m (Either String a)
-readJSON = fmap eitherDecode . liftIO . B.readFile
+readJSON = liftIO . fmap eitherDecode . B.readFile
 
 
+-- | Write some data to a file using JSON serialization
 writeJSON :: (MonadIO m, ToJSON a) => FilePath -> a -> m ()
 writeJSON fp = liftIO . B.writeFile fp . encode
