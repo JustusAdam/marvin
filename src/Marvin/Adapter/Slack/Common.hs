@@ -7,9 +7,7 @@ import           Control.Applicative             ((<|>))
 import           Control.Arrow                   ((&&&))
 import           Control.Concurrent.Async.Lifted (async)
 import           Control.Concurrent.Chan.Lifted  (Chan, newChan, readChan, writeChan)
-import           Control.Concurrent.MVar.Lifted  (modifyMVar, modifyMVar_, newEmptyMVar, newMVar,
-                                                  putMVar, readMVar, takeMVar)
-import           Control.Exception.Lifted
+import           Control.Concurrent.MVar.Lifted  (modifyMVar, modifyMVar_, newMVar, readMVar)
 import           Control.Lens                    hiding ((.=))
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -20,7 +18,6 @@ import qualified Data.ByteString.Lazy.Char8      as BS
 import           Data.Char                       (isSpace)
 import           Data.Foldable                   (asum)
 import qualified Data.HashMap.Strict             as HM
-import           Data.Maybe                      (fromMaybe)
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter                  hiding (mkAdapterId)
@@ -28,9 +25,7 @@ import           Marvin.Adapter.Slack.Types
 import           Marvin.Internal
 import           Marvin.Internal.Types           as Types hiding (mkAdapterId)
 import           Marvin.Interpolate.Text
-import           Network.URI
 import           Network.Wreq
-import           Text.Read                       (readMaybe)
 import           Util
 
 

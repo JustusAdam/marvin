@@ -6,7 +6,6 @@ module Marvin.Adapter.Slack.Types where
 
 import           Control.Concurrent.Chan.Lifted (Chan)
 import           Control.Concurrent.MVar.Lifted (MVar)
-import           Control.Concurrent.STM         (TMVar)
 import           Control.Lens                   hiding ((.=))
 import           Data.Aeson                     hiding (Error)
 import           Data.Aeson.TH
@@ -19,7 +18,6 @@ import           Data.String                    (IsString (..))
 import qualified Data.Text                      as T
 import qualified Data.Text.Lazy                 as L
 import           Network.URI
-import           Network.WebSockets
 
 
 jsonParseURI :: Value -> Parser URI

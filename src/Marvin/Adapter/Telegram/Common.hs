@@ -8,7 +8,6 @@ module Marvin.Adapter.Telegram.Common where
 import           Control.Applicative
 import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
-import           Control.Concurrent.Lifted
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -22,8 +21,6 @@ import           Marvin.Adapter                  hiding (mkAdapterId)
 import           Marvin.Internal.Types           hiding (mkAdapterId)
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text
-import           Network.Wai
-import           Network.Wai.Handler.Warp
 import           Network.Wreq
 import           Util
 

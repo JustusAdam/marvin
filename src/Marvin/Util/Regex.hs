@@ -16,7 +16,6 @@ import           Control.DeepSeq
 import           Data.String
 import qualified Data.Text.ICU   as Re
 import qualified Data.Text.Lazy  as L
-import           GHC.Generics
 
 
 -- | Abstract Wrapper for a reglar expression implementation. Has an 'IsString' implementation, so literal strings can be used to create a 'Regex'.

@@ -18,7 +18,7 @@ module Marvin.Adapter.Slack.RTM
 import           Control.Concurrent.Async.Lifted (async)
 import           Control.Concurrent.Chan.Lifted
 import           Control.Concurrent.MVar.Lifted
-import           Control.Concurrent.STM          (TMVar, atomically, newTMVar, putTMVar, takeTMVar)
+import           Control.Concurrent.STM          (atomically, newTMVar, putTMVar, takeTMVar)
 import           Control.Exception.Lifted
 import           Control.Lens                    hiding ((.=))
 import           Control.Monad
