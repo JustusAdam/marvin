@@ -67,12 +67,14 @@ library
                      , lifted-async
                      , wai
                      , warp
+                     , warp-tls
                      , haskeline
                      , monad-loops
                      , time
                      , transformers-base
                      , monad-control
                      , deepseq
+                     , http-types
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies

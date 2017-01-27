@@ -108,13 +108,12 @@ stripWhiteSpaceMay t =
         _ -> Nothing
 
 
-runHandlerLoop :: MkSlack a => Chan BS.ByteString -> EventHandler (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
-runHandlerLoop messageChan handler =
+runHandlerLoop :: MkSlack a => Chan (Either InternalType (Event (SlackAdapter a))) -> EventHandler (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
+runHandlerLoop evChan handler =
     forever $ do
-        d <- readChan messageChan
-        case eitherDecode d >>= parseEither eventParser of
-            Left err -> logErrorN $(isT "Error parsing json: #{err} original data: #{rawBS d}")
-            Right (Right ev@(MessageEvent u c m t)) -> do
+        d <- readChan evChan
+        void $ async $ case d of
+            Right ev@(MessageEvent u c m t) -> do
 
                 botname <- L.toLower <$> getBotname
                 let lmsg = L.stripStart $ L.toLower m
@@ -122,11 +121,11 @@ runHandlerLoop messageChan handler =
                     Nothing -> ev
                     Just m' -> CommandEvent u c m' t
 
-            Right (Right event) -> liftIO $ handler event
-            Right (Left internalEvent) ->
+            Right event -> liftIO $ handler event
+            Left internalEvent ->
                 case internalEvent of
                     Unhandeled type_ ->
-                        logDebugN $(isT "Unhandeled event type #{type_} payload: #{rawBS d}")
+                        logDebugN $(isT "Unhandeled event type #{type_} payload")
                     Error code msg ->
                         logErrorN $(isT "Error from remote code: #{code} msg: #{msg}")
                     Ignored -> return ()
@@ -289,7 +288,7 @@ renameChannel channelInfo@(LimitedChannelInfo id name _) = do
 -- | Class to enable polymorphism for 'SlackAdapter' over the method used for retrieving updates. ('RTM' or 'EventsAPI')
 class MkSlack a where
     mkAdapterId :: AdapterId (SlackAdapter a)
-    initIOConnections :: Chan BS.ByteString -> AdapterM (SlackAdapter a) ()
+    initIOConnections :: Chan (Either InternalType (Event (SlackAdapter a))) -> AdapterM (SlackAdapter a) ()
 
 
 instance MkSlack a => IsAdapter (SlackAdapter a) where

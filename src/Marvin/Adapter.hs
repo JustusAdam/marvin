@@ -14,7 +14,7 @@ Portability : POSIX
 module Marvin.Adapter
     ( RunWithAdapter, EventHandler
     , IsAdapter(..), AdapterId, mkAdapterId, unwrapAdapterId
-    , AdapterM
+    , AdapterM, Event(..)
     , lookupFromAdapterConfig, requireFromAdapterConfig
     , lookupFromAppConfig, requireFromAppConfig, getBotname
     , getAdapterConfig, getAppConfig

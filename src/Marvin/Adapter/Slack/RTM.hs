@@ -41,9 +41,15 @@ import           Text.Read                       (readMaybe)
 import           Wuss
 
 
-runConnectionLoop :: Chan BS.ByteString -> MVar Connection -> AdapterM (SlackAdapter RTM) ()
-runConnectionLoop messageChan connectionTracker = forever $ do
+runConnectionLoop :: Chan (Either InternalType (Event (SlackAdapter a))) -> MVar Connection -> AdapterM (SlackAdapter RTM) ()
+runConnectionLoop eventChan connectionTracker = forever $ do
     token <- requireFromAdapterConfig "token"
+    messageChan <- newChan
+    void $ async $ forever $ do
+        msg <- readChan messageChan
+        case eitherDecode msg >>= parseEither eventParser of
+            Left e -> logErrorN $(isT "Error parsing json: #{e} original data: #{rawBS msg}")
+            Right v -> writeChan eventChan v
     logDebugN "initializing socket"
     r <- liftIO $ post "https://slack.com/api/rtm.start" [ "token" := (token :: T.Text) ]
     case eitherDecode (r^.responseBody) of
