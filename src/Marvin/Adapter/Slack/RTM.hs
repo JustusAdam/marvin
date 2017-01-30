@@ -32,7 +32,6 @@ import qualified Data.Text                       as T
 import           Marvin.Adapter
 import           Marvin.Adapter.Slack.Common
 import           Marvin.Adapter.Slack.Types
-import           Marvin.Internal
 import           Marvin.Interpolate.Text
 import           Network.URI
 import           Network.WebSockets

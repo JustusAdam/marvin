@@ -20,9 +20,9 @@ import           Data.Char                       (isSpace)
 import qualified Data.Text.Lazy                  as L
 import           Data.Time.Clock                 (getCurrentTime)
 import           Marvin.Adapter
-import           Marvin.Internal.Types
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text.Lazy
+import           Marvin.Types
 import           System.Console.Haskeline
 
 

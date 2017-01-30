@@ -17,8 +17,8 @@ import           Data.HashMap.Strict            (HashMap)
 import           Data.String                    (IsString (..))
 import qualified Data.Text                      as T
 import qualified Data.Text.Lazy                 as L
+import           Marvin.Adapter
 import           Network.URI
-import Marvin.Adapter
 
 
 jsonParseURI :: Value -> Parser URI

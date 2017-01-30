@@ -7,6 +7,7 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
+{-# LANGUAGE NamedFieldPuns #-}
 module Marvin.Adapter.Slack.EventsAPI
     ( SlackAdapter, EventsAPI
     , SlackUserId, SlackChannelId
@@ -14,23 +15,26 @@ module Marvin.Adapter.Slack.EventsAPI
     ) where
 
 
+import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
+import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson
 import           Data.Aeson.Types
-import           Data.Maybe                     (fromMaybe)
-import qualified Data.Text                      as T
-import qualified Data.Text.Lazy                 as L
-import qualified Data.Text.Lazy.Encoding        as L
+import           Data.Maybe                      (fromMaybe)
+import qualified Data.Text                       as T
+import qualified Data.Text.Lazy                  as L
+import qualified Data.Text.Lazy.Encoding         as L
 import           Marvin.Adapter
 import           Marvin.Adapter.Slack.Common
 import           Marvin.Adapter.Slack.Types
-import           Marvin.Interpolate.Text
+import           Marvin.Interpolate.All
 import           Network.HTTP.Types
 import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Handler.WarpTLS
+import           Network.Wreq
 
 
 eventAPIeventParser :: Value -> Parser (T.Text, Either L.Text (InternalType  a))
@@ -46,17 +50,21 @@ eventAPIeventParser = withObject "expected object" $ \o -> do
 
 runEventReceiver :: Chan (InternalType EventsAPI) -> AdapterM (SlackAdapter EventsAPI) ()
 runEventReceiver evChan = do
-    certfile <- requireFromAdapterConfig "certfile"
-    keyfile <- requireFromAdapterConfig "keyfile"
+    useHttps <- fromMaybe True <$> lookupFromAdapterConfig "use-tls"
+    server <- if useHttps
+        then do
+            certfile <- requireFromAdapterConfig "certfile"
+            keyfile <- requireFromAdapterConfig "keyfile"
+            return $ runTLS $ tlsSettings certfile keyfile
+        else return runSettings
     port <- fromMaybe 7000 <$> lookupFromAdapterConfig "port"
     expectedToken <- requireFromAdapterConfig "token"
 
-    let tlsSet = tlsSettings certfile keyfile
-        warpSet = setPort port defaultSettings
+    let warpSet = setPort port defaultSettings
 
     logFn <- askLoggerIO
 
-    liftIO $ runTLS tlsSet warpSet $ \req resp -> flip runLoggingT logFn $ do
+    liftIO $ server warpSet $ \req resp -> flip runLoggingT logFn $ do
         let meth = requestMethod req
         if meth == methodPost
             then do
@@ -77,10 +85,28 @@ runEventReceiver evChan = do
             else liftIO $ resp $ responseLBS methodNotAllowed405 [] ""
 
 
+sendMessageLoop :: AdapterM (SlackAdapter EventsAPI) ()
+sendMessageLoop = do
+    SlackAdapter{outChannel} <- getAdapter
+    forever $ do
+        (SlackChannelId chan, msg) <- readChan outChannel
+        res <- execAPIMethod
+            (const $ return ())
+            "chat.postMessage"
+            [ "channel" := chan
+            , "text" := msg
+            ]
+        case res of
+            Left err -> logErrorN $(isT "Sending message failed: #{err}")
+            Right () -> return ()
+
+
 -- | Recieve events as a server via HTTP webhook (not implemented yet)
 data EventsAPI
 
 
 instance MkSlack EventsAPI where
     mkAdapterId = "slack-events"
-    initIOConnections = error "not implemented"
+    initIOConnections inChan = do
+        void $ async $ runEventReceiver inChan
+        sendMessageLoop

@@ -22,9 +22,8 @@ import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter                  hiding (mkAdapterId)
 import           Marvin.Adapter.Slack.Types
-import           Marvin.Internal
-import           Marvin.Internal.Types           as Types hiding (mkAdapterId)
-import           Marvin.Interpolate.Text
+import           Marvin.Interpolate.All
+import           Marvin.Types
 import           Network.Wreq
 import           Util
 
@@ -130,7 +129,7 @@ runnerImpl handler = do
 execAPIMethod :: MkSlack a => (Object -> Parser v) -> String -> [FormParam] -> AdapterM (SlackAdapter a) (Either String v)
 execAPIMethod innerParser method params = do
     token <- requireFromAdapterConfig "token"
-    response <- liftIO $ post ("https://slack.com/api/" ++ method) (("token" := (token :: T.Text)):params)
+    response <- liftIO $ post $(isS "https://slack.com/api/#{method}") (("token" := (token :: T.Text)):params)
     return $ eitherDecode (response^.responseBody) >>= join . parseEither (apiResponseParser innerParser)
 
 

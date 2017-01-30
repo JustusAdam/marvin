@@ -18,9 +18,7 @@ import           Data.Maybe
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter                  hiding (mkAdapterId)
-import           Marvin.Internal.Types           hiding (mkAdapterId)
-import           Marvin.Interpolate.String
-import           Marvin.Interpolate.Text
+import           Marvin.Interpolate.All
 import           Network.Wreq
 import           Util
 

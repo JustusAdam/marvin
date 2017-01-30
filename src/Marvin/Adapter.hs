@@ -17,7 +17,7 @@ module Marvin.Adapter
     , AdapterM, Event(..)
     , lookupFromAdapterConfig, requireFromAdapterConfig
     , lookupFromAppConfig, requireFromAppConfig, getBotname
-    , getAdapterConfig, getAppConfig
+    , getAdapterConfig, getAppConfig, getAdapter
     , liftAdapterAction
     ) where
 
