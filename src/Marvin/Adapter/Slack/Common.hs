@@ -51,27 +51,11 @@ eventParser v@(Object o) = isErrParser <|> hasTypeParser
         -- https://api.slack.com/rtm
         case t of
             "error" -> Error <$> o .: "code" <*> o .: "msg"
-            "message" -> do
-                subt <- o .:? "subtype"
-                SlackEvent <$> case (subt :: Maybe T.Text) of
-                    Just str ->
-                        case str of
-                            "channel_join" -> cJoin
-                            "group_join" -> cJoin
-                            "channel_leave" -> cLeave
-                            "group_leave" -> cLeave
-                            "channel_topic" ->
-                                TopicChangeEvent <$> user <*> channel <*> o .: "topic" <*> ts
-                            _ -> msgEv
-
-                    _ -> msgEv
-              where
-                ts = o .: "ts" >>= timestampFromNumber
-                msgEv = messageParser v
-                user = o .: "user"
-                channel = o .: "channel"
-                cJoin = ChannelJoinEvent <$> user <*> channel <*> ts
-                cLeave = ChannelLeaveEvent <$> user <*> channel <*> ts
+            "message" -> messageTypeEvent
+            "message.channels" -> messageTypeEvent
+            "message.groups" -> messageTypeEvent
+            "message.im" -> messageTypeEvent
+            "message.mpim" -> messageTypeEvent
             "reconnect_url" -> return Ignored
             "channel_archive" -> ChannelArchiveStatusChange <$> o .: "channel" <*> pure True
             "channel_unarchive" -> ChannelArchiveStatusChange <$> o .: "channel" <*> pure False
@@ -80,6 +64,27 @@ eventParser v@(Object o) = isErrParser <|> hasTypeParser
             "channel_rename" -> ChannelRename <$> (o .: "channel" >>= lciParser)
             "user_change" -> UserChange <$> (o .: "user" >>= userInfoParser)
             _ -> return $ Unhandeled t
+    messageTypeEvent = do
+        subt <- o .:? "subtype"
+        SlackEvent <$> case (subt :: Maybe T.Text) of
+            Just str ->
+                case str of
+                    "channel_join" -> cJoin
+                    "group_join" -> cJoin
+                    "channel_leave" -> cLeave
+                    "group_leave" -> cLeave
+                    "channel_topic" ->
+                        TopicChangeEvent <$> user <*> channel <*> o .: "topic" <*> ts
+                    _ -> msgEv
+
+            _ -> msgEv
+      where
+        ts = o .: "ts" >>= timestampFromNumber
+        msgEv = messageParser v
+        user = o .: "user"
+        channel = o .: "channel"
+        cJoin = ChannelJoinEvent <$> user <*> channel <*> ts
+        cLeave = ChannelLeaveEvent <$> user <*> channel <*> ts
 eventParser _ = fail "expected object"
 
 
