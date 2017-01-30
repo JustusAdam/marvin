@@ -105,6 +105,13 @@ instance FromJSON (TelegramUpdate any) where
             isUnhandeled = return Unhandeled
 
 
+telegramSupportedUpdates :: [T.Text]
+telegramSupportedUpdates = 
+    [ "message"
+    , "channel_post"
+    ]
+
+
 msgParser ::  Value -> Parser (Event (TelegramAdapter a))
 msgParser = withObject "expected message object" $ \o ->
     MessageEvent

@@ -50,8 +50,8 @@ eventAPIeventParser = withObject "expected object" $ \o -> do
 
 runEventReceiver :: Chan (InternalType EventsAPI) -> AdapterM (SlackAdapter EventsAPI) ()
 runEventReceiver evChan = do
-    useHttps <- fromMaybe True <$> lookupFromAdapterConfig "use-tls"
-    server <- if useHttps
+    useTLS <- fromMaybe True <$> lookupFromAdapterConfig "use-tls"
+    server <- if useTLS
         then do
             certfile <- requireFromAdapterConfig "certfile"
             keyfile <- requireFromAdapterConfig "keyfile"
