@@ -41,7 +41,7 @@ import           Text.Read                       (readMaybe)
 import           Wuss
 
 
-runConnectionLoop :: Chan (Either InternalType (Event (SlackAdapter a))) -> MVar Connection -> AdapterM (SlackAdapter RTM) ()
+runConnectionLoop :: Chan (InternalType RTM) -> MVar Connection -> AdapterM (SlackAdapter RTM) ()
 runConnectionLoop eventChan connectionTracker = forever $ do
     token <- requireFromAdapterConfig "token"
     messageChan <- newChan

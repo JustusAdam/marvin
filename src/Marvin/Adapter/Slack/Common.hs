@@ -39,65 +39,48 @@ messageParser = withObject "expected object" $ \o ->
         <*> (o .: "ts" >>= timestampFromNumber)
 
 
-eventParser :: Value -> Parser (Either InternalType (Event (SlackAdapter a)))
+eventParser :: Value -> Parser (InternalType a)
 eventParser v@(Object o) = isErrParser <|> hasTypeParser
   where
     isErrParser = do
         e <- o .: "error"
         flip (withObject "expected object") e $ \eo ->
-            Left <$> (Error <$> eo .: "code" <*> eo .: "msg")
+            Error <$> eo .: "code" <*> eo .: "msg"
     hasTypeParser = do
         t <- o .: "type"
 
         -- https://api.slack.com/rtm
         case t of
-            "error" -> do
-                ev <- Error <$> o .: "code" <*> o .: "msg"
-                return $ Left ev
+            "error" -> Error <$> o .: "code" <*> o .: "msg"
             "message" -> do
                 subt <- o .:? "subtype"
-                case (subt :: Maybe T.Text) of
+                SlackEvent <$> case (subt :: Maybe T.Text) of
                     Just str ->
                         case str of
                             "channel_join" -> cJoin
                             "group_join" -> cJoin
                             "channel_leave" -> cLeave
                             "group_leave" -> cLeave
-                            "channel_topic" -> do
-                                t <- TopicChangeEvent <$> user <*> channel <*> o .: "topic" <*> ts
-                                return $ Right t
+                            "channel_topic" ->
+                                TopicChangeEvent <$> user <*> channel <*> o .: "topic" <*> ts
                             _ -> msgEv
 
                     _ -> msgEv
               where
                 ts = o .: "ts" >>= timestampFromNumber
-                msgEv = Right <$> messageParser v
+                msgEv = messageParser v
                 user = o .: "user"
                 channel = o .: "channel"
-                cJoin = do
-                    ev <- ChannelJoinEvent <$> user <*> channel <*> ts
-                    return $ Right ev
-                cLeave = do
-                    ev <- ChannelLeaveEvent <$> user <*> channel <*> ts
-                    return $ Right ev
-            "reconnect_url" -> return $ Left Ignored
-            "channel_archive" -> do
-                ev <- ChannelArchiveStatusChange <$> o .: "channel" <*> pure True
-                return $ Left ev
-            "channel_unarchive" -> do
-                ev <- ChannelArchiveStatusChange <$> o .: "channel" <*> pure False
-                return $ Left ev
-            "channel_created" -> do
-                ev <- o .: "channel" >>= lciParser
-                return $ Left $ ChannelCreated ev
-            "channel_deleted" -> Left . ChannelDeleted <$> o .: "channel"
-            "channel_rename" -> do
-                ev <- o .: "channel" >>= lciParser
-                pure $ Left $ ChannelRename ev
-            "user_change" -> do
-                ev <- o .: "user" >>= userInfoParser
-                pure $ Left $ UserChange ev
-            _ -> return $ Left $ Unhandeled t
+                cJoin = ChannelJoinEvent <$> user <*> channel <*> ts
+                cLeave = ChannelLeaveEvent <$> user <*> channel <*> ts
+            "reconnect_url" -> return Ignored
+            "channel_archive" -> ChannelArchiveStatusChange <$> o .: "channel" <*> pure True
+            "channel_unarchive" -> ChannelArchiveStatusChange <$> o .: "channel" <*> pure False
+            "channel_created" -> ChannelCreated <$> (o .: "channel" >>= lciParser)
+            "channel_deleted" -> ChannelDeleted <$> o .: "channel"
+            "channel_rename" -> ChannelRename <$> (o .: "channel" >>= lciParser)
+            "user_change" -> UserChange <$> (o .: "user" >>= userInfoParser)
+            _ -> return $ Unhandeled t
 eventParser _ = fail "expected object"
 
 
@@ -108,12 +91,12 @@ stripWhiteSpaceMay t =
         _ -> Nothing
 
 
-runHandlerLoop :: MkSlack a => Chan (Either InternalType (Event (SlackAdapter a))) -> EventHandler (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
+runHandlerLoop :: MkSlack a => Chan (InternalType a) -> EventHandler (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
 runHandlerLoop evChan handler =
     forever $ do
         d <- readChan evChan
         void $ async $ case d of
-            Right ev@(MessageEvent u c m t) -> do
+            SlackEvent ev@(MessageEvent u c m t) -> do
 
                 botname <- L.toLower <$> getBotname
                 let lmsg = L.stripStart $ L.toLower m
@@ -121,22 +104,20 @@ runHandlerLoop evChan handler =
                     Nothing -> ev
                     Just m' -> CommandEvent u c m' t
 
-            Right event -> liftIO $ handler event
-            Left internalEvent ->
-                case internalEvent of
-                    Unhandeled type_ ->
-                        logDebugN $(isT "Unhandeled event type #{type_} payload")
-                    Error code msg ->
-                        logErrorN $(isT "Error from remote code: #{code} msg: #{msg}")
-                    Ignored -> return ()
-                    ChannelArchiveStatusChange _ _ ->
-                        -- TODO implement once we track the archiving status
-                        return ()
-                    ChannelCreated info ->
-                        putChannel info
-                    ChannelDeleted chan -> deleteChannel chan
-                    ChannelRename info -> renameChannel info
-                    UserChange ui -> void $ refreshSingleUserInfo (ui^.idValue)
+            SlackEvent event -> liftIO $ handler event
+            Unhandeled type_ ->
+                logDebugN $(isT "Unhandeled event type #{type_} payload")
+            Error code msg ->
+                logErrorN $(isT "Error from remote code: #{code} msg: #{msg}")
+            Ignored -> return ()
+            ChannelArchiveStatusChange _ _ ->
+                -- TODO implement once we track the archiving status
+                return ()
+            ChannelCreated info ->
+                putChannel info
+            ChannelDeleted chan -> deleteChannel chan
+            ChannelRename info -> renameChannel info
+            UserChange ui -> void $ refreshSingleUserInfo (ui^.idValue)
 
 
 runnerImpl :: MkSlack a => RunWithAdapter (SlackAdapter a)
@@ -288,7 +269,7 @@ renameChannel channelInfo@(LimitedChannelInfo id name _) = do
 -- | Class to enable polymorphism for 'SlackAdapter' over the method used for retrieving updates. ('RTM' or 'EventsAPI')
 class MkSlack a where
     mkAdapterId :: AdapterId (SlackAdapter a)
-    initIOConnections :: Chan (Either InternalType (Event (SlackAdapter a))) -> AdapterM (SlackAdapter a) ()
+    initIOConnections :: Chan (InternalType a) -> AdapterM (SlackAdapter a) ()
 
 
 instance MkSlack a => IsAdapter (SlackAdapter a) where

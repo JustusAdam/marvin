@@ -18,6 +18,7 @@ import           Data.String                    (IsString (..))
 import qualified Data.Text                      as T
 import qualified Data.Text.Lazy                 as L
 import           Network.URI
+import Marvin.Adapter
 
 
 jsonParseURI :: Value -> Parser URI
@@ -76,8 +77,9 @@ declareFields [d|
 
 
 
-data InternalType
-    = Error
+data InternalType a
+    = SlackEvent (Event (SlackAdapter a))
+    | Error
         { code :: Int
         , msg  :: String
         }

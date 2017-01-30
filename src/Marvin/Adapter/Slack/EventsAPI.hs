@@ -33,7 +33,7 @@ import           Network.Wai.Handler.Warp
 import           Network.Wai.Handler.WarpTLS
 
 
-eventAPIeventParser :: Value -> Parser (T.Text, Either L.Text (Either InternalType (Event (SlackAdapter a))))
+eventAPIeventParser :: Value -> Parser (T.Text, Either L.Text (InternalType  a))
 eventAPIeventParser = withObject "expected object" $ \o -> do
     token <- o .: "token"
     type_ <- o .: "type"
@@ -44,7 +44,7 @@ eventAPIeventParser = withObject "expected object" $ \o -> do
         _ -> fail "unknown wrapper event type"
 
 
-runEventReceiver :: Chan (Either InternalType (Event (SlackAdapter EventsAPI))) -> AdapterM (SlackAdapter EventsAPI) ()
+runEventReceiver :: Chan (InternalType EventsAPI) -> AdapterM (SlackAdapter EventsAPI) ()
 runEventReceiver evChan = do
     certfile <- requireFromAdapterConfig "certfile"
     keyfile <- requireFromAdapterConfig "keyfile"
@@ -63,10 +63,10 @@ runEventReceiver evChan = do
                 bod <- liftIO $ lazyRequestBody req
                 case eitherDecode bod >>= parseEither eventAPIeventParser of
                     Left err -> do
-                        logErrorN $(isT "Unreadable JSON event: #{err}")
+                        logErrorN $(isT "Unreadable JSON event: '#{err}'")
                         liftIO $ resp $ responseLBS notAcceptable406 [] ""
                     Right (token,_) | token /= expectedToken -> do
-                        logErrorN $(isT "Recieved incorrect token: #{token}")
+                        logErrorN $(isT "Recieved incorrect token: '#{token}'")
                         liftIO $ resp $ responseLBS unauthorized401 [] ""
                     Right (_, Left challenge) -> do
                         logInfoN $(isT "Recieved challenge event: '#{challenge}'")
