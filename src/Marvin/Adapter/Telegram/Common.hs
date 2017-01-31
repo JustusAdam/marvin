@@ -106,7 +106,7 @@ instance FromJSON (TelegramUpdate any) where
 
 
 telegramSupportedUpdates :: [T.Text]
-telegramSupportedUpdates = 
+telegramSupportedUpdates =
     [ "message"
     , "channel_post"
     ]
