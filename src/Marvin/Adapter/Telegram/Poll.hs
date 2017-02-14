@@ -18,19 +18,34 @@ module Marvin.Adapter.Telegram.Poll
 
 import           Control.Concurrent.Chan.Lifted
 import           Control.Concurrent.Lifted
+import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Logger
 import           Data.Aeson                     hiding (Error, Success)
+import           Data.Aeson.Types               hiding (Error, Success)
+import           Data.IORef.Lifted
 import           Marvin.Adapter
 import           Marvin.Adapter.Telegram.Common
 import           Marvin.Interpolate.Text
+import           Network.HTTP.Client            (managerResponseTimeout)
+import           Network.HTTP.Client.TLS        (tlsManagerSettings)
+import           Network.Wreq
 
 
+data UpdateWithId = UpdateWithId {updateId :: Integer, updateContent :: TelegramUpdate Poll }
+
+instance FromJSON UpdateWithId where
+    parseJSON = withObject "expected object" $ \o -> UpdateWithId <$> o .: "update_id" <*> parseJSON (Object o)
 
 pollEventGetter :: Chan (TelegramUpdate Poll) -> AdapterM (TelegramAdapter Poll) ()
-pollEventGetter msgChan =
+pollEventGetter msgChan = do
+    idRef <- newIORef Nothing
     forever $ do
-        response <- execAPIMethod parseJSON "getUpdates" []
+        timeout <- lookupFromAdapterConfig "polling-timeout" >>= readTimeout
+        let defParams = ["timeout" := (timeout :: Int) ]
+        nextId <- readIORef idRef
+        let pollSettings = defaults & manager . _Left .~ tlsManagerSettings { managerResponseTimeout = Just ((timeout + 3) * 1000)}
+        response <- execAPIMethodWith pollSettings parseJSON "getUpdates" $ maybe defParams ((:defParams) . ("offset" :=)) nextId
         case response of
             Left err -> do
                 logErrorN $(isT "Unable to parse json: #{err}")
@@ -38,8 +53,20 @@ pollEventGetter msgChan =
             Right (Error code desc) -> do
                 logErrorN $(isT "Sending message failed with #{code}: #{desc}")
                 threadDelay 30000
-            Right Success {result=updates} ->
-                writeList2Chan msgChan updates
+            Right Success {result=[]} -> return ()
+            Right Success {result=updates} -> do
+                writeIORef idRef $ Just $ succ $ maximum $ map updateId updates
+                logDebugN "Writing messages"
+                writeList2Chan msgChan $ map updateContent updates
+  where
+    defaultTimeout = 120
+    readTimeout Nothing = return defaultTimeout
+    readTimeout (Just n)
+        | n < 0 = do
+            logErrorN $(isT "Telegram adapter poll timeout must be positive, was #{n} (using default timeout instead)")
+            return defaultTimeout
+        | otherwise = return n
+
 
 -- | Use the telegram API by fetching updates via HTTP
 data Poll

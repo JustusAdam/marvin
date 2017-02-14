@@ -8,6 +8,7 @@ module Marvin.Adapter.Telegram.Common where
 import           Control.Applicative
 import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
+import           Control.Concurrent.Lifted
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -22,6 +23,7 @@ import           Marvin.Interpolate.All
 import           Network.Wreq
 import           Util
 
+import           Control.Exception.Lifted
 
 data APIResponse a
     = Success { description :: Maybe T.Text, result :: a}
@@ -131,10 +133,17 @@ apiResponseParser innerParser = withObject "expected object" $ \o -> do
 
 
 execAPIMethod :: MkTelegram b => (Value -> Parser a) -> String -> [FormParam] -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
-execAPIMethod innerParser methodName params = do
+execAPIMethod = execAPIMethodWith defaults
+
+execAPIMethodWith :: MkTelegram b => Options -> (Value -> Parser a) -> String -> [FormParam] -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
+execAPIMethodWith opts innerParser methodName params = do
     token <- requireFromAdapterConfig "token"
-    response <- liftIO $ post $(isS "https://api.telegram.org/bot#{token :: String}/#{methodName}") params
-    return $ eitherDecode (response^.responseBody) >>= parseEither (apiResponseParser innerParser)
+    (>>= parseEither (apiResponseParser innerParser))
+        . eitherDecode
+        . (^. responseBody)
+        <$> retry 3 (liftIO (postWith opts $(isS "https://api.telegram.org/bot#{token :: String}/#{methodName}") params))
+  where
+    retry n a = (Right <$> a) `catch` \e -> if n <= 0 then return $ Left $ displayException e else retry (succ n) a
 
 
 getUsernameImpl :: TelegramUser -> AdapterM (TelegramAdapter a) L.Text
@@ -161,10 +170,14 @@ runnerImpl :: forall a. MkTelegram a => RunWithAdapter (TelegramAdapter a)
 runnerImpl handler = do
     msgChan <- newChan
     let eventGetter = mkEventGetter msgChan
-    async eventGetter
+    async $ eventGetter `catch` \e -> do
+        logErrorN $(isT "Unexpected exception in event getter: #{e :: SomeException}")
+        throw e
 
     forever $ do
+        logDebugN "Starting to read"
         d <- readChan msgChan
+        logDebugN "Recieved message"
         case d of
             Ev ev -> liftIO $ handler ev
             Ignored -> return ()

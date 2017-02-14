@@ -37,7 +37,7 @@ import           Network.Wai.Handler.WarpTLS
 import           Network.Wreq
 
 
-eventAPIeventParser :: Value -> Parser (T.Text, Either L.Text (InternalType  a))
+eventAPIeventParser :: Value -> Parser (T.Text, Either L.Text (InternalType a))
 eventAPIeventParser = withObject "expected object" $ \o -> do
     token <- o .: "token"
     type_ <- o .: "type"

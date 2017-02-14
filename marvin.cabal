@@ -62,7 +62,7 @@ library
                      , text
                      , unordered-containers
                      , stm
-                     , marvin-interpolate > 0.4
+                     , marvin-interpolate >= 1.0
                      , lifted-base
                      , lifted-async
                      , wai
@@ -75,6 +75,8 @@ library
                      , monad-control
                      , deepseq
                      , http-types
+                     , http-client
+                     , http-client-tls
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies
