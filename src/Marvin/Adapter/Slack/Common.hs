@@ -103,8 +103,9 @@ runHandlerLoop evChan handler =
             SlackEvent ev@(MessageEvent u c m t) -> do
 
                 botname <- L.toLower <$> getBotname
-                let lmsg = L.stripStart $ L.toLower m
-                liftIO $ handler $ case asum $ map ((`L.stripPrefix` lmsg) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname] of
+                let strippedMsg = L.stripStart m
+                let lmsg = L.toLower strippedMsg
+                liftIO $ handler $ case asum $ map ((\prefix -> if prefix `L.isPrefixOf` lmsg then Just $ L.drop (L.length prefix) strippedMsg else Nothing) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname] of
                     Nothing -> ev
                     Just m' -> CommandEvent u c m' t
 

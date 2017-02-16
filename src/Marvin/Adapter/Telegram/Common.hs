@@ -16,6 +16,8 @@ import           Control.Monad.Logger
 import           Data.Aeson                      hiding (Error, Success)
 import           Data.Aeson.Types                (Parser, parseEither)
 import           Data.Maybe
+import Data.Char (isSpace)
+import Data.Foldable (asum)
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter                  hiding (mkAdapterId)
@@ -138,12 +140,13 @@ execAPIMethod = execAPIMethodWith defaults
 execAPIMethodWith :: MkTelegram b => Options -> (Value -> Parser a) -> String -> [FormParam] -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
 execAPIMethodWith opts innerParser methodName params = do
     token <- requireFromAdapterConfig "token"
-    (>>= parseEither (apiResponseParser innerParser))
-        . eitherDecode
-        . (^. responseBody)
-        <$> retry 3 (liftIO (postWith opts $(isS "https://api.telegram.org/bot#{token :: String}/#{methodName}") params))
+    res <- retry 3 (liftIO (postWith opts $(isS "https://api.telegram.org/bot#{token :: String}/#{methodName}") params))
+    return $ res >>= eitherDecode . (^. responseBody) >>= parseEither (apiResponseParser innerParser)
   where
-    retry n a = (Right <$> a) `catch` \e -> if n <= 0 then return $ Left $ displayException e else retry (succ n) a
+    retry n a = (Right <$> a) `catch` \e -> if n <= 0 
+                                                then -- TODO only catch appropriate exceptions 
+                                                    return $ Left $ displayException (e :: SomeException) 
+                                                else retry (succ n) a
 
 
 getUsernameImpl :: TelegramUser -> AdapterM (TelegramAdapter a) L.Text
@@ -164,7 +167,11 @@ messageChannelImpl chat msg = do
         Right (Error code desc) ->
             logErrorN $(isT "Sending message failed with #{code}: #{desc}")
 
-
+stripWhiteSpaceMay :: L.Text -> Maybe L.Text
+stripWhiteSpaceMay t =
+    case L.uncons t of
+        Just (c, _) | isSpace c -> Just $ L.stripStart t
+        _ -> Nothing
 
 runnerImpl :: forall a. MkTelegram a => RunWithAdapter (TelegramAdapter a)
 runnerImpl handler = do
@@ -179,6 +186,14 @@ runnerImpl handler = do
         d <- readChan msgChan
         logDebugN "Recieved message"
         case d of
+            Ev ev@(MessageEvent u chat msg ts) -> do
+                botname <- L.toLower <$> getBotname
+                let strippedMsg = L.stripStart msg
+                let lmsg = L.toLower strippedMsg
+                liftIO $ handler $ case (chat^.type_, asum $ map ((\prefix -> if prefix `L.isPrefixOf` lmsg then Just $ L.drop (L.length prefix) strippedMsg else Nothing) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname]) of
+                    (PrivateChat, _) -> CommandEvent u chat msg ts
+                    (_, Nothing) -> ev
+                    (_, Just m') -> CommandEvent u chat m' ts
             Ev ev -> liftIO $ handler ev
             Ignored -> return ()
             Unhandeled -> logDebugN $(isT "Unhadeled event.")
