@@ -1,5 +1,5 @@
 name:                marvin
-version:             0.1.3
+version:             0.1.4
 synopsis:            A modular chat bot
 description:         A framework for writing portable chat bots. Inspired by hubot. The documentation is on readthedocs: <https://marvin.readthedocs.io>
 homepage:            https://marvin.readthedocs.io
@@ -9,6 +9,7 @@ author:              JustusAdam
 maintainer:          dev@justus.science
 copyright:           Copyright: (c) 2016 Justus Adam
 category:            Development
+stability:           Beta
 build-type:          Simple
 extra-source-files:  README.md
                    , CHANGELOG.md
