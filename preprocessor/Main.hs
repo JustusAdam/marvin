@@ -1,16 +1,16 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
-import           Data.Aeson                      hiding (object)
-import qualified Data.ByteString.Lazy            as B
-import qualified Data.Configurator               as C
-import           Data.Maybe                      (fromMaybe)
-import           Data.Monoid                     ((<>))
-import           Data.MonoTraversable.Unprefixed
-import           Data.Sequences
-import qualified Data.Text.IO                    as T
-import           Marvin.Run                      (defaultConfigName, lookupFromAppConfig)
+import           Control.Monad         (filterM)
+import           Data.Aeson            hiding (object)
+import qualified Data.ByteString.Lazy  as B
+import qualified Data.Configurator     as C
+import           Data.List             (intercalate, isPrefixOf)
+import           Data.Maybe            (fromMaybe)
+import           Data.Monoid           ((<>))
+import qualified Data.Text.IO          as T
+import           Marvin.Run            (defaultConfigName, lookupFromAppConfig)
 import           Options.Applicative
-import           Prelude                         hiding (elem, filter)
+import           Prelude
 import           System.Directory
 import           System.FilePath
 import           Text.Mustache

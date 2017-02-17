@@ -3,15 +3,14 @@ module Main where
 
 import           Control.Arrow         (second)
 import           Control.Monad
-import           Data.Containers
 import           Data.Foldable         (for_)
+import           Data.Maybe            (isJust)
 import           Data.Monoid           ((<>))
-import           Data.Sequences
 import qualified Data.Text             as T
 import qualified Data.Text.IO          as T
 import           Options.Applicative
 import           Paths_marvin
-import           Prelude               hiding (lookup)
+import           Prelude
 import           System.Directory
 import           System.FilePath
 import           System.IO
@@ -54,7 +53,7 @@ main :: IO ()
 main = do
     Opts{..} <- execParser infoParser
     d <- (</> "initializer") <$> getDataDir
-    unless (adapter `member` adType) $ hPutStrLn stderr "Unrecognized adapter"
+    unless (isJust $ lookup adapter adType) $ hPutStrLn stderr "Unrecognized adapter"
 
     let subsData = object [ "name" ~> botname
                           , "scriptsig" ~> maybe "IsAdapter a => ScriptInit a" ("ScriptInit " <>) (lookup adapter adType)

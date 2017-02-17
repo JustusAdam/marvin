@@ -7,6 +7,7 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
+{-# LANGUAGE CPP #-}
 module Marvin.Adapter.Telegram.Poll
     ( TelegramAdapter, Poll
     , TelegramChat(..), ChatType(..)
@@ -31,6 +32,11 @@ import           Network.HTTP.Client            (managerResponseTimeout)
 import           Network.HTTP.Client.TLS        (tlsManagerSettings)
 import           Network.Wreq
 
+#if MIN_VERSION_http_client(0,5,0)
+import           Network.HTTP.Client            (responseTimeoutMicro)
+#else
+responseTimeoutMicro = Just
+#endif
 
 data UpdateWithId = UpdateWithId {updateId :: Integer, updateContent :: TelegramUpdate Poll }
 
@@ -44,7 +50,7 @@ pollEventGetter msgChan = do
         timeout <- lookupFromAdapterConfig "polling-timeout" >>= readTimeout
         let defParams = ["timeout" := (timeout :: Int) ]
         nextId <- readIORef idRef
-        let pollSettings = defaults & manager . _Left .~ tlsManagerSettings { managerResponseTimeout = Just ((timeout + 3) * 1000)}
+        let pollSettings = defaults & manager . _Left .~ tlsManagerSettings { managerResponseTimeout = responseTimeoutMicro ((timeout + 3) * 1000)}
         response <- execAPIMethodWith pollSettings parseJSON "getUpdates" $ maybe defParams ((:defParams) . ("offset" :=)) nextId
         case response of
             Left err -> do
