@@ -94,7 +94,7 @@ executable marvin-pp
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base >= 4.7 && < 5
-                     , mustache >= 0.2
+                     , mustache >= 2.0
                      , directory >= 1.2
                      , filepath >= 1.4
                      , marvin >= 0.1
@@ -116,7 +116,7 @@ executable marvin-init
   other-modules:       Paths_marvin
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base >= 4.7 && < 5
-                     , mustache >= 0.2
+                     , mustache >= 2.0
                      , directory >= 1.2
                      , filepath >= 1.4
                      , optparse-applicative >= 0.11 && < 1
