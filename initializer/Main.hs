@@ -5,6 +5,7 @@ import           Control.Arrow         (second)
 import           Control.Monad
 import           Data.Containers
 import           Data.Foldable         (for_)
+import           Data.Monoid           ((<>))
 import           Data.Sequences
 import qualified Data.Text.IO          as T
 import           Options.Applicative
