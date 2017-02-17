@@ -5,19 +5,21 @@
 
 Marvin is an attempt to combine the ease of use of [hubot](https://hubot.github.com) with the typesafety and easy syntax of Haskell and the performance gains from compiled languages.
 
-The in-depth documentation can be found on readthedocs https://marvin.readthedocs.org 
+## Installing and using marvin
 
+The verbose documentation can be found on readthedocs https://marvin.readthedocs.io.
+It should hopefully answer all your questions.
 
-## Installation
+Installation instructions are on [this](http://marvin.readthedocs.io/en/latest/getting-started.html) documentation page.
 
-You can get a release version of marvin on [Hackage](https://hackage.haskell.org/package/marvin).
+## Links
 
-However this library is still a very early stage so you might want to get updates quicker. 
-You can do so by using [stack](https://docs.haskellstack.org) and adding a recent commit of this repository to your `stack.yaml` file.
-Stack will take care of downloading and building it for you.
+- Documentation: https://marvin.readthedocs.io
+- Hackage: https://hackage.haskell.org/package/marvin
+- Repository: https://github.com/JustusAdam/marvin
+- Documentation repository: https://github.com/JustusAdam/marvin-docs
 
-
-## TLDR
+## A teaser
 
 ```Haskell
 module MyScript where
@@ -46,161 +48,27 @@ script = defineScript "my-script" $ do
         send contents
 ```
 
-## How to Marvin
+## Contributing
 
-The best way to use Marvin is very much taken from hubot.
+Any kind of contribution is very welcome.
 
-A Marvin instance composes of a collection of scripts which are reactions or actions on certain messages posted in slack.
-Each script is a Haskell source file. 
-They get compiled into one single static binary, which acts depending on the adapter used, in the case of the slack real time messaging adapter for instance it opens a websocket to the slack server from which it recieves events as they happen in your chat application.
+### Issues and errors
 
-### Defining scripts
+If you are a marvin user, please report any error, issues, or improvement suggestions to the [issue section](https://github.com/JustusAdam/marvin/issues) or [write me an email](mailto:dev@justus.science).
 
-Defining scripts is very easy.
+### Testing
 
-Create a new Haskell source file like "MyScript.hs" and import marvins prelude `Marvin.Prelude`.
-This provides you with all the tools you need to interact with marvin.
+I welcome anybody who tests marvin by deploying it. 
+Especially testing different adapters is a huge help.
 
-Now you can start to define your script with `defineScript` which produces a script initializer.
-If you wish to use marvins automatic script discovery your script initializer should be named `script`  
+### Hacking
 
-```Haskell
-module MyScript where
+If you want to hack on marvin, feel free to do so and send me your changes as pull requests.
 
-import Marvin.Prelude
+Current hot places to get started:
 
-script :: IsAdapter a => ScriptInit a
-script = defineScript "my-script" $ do
-    ...
-```
+- Convenient HTTP requests API in `Marvin.Util.HTTP`.
+- Convenient JSON handling API in `Marvin.Util.JSON`.
+- New adapters as submodules of `Marvin.Adapter`.
+- A basic library of scripts (maybe as a `Marvin.Scripts.Prelude` module?) (inspiration: https://github.com/github/hubot-scripts)
 
-The script id, "my-script" in this case, is the name used for this script when repoting loggin messages as well as the key for this scripts configuration, see [configuration](#configuration).
-
-In the define script block you can have marvin react to certain events with `hear` and `respond`.
-More information on those in the section [reacting](#reacting)
-
-Finally after you have defined your scripts you have to tie them together.
-You can do this [manually](#wiring-manually) or you can have marvin create the boilerplate code for you.
-
-To do this simply place a main file (this is the file you'll be compiling later) in the same directory the scripts are placed in.
-Leave the file empty except for this line at the top `{-# OPTIONS_GHC -F -pgmF marvin-pp #-}`.
-When you compile the file marvin will look for any other ".hs" and ".lhs" files in the same directory, import them and define a server which runs with the `script` from each.
-If you wish to hide a file from the auto discovery either place it in a different directory or prefix it with "." or "_".
-
-### Reacting
-
-There are two main ways (currently) of reacting to events, `hear` and `respond`.
-
-`hear` is for matching any incoming message. The provided regex is tried against all incomming messages, if one matches the handler is called.
-
-`repond` only triggers on message which have the bot name, or a case variation thereof as the first word.
-
-
-Once a handler has triggered it may perform arbitrary IO actions (using `liftIO`) and send messages using `reply` and `send`.
-
-- `reply` addresses the message to the original sender of the message that triggered the handler.
-- `send` sends it to the same Channel the tiggering message weas sent to.
-- `messageChannel` sends a message to a Channel specified by the user.
-
-### Configuration
-
-Configuration for marvin is written in the [configurator](https://hackage.haskell.org/package/configurator) syntax.
-
-Configuration pertaining to the bot is stored under the "bot" key.
-
-```
-bot {
-    name = "my-bot"
-    logging = "INFO"
-}
-```
-
-By default each script has access to a configuration stored under `script.<script-id>`.
-And of course these scripts can have nested config groups.
-
-```
-bot {
-    name = "my-bot"
-}
-
-script {
-    script-1 {
-        some-string = "foo"
-        some-int = 1337
-        bome-bool = true
-    }
-    script 2 {
-        nested-group {
-            val = false
-        }
-        name = "Trump"
-        capable = false
-    }
-}
-```
-
-Configuration pertaining to the adapter is stored under `adapter.<adapter-name>`
-
-```
-bot {
-    name = "my-bot"
-    logging = "INFO"
-}
-adapter {
-    slack-rtm {
-        token = "eofk"
-    }
-}
-``` 
-
-### Wiring manually
-
-How Marvin interacts with your chat program depends on the used Adapter.
-For instance the currently default `slack-rtm` adapter creates a (client) websocket connection with the slack API and listens to the events there.
-Other adapters may require to set up a server. 
-
-### Utilities
-
-All these utilities are already available to you if you import `Marvin.Prelude`.
-
-#### Regex
-
-Implemented in `Marvin.Util.Regex`, documentation coming soon.
-
-#### Mutable variables
-
-Implementation started in `Marvin.Util.Mutable`, documentation coming soon.
-
-#### Format strings
-
-Marvins Prelude exposes the [marvin-interpolate](https://github.com/JustusAdam/marvin-interpolate) library, which enables the user to write CoffeeScript/Scala like interpolated Strings using Template Haskell.
-
-```haskell
-
-str = let x = "Hello" in $(isL "#{x} World!")
--- "Hello World"
-```
-
-#### JSON
-
-Exposed in `Marvin.Util.JSON` documentation coming soon. Until then refer to [aeson](https://hackage.haskell.org/package/aeson).
-
-#### Logging
-
-Marvin comes with a logging facility built in. 
-`Marvin.Util.Logging` expose the logging facility. 
-Several functions are available, depending on the urgency of your message, like `logError`, `logInfo` and `logWarn`.
-Logging messages made this way are automatically formatted and tagged with the scripts that reported them.
-
-By default all logging messages with higher priority `NOTICE` or higher are shown. 
-Using the command line parameter `verbose` also adds `INFO` messages and `debug` adds `DEBUG` messages.
-You can select the exact logging level in your config file (see also [configuration](#configuration)).
- 
-
-#### Random
-
-Implemented in `Marvin.Util.Random`, documentation coming soon.
-
-#### HTTP
-
-Coarsely implemented in `Marvin.Util.HTTP`, documentation coming soon.
