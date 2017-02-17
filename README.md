@@ -34,11 +34,10 @@ script = defineScript "my-script" $ do
 
         reply $(isL "All right, i'll do #{match !! 1}")
     
-    respond "open the (\\w+) door" $ do
-        match <- getMatch
-        let door = match !! 1
-        openDoor door
-        send $(isL "Door #{door} opened")
+    respond "repeat" $ do
+        message <- getMessage
+
+        send $(isL "You wrote #{message}")
     
     respond "what is in file (\\w+)\\??" $ do
         match <- getMatch 
@@ -47,6 +46,12 @@ script = defineScript "my-script" $ do
         contents <- liftIO $ readFile file
 
         send contents
+    
+    enterIn "#random" $ do
+        user <- getUser
+        username <- getUsername user
+
+        send $(isL "Hello #{username} welcome to the random channel!")
 ```
 
 ## Contributing
