@@ -64,8 +64,8 @@ runEventReceiver evChan = do
 
     logFn <- askLoggerIO
 
-    liftIO $ server warpSet $ \req resp -> flip runLoggingT logFn $ 
-        let 
+    liftIO $ server warpSet $ \req resp -> flip runLoggingT logFn $
+        let
             respond status headers body = liftIO $ resp $ responseLBS status headers body
         in  if requestMethod req == methodPost
                 then do

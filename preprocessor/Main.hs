@@ -4,6 +4,7 @@ import           Data.Aeson                      hiding (object)
 import qualified Data.ByteString.Lazy            as B
 import qualified Data.Configurator               as C
 import           Data.Maybe                      (fromMaybe)
+import           Data.Monoid                     ((<>))
 import           Data.MonoTraversable.Unprefixed
 import           Data.Sequences
 import qualified Data.Text.IO                    as T
