@@ -7,6 +7,7 @@ import           Data.Containers
 import           Data.Foldable         (for_)
 import           Data.Monoid           ((<>))
 import           Data.Sequences
+import qualified Data.Text             as T
 import qualified Data.Text.IO          as T
 import           Options.Applicative
 import           Paths_marvin
@@ -65,7 +66,7 @@ main = do
         unless exists (createDirectory dir)
 
     for_ wantFiles $ \(source, target) -> do
-        let targetName = unpack $ substituteValue target subsData
+        let targetName = T.unpack $ substituteValue target subsData
         if ".mustache" == takeExtension source
             then do
                 tpl <- fromEither <$> automaticCompile [d] source
