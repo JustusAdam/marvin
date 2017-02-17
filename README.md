@@ -14,10 +14,11 @@ Installation instructions are on [this](http://marvin.readthedocs.io/en/latest/g
 
 ## Links
 
-- Documentation: https://marvin.readthedocs.io
-- Hackage: https://hackage.haskell.org/package/marvin
-- Repository: https://github.com/JustusAdam/marvin
-- Documentation repository: https://github.com/JustusAdam/marvin-docs
+- [Documentation](https://marvin.readthedocs.io)
+- [Hackage](https://hackage.haskell.org/package/marvin)
+- [Repository](https://github.com/JustusAdam/marvin)
+- [Bugtracker](https://github.com/JustusAdam/marvin/issues)
+- [Documentation repository](https://github.com/JustusAdam/marvin-docs) and [bugtracker](https://github.com/JustusAdam/marvin-docs/issues)
 
 ## A teaser
 
