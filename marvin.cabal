@@ -121,7 +121,7 @@ executable marvin-init
                      , directory >= 1.2
                      , filepath >= 1.4
                      , optparse-applicative >= 0.11 && < 1
-                     , mono-traversable >= 1.0
+                     , mono-traversable >= 0.10
                      , text >= 1.0
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
