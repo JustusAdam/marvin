@@ -64,25 +64,26 @@ runEventReceiver evChan = do
 
     logFn <- askLoggerIO
 
-    liftIO $ server warpSet $ \req resp -> flip runLoggingT logFn $ do
-        let meth = requestMethod req
-        if meth == methodPost
-            then do
-                bod <- liftIO $ lazyRequestBody req
-                case eitherDecode bod >>= parseEither eventAPIeventParser of
-                    Left err -> do
-                        logErrorN $(isT "Unreadable JSON event: '#{err}'")
-                        liftIO $ resp $ responseLBS notAcceptable406 [] ""
-                    Right (token,_) | token /= expectedToken -> do
-                        logErrorN $(isT "Recieved incorrect token: '#{token}'")
-                        liftIO $ resp $ responseLBS unauthorized401 [] ""
-                    Right (_, Left challenge) -> do
-                        logInfoN $(isT "Recieved challenge event: '#{challenge}'")
-                        liftIO $ resp $ responseLBS ok200 [] (L.encodeUtf8 challenge)
-                    Right (_, Right ev) -> do
-                        writeChan evChan ev
-                        liftIO $ resp $ responseLBS ok200 [] ""
-            else liftIO $ resp $ responseLBS methodNotAllowed405 [] ""
+    liftIO $ server warpSet $ \req resp -> flip runLoggingT logFn $ 
+        let 
+            respond status headers body = liftIO $ resp $ responseLBS status headers body
+        in  if requestMethod req == methodPost
+                then do
+                    bod <- liftIO $ lazyRequestBody req
+                    case eitherDecode bod >>= parseEither eventAPIeventParser of
+                        Left err -> do
+                            logErrorN $(isT "Unreadable JSON event: '#{err}'")
+                            respond notAcceptable406 [] ""
+                        Right (token,_) | token /= expectedToken -> do
+                            logErrorN $(isT "Recieved incorrect token: '#{token}'")
+                            respond unauthorized401 [] ""
+                        Right (_, Left challenge) -> do
+                            logInfoN $(isT "Recieved challenge event: '#{challenge}'")
+                            respond ok200 [] (L.encodeUtf8 challenge)
+                        Right (_, Right ev) -> do
+                            writeChan evChan ev
+                            respond ok200 [] ""
+                else respond methodNotAllowed405 [] ""
 
 
 sendMessageLoop :: AdapterM (SlackAdapter EventsAPI) ()
