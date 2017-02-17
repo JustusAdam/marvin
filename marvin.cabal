@@ -1,5 +1,5 @@
 name:                marvin
-version:             0.1.0
+version:             0.1.1
 synopsis:            A modular chat bot
 description:         A framework for writing portable chat bots. Inspired by hubot. The documentation is on readthedocs: <https://marvin.readthedocs.io>
 homepage:            https://marvin.readthedocs.io
@@ -11,6 +11,7 @@ copyright:           Copyright: (c) 2016 Justus Adam
 category:            Development
 build-type:          Simple
 extra-source-files:  README.md
+                   , CHANGELOG.md
                    , preprocessor/Main.mustache
 data-dir:            resources
 data-files:          initializer/*.hs.mustache
@@ -43,40 +44,39 @@ library
                      , Marvin.Adapter.Slack.Common
                      , Marvin.Adapter.Telegram.Common
   build-depends:       base >= 4.7 && < 5
-                     , wreq
-                     , aeson
-                     , mtl
-                     , lens
-                     , text-icu
-                     , vector
-                     , optparse-applicative
-                     , configurator
-                     , bytestring
-                     , async
-                     , monad-logger
-                     , websockets
+                     , wreq >= 0.4 && < 0.5
+                     , aeson >= 0.11 && < 1.2
+                     , mtl >= 2.2 && < 3
+                     , lens >= 4 && < 5
+                     , text-icu >= 0.6 && < 0.8
+                     , vector >= 0.11 && < 1
+                     , optparse-applicative >= 0.11 && < 1
+                     , configurator >= 0.3
+                     , bytestring >= 0.10
+                     , monad-logger >= 0.3
+                     , websockets >= 0.9
                      , network-uri
-                     , wuss
-                     , random
-                     , hashable
-                     , text
-                     , unordered-containers
-                     , stm
+                     , wuss >=1.0
+                     , random >= 1.0
+                     , hashable >= 1.0
+                     , text >= 1.0
+                     , unordered-containers >= 0.2
+                     , stm >= 2.0
                      , marvin-interpolate >= 1.0
-                     , lifted-base
-                     , lifted-async
-                     , wai
-                     , warp
-                     , warp-tls
-                     , haskeline
-                     , monad-loops
-                     , time
-                     , transformers-base
-                     , monad-control
-                     , deepseq
-                     , http-types
-                     , http-client
-                     , http-client-tls
+                     , lifted-base >= 0.22 && < 0.3
+                     , lifted-async >= 0.8 && < 1
+                     , wai >= 3 && < 4
+                     , warp >= 3 && < 4
+                     , warp-tls >= 3 && < 4
+                     , haskeline >= 0.7 && < 1
+                     , monad-loops >= 0.4
+                     , time >= 1 && < 2
+                     , transformers-base >= 0.4 && < 0.5
+                     , monad-control >= 1 && < 2
+                     , deepseq >= 1 && < 2
+                     , http-types >= 0.8 && < 1.0
+                     , http-client >= 0.4 && < 0.6
+                     , http-client-tls >= 0.2 && < 0.4
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies
@@ -99,7 +99,7 @@ executable marvin-pp
                      , configurator
                      , optparse-applicative
                      , bytestring
-                     , mono-traversable
+                     , mono-traversable >= 1.0
                      , text
                      , aeson
   default-language:    Haskell2010
