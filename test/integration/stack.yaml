@@ -4,5 +4,5 @@ packages:
 - '.'
 - ../..
 extra-deps:
-- marvin-interpolate-0.4.0
+- marvin-interpolate-1.0
 resolver: lts-7.14

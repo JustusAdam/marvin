@@ -15,9 +15,9 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson                      hiding (Error, Success)
 import           Data.Aeson.Types                (Parser, parseEither)
+import           Data.Char                       (isSpace)
+import           Data.Foldable                   (asum)
 import           Data.Maybe
-import Data.Char (isSpace)
-import Data.Foldable (asum)
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter                  hiding (mkAdapterId)
@@ -143,9 +143,9 @@ execAPIMethodWith opts innerParser methodName params = do
     res <- retry 3 (liftIO (postWith opts $(isS "https://api.telegram.org/bot#{token :: String}/#{methodName}") params))
     return $ res >>= eitherDecode . (^. responseBody) >>= parseEither (apiResponseParser innerParser)
   where
-    retry n a = (Right <$> a) `catch` \e -> if n <= 0 
-                                                then -- TODO only catch appropriate exceptions 
-                                                    return $ Left $ displayException (e :: SomeException) 
+    retry n a = (Right <$> a) `catch` \e -> if n <= 0
+                                                then -- TODO only catch appropriate exceptions
+                                                    return $ Left $ displayException (e :: SomeException)
                                                 else retry (succ n) a
 
 
