@@ -1,6 +1,6 @@
 {-|
 Module      : $Header$
-Description : Adapter for communicating with a shell prompt.
+Description : Adapter for communicating with IRC.
 Copyright   : (c) Justus Adam, 2017
 License     : BSD3
 Maintainer  : dev@justus.science
@@ -10,35 +10,37 @@ Portability : POSIX
 Caveats: It is assumes that all messages are utf-8 encoded.
 -}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types     #-}
 module Marvin.Adapter.IRC where
 
 
-import Marvin.Adapter
-import Network.IRC.Conduit as IRC
-import Data.Conduit
-import Control.Concurrent.Chan.Lifted
-import Control.Concurrent.Async.Lifted
-import Control.Exception.Lifted
-import qualified Data.Text.Lazy as L
-import qualified Data.Text.Lazy.Encoding as L
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import Marvin.Interpolate.All
-import Marvin.Types as MT
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Lens
-import Data.ByteString (ByteString)
-import Data.Maybe
-import Control.Monad.Logger
+import           Control.Concurrent.Async.Lifted
+import           Control.Concurrent.Chan.Lifted
+import           Control.Exception.Lifted
+import           Control.Lens
+import           Control.Monad
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Data.ByteString                 (ByteString)
+import           Data.Conduit
+import           Data.Maybe
+import qualified Data.Text                       as T
+import qualified Data.Text.Encoding              as T
+import qualified Data.Text.Lazy                  as L
+import qualified Data.Text.Lazy.Encoding         as L
 import           Data.Time.Clock                 (getCurrentTime)
+import           Marvin.Adapter
+import           Marvin.Interpolate.All
+import           Marvin.Types                    as MT
+import           Network.IRC.Conduit             as IRC
 
 
 type MarvinIRCMsg = IRC.Message L.Text
 
 
-data IRCChannel = RealChannel { chanName :: L.Text } | Direct { chanName :: L.Text }
+data IRCChannel
+    = RealChannel { chanName :: L.Text }
+    | Direct      { chanName :: L.Text }
 
 
 data IRCAdapter = IRCAdapter
@@ -80,11 +82,11 @@ processor inChan handler = do
                     Ping a b -> writeChan msgOutChan $ Pong $ fromMaybe a b
                     Invite chan _ -> writeChan msgOutChan $ Join chan
                     _ -> logDebugN $(isT "Unhadeled event #{rawEv}")
-    forever $ 
+    forever $
         handleOneMessage `catch` (\e -> logErrorN $(isT "UserError: #{e :: ErrorCall}"))
   where
     runHandler = void . async . liftIO . handler
-    
+
 
 
 instance IsAdapter IRCAdapter where
@@ -103,7 +105,7 @@ instance IsAdapter IRCAdapter where
                       RealChannel c -> Notice c
     -- | Just returns the value again
     getUsername = return
-    
+
     -- Im not happy with this yet, we need to distinguish users and channels somehow
     getChannelName = return . chanName
     resolveChannel = return . Just . RealChannel
