@@ -50,6 +50,12 @@ data ChatType
     | ChannelChat
 
 
+class HasUsername s a | s -> a where username :: Lens' s a
+class HasLastName s a | s -> a where lastName :: Lens' s a
+class HasId_ s a | s -> a where id_ :: Lens' s a
+class HasFirstName s a | s -> a where firstName :: Lens' s a
+class HasType_ s a | s -> a where type_ :: Lens' s a
+
 -- | A user object as contained in the telegram update objects
 declareFields [d|
     data TelegramUser = TelegramUser

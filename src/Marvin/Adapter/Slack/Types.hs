@@ -42,7 +42,12 @@ newtype SlackChannelId = SlackChannelId T.Text deriving (IsString, Eq, Show, Has
 deriveJSON defaultOptions { unwrapUnaryRecords = True } ''SlackUserId
 deriveJSON defaultOptions { unwrapUnaryRecords = True } ''SlackChannelId
 
-
+class HasTopic s a | s -> a where topic :: Lens' s a
+class HasName s a | s -> a where name :: Lens' s a
+class HasIdValue s a | s -> a where idValue :: Lens' s a
+class HasUsername s a | s -> a where username :: Lens' s a
+class HasNameResolver s a | s -> a where nameResolver :: Lens' s a
+class HasInfoCache s a | s -> a where infoCache :: Lens' s a
 
 declareFields [d|
     data LimitedChannelInfo = LimitedChannelInfo
