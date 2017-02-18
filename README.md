@@ -19,6 +19,9 @@ Installation instructions are on [this](http://marvin.readthedocs.io/en/latest/g
 - [Repository](https://github.com/JustusAdam/marvin)
 - [Bugtracker](https://github.com/JustusAdam/marvin/issues)
 - [Documentation repository](https://github.com/JustusAdam/marvin-docs) and [bugtracker](https://github.com/JustusAdam/marvin-docs/issues)
+- [Slack channel][slack-channel] ([signup instructions](#testing-and-talking))
+
+[slack-channel]: https://marvin-bot.slack.com
 
 ## A teaser
 
@@ -53,6 +56,12 @@ script = defineScript "my-script" $ do
 
         send $(isL "Hello #{username} welcome to the random channel!")
 ```
+
+## Testing and Talking
+
+There's a [slack channel][slack-channel] where you can ask questions or play around with a [test instance of marvin](https://github.com/JustusAdam/marvin/blob/master/test/integration/slack/Script1.hs).
+
+It's currently invite-only, so [send me an email](mailto:dev@justus.science) if you would like to join.
 
 ## Contributing
 
