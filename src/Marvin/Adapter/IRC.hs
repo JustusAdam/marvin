@@ -38,6 +38,7 @@ import           Network.IRC.Conduit             as IRC
 type MarvinIRCMsg = IRC.Message L.Text
 
 
+-- Im not happy with this yet, we need to distinguish users and channels somehow
 data IRCChannel
     = RealChannel { chanName :: L.Text }
     | Direct      { chanName :: L.Text }
@@ -106,7 +107,6 @@ instance IsAdapter IRCAdapter where
     -- | Just returns the value again
     getUsername = return
 
-    -- Im not happy with this yet, we need to distinguish users and channels somehow
     getChannelName = return . chanName
     resolveChannel = return . Just . RealChannel
 

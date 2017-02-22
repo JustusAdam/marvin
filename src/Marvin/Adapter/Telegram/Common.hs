@@ -28,8 +28,8 @@ import           Util
 import           Control.Exception.Lifted
 
 data APIResponse a
-    = Success { description :: Maybe T.Text, result :: a}
-    | Error { errorCode :: Int, errDescription :: T.Text}
+    = Success { description :: Maybe T.Text, result :: a }
+    | Error { errorCode :: Int, errDescription :: T.Text }
 
 
 -- | The telegram adapter type for a particular update type. Either 'Push' or 'Poll'
@@ -219,11 +219,9 @@ instance MkTelegram a => IsAdapter (TelegramAdapter a) where
     runWithAdapter = runnerImpl
     getUsername = getUsernameImpl
     getChannelName = getChannelNameImpl
-    -- | Not supported in this adapter and always returns 'Nothing'
     resolveChannel _ = do
         logErrorN "Channel resolving not supported"
         return Nothing
-    -- | Not supported in this adapter and always returns 'Nothing'
     resolveUser _ = do
         logErrorN "User resolving not supported"
         return Nothing
