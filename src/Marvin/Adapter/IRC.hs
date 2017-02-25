@@ -7,11 +7,13 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 
-Caveats: It is assumes that all messages are utf-8 encoded.
+See caveats and potential issues with this adapter here `https://marvin.readthedocs.io/en/latest/adapters.html#irc`.
 -}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE Rank2Types     #-}
-module Marvin.Adapter.IRC where
+module Marvin.Adapter.IRC 
+    ( IRCAdapter, IRCChannel
+    ) where
 
 
 import           Control.Concurrent.Async.Lifted
