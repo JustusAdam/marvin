@@ -6,6 +6,12 @@ License     : BSD3
 Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
+
+
+=== Caveats:
+
+'resolveUser' and 'resolveChannel' resolving are not yet supported in this adapter and always returns 'Nothing'. See <https://github.com/JustusAdam/marvin/issues/10 #10>.
+
 -}
 {-# LANGUAGE NamedFieldPuns #-}
 module Marvin.Adapter.Telegram.Push
