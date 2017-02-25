@@ -7,7 +7,7 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 
-See caveats and potential issues with this adapter here `https://marvin.readthedocs.io/en/latest/adapters.html#irc`.
+See caveats and potential issues with this adapter here <https://marvin.readthedocs.io/en/latest/adapters.html#irc>.
 -}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE Rank2Types     #-}
