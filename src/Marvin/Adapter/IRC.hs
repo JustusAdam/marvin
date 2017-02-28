@@ -60,6 +60,8 @@ producer chan = forever $ do
 consumer = awaitForever . writeChan
 
 
+-- NOTE: Maybe we can add some verification of how the server was coping with a message of ours.
+-- Perhaps save queries to the server in a queue and associate incoming numerics and such with them?
 processor :: Chan (Either ByteString IrcEvent) -> EventHandler IRCAdapter -> AdapterM IRCAdapter ()
 processor inChan handler = do
     IRCAdapter{msgOutChan} <- getAdapter
@@ -91,7 +93,6 @@ processor inChan handler = do
     runHandler = void . async . liftIO . handler
 
 
-
 instance IsAdapter IRCAdapter where
     -- | Stores the username
     type User IRCAdapter = L.Text
@@ -106,12 +107,12 @@ instance IsAdapter IRCAdapter where
         msgType = case chan of
                       Direct n -> Privmsg n
                       RealChannel c -> Notice c
-    -- | Just returns the value again
-    getUsername = return
 
+    -- TODO Perhaps these resolving funtions should be changed such that 
+    -- they return Nothing if the user doesn't exist.
+    getUsername = return
     getChannelName = return . chanName
     resolveChannel = return . Just . RealChannel
-
     -- | Just returns the value again
     resolveUser = return . Just
     initAdapter = IRCAdapter <$> newChan

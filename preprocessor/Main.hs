@@ -38,6 +38,7 @@ adapters =
     , ("telegram-poll", ("Marvin.Adapter.Telegram.Poll", "(TelegramAdapter Poll)"))
     , ("telegram-push", ("Marvin.Adapter.Telegram.Push", "(TelegramAdapter Push)"))
     , ("shell", ("Marvin.Adapter.Shell", "ShellAdapter"))
+    , ("irc", ("Marvin.Adapter.IRC", "IRCAdapter"))
     ]
 
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Main where
 
-import           Control.Arrow         (second)
+import           Control.Arrow         (second, (***))
 import           Control.Monad
 import           Data.Foldable         (for_)
 import           Data.Maybe            (isJust)
@@ -44,9 +44,15 @@ wantFiles = map (second $ fromEither . compileTemplate "")
     ]
 
 
-adType :: [(String, String)]
+adType :: [(String, (String, String))]
 adType =
-    [ ("slack-rtm", "SlackRTMAdapter") ]
+    [ ("slack-rtm", ("Marvin.Adapter.Slack.RTM", "(SlackAdapter RTM)"))
+    , ("slack-events", ("Marvin.Adapter.Slack.EventsAPI", "(SlackAdapter EventsAPI)"))
+    , ("telegram-poll", ("Marvin.Adapter.Telegram.Poll", "(TelegramAdapter Poll)"))
+    , ("telegram-push", ("Marvin.Adapter.Telegram.Push", "(TelegramAdapter Push)"))
+    , ("shell", ("Marvin.Adapter.Shell", "ShellAdapter"))
+    , ("irc", ("Marvin.Adapter.IRC", "IRCAdapter"))
+    ]
 
 
 main :: IO ()
@@ -55,8 +61,10 @@ main = do
     d <- (</> "initializer") <$> getDataDir
     unless (isJust $ lookup adapter adType) $ hPutStrLn stderr "Unrecognized adapter"
 
-    let subsData = object [ "name" ~> botname
-                          , "scriptsig" ~> maybe "IsAdapter a => ScriptInit a" ("ScriptInit " <>) (lookup adapter adType)
+    let (adModule, adSig) = maybe ("IsAdapter a => ScriptInit a", "") (("import " <>) *** ("ScriptInit " <>)) (lookup adapter adType)
+        subsData = object [ "name" ~> botname
+                          , "scriptsig" ~> adSig
+                          , "adaptermod" ~> adModule
                           , "adapter" ~> adapter
                           ]
 
