@@ -3,13 +3,16 @@ module MyScript where
 
 import Marvin.Prelude
 {{ adaptermod }}
+import Control.Monad.Logger -- imported for logging
 
 
 script :: {{ scriptsig }}
 script = defineScript "my-script" $ do
     hear (r [CaseInsensitive] "ping") $ do -- react to any message
         msg <- getMessage -- read the message contents
-        infoM (content msg) -- logging
+        $logInfo $(isT "Got message with content: #{msg}") -- logging
         send "Pong" -- sending messages back
     respond "hello" $ do -- react to direct commands
-        reply "Hello to you too"
+        user <- getUser
+        username <- getUsername user
+        reply $(isL "Hello to you too, #{username}")

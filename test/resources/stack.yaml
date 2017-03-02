@@ -43,6 +43,7 @@ extra-deps:
 # will not be run. This is useful for tweaking upstream packages.
 packages:
 - '.'
+- '..'
 
 # Override default flag values for local packages and extra-deps
 flags: {}

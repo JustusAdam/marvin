@@ -49,15 +49,16 @@ modifyMutable m = liftIO . modifyIORef m
 -- 'readSynchronized' does not empty it and also blocks if the 'Synchronized' is empty.
 --
 -- Should you just use it as a thread safe mutable variable, mutations typically follow the pattern:
+--
 -- @
 --   val <- takeSynchronized -- obtain the value and leave it empty to block concurrent reads
---   let mod = modify val -- modify the value
+--   mod <- modifyWithIO val -- modify the value, typically involves IO
 --   writeSynchronized mod -- write back the result
 -- @
 --
 -- Another use for this type is as a message channel, where we have a producer and a consumer,
 -- the producer tries to write values into the 'Synchronized' ('writeSynchronized') and the consumer
--- waits for the 'Synchronized' to be filled and takes the value 'takeSynchronized' for procesing.
+-- waits for the 'Synchronized' to be filled and takes the value ('takeSynchronized') for procesing.
 --
 -- It works generally best if any 'Synchronized' is only used for one of these two applications at the same time.
 --

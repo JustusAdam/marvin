@@ -10,8 +10,6 @@
         {
             "taskName": "build",
             "args": [
-                "--stack-yaml",
-                "stack-docker.yaml"
             ],
             "isBuildCommand": true
         }
