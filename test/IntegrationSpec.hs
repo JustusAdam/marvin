@@ -3,8 +3,6 @@ import System.IO.Temp
 import System.Directory
 import System.Process
 
--- make test that initializer produces compilable thing
-
 -- | This test is used to make sure the initializer produces a compileable project
 runInitAndCompileResult :: IO ()
 runInitAndCompileResult = 
@@ -13,7 +11,6 @@ runInitAndCompileResult =
             callProcess "stack" ["exec", "--", "marvin-init", "-a", "shell", "testbot"]
             copyFile "../test/resources/stack.yaml" "stack.yaml"
             callProcess "stack" ["build"]
---   where dir = ".testdir"
 
 
 main :: IO ()
