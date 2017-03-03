@@ -11,7 +11,7 @@ See caveats and potential issues with this adapter here <https://marvin.readthed
 -}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE Rank2Types     #-}
-module Marvin.Adapter.IRC 
+module Marvin.Adapter.IRC
     ( IRCAdapter, IRCChannel
     ) where
 
@@ -108,7 +108,7 @@ instance IsAdapter IRCAdapter where
                       Direct n -> Privmsg n
                       RealChannel c -> Notice c
 
-    -- TODO Perhaps these resolving funtions should be changed such that 
+    -- TODO Perhaps these resolving funtions should be changed such that
     -- they return Nothing if the user doesn't exist.
     getUsername = return
     getChannelName = return . chanName
