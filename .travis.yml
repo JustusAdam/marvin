@@ -50,20 +50,20 @@ matrix:
 
   # The Stack builds. We can pass in arbitrary Stack arguments via the ARGS
   # variable, such as using --stack-yaml to point to a different file.
-  - env: BUILD=stack ARGS=""
+  - env: BUILD=stack STACK_RESOLVER="lts" STACK_YAML="etc/travis/lts-8-stack.yaml"
     compiler: ": #stack default"
     addons: {apt: {packages: [libgmp-dev]}}
 
-  - env: BUILD=stack ARGS="--resolver lts-7"
+  - env: BUILD=stack STACK_RESOLVER="lts-7" STACK_YAML="etc/travis/old-stack.yaml"
     compiler: ": #stack 8.0.1"
     addons: {apt: {packages: [libgmp-dev]}}
 
-  - env: BUILD=stack ARGS="--resolver lts-8"
+  - env: BUILD=stack STACK_RESOLVER="lts-8" STACK_YAML="etc/travis/lts-8-stack.yaml"
     compiler: ": #stack 8.0.2"
     addons: {apt: {packages: [libgmp-dev]}}
 
   # Nightly builds are allowed to fail
-  - env: BUILD=stack ARGS="--resolver nightly"
+  - env: BUILD=stack STACK_RESOLVER="nightly" STACK_YAML="etc/travis/new-stack.yaml"
     compiler: ": #stack nightly"
     addons: {apt: {packages: [libgmp-dev]}}
 
@@ -89,9 +89,6 @@ matrix:
 
   allow_failures:
   - env: BUILD=cabal GHCVER=head  CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
-  - env: BUILD=stack ARGS="--resolver nightly"
-  # TODO remove the following line once lts-8 contains mustache again
-  - env: BUILD=stack ARGS="--resolver lts-8"
 
 before_install:
 # Using compiler above sets CC to an invalid value, so unset it
@@ -129,7 +126,7 @@ install:
   set -ex
   case "$BUILD" in
     stack)
-      stack --no-terminal --install-ghc $ARGS test --bench --only-dependencies
+      stack --no-terminal --resolver $STACK_RESOLVER --install-ghc test --bench --only-dependencies
       ;;
     cabal)
       cabal --version
@@ -148,7 +145,7 @@ script:
   set -ex
   case "$BUILD" in
     stack)
-      stack --no-terminal $ARGS test --bench --no-run-benchmarks --haddock --no-haddock-deps
+      stack --no-terminal --resolver $STACK_RESOLVER test --bench --no-run-benchmarks --haddock --no-haddock-deps
       ;;
     cabal)
       cabal install --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1 $CABALARGS $PACKAGES

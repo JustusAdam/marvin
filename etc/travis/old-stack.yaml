@@ -1,0 +1,6 @@
+resolver: lts-7.15
+extra-deps:
+- marvin-interpolate-1.1
+- irc-conduit-0.2.2.1
+packages:
+- '../..'
