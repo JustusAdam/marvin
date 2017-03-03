@@ -16,5 +16,5 @@ runInitAndCompileResult =
 main :: IO ()
 main = hspec $
     describe "initializer" $
-        it "produces a runnable project" $
+        it "produces a compileable project" $
             runInitAndCompileResult `shouldReturn` ()

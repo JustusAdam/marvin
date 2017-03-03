@@ -25,7 +25,7 @@ newtype Regex = Regex Re.Regex
 instance NFData Regex where
     rnf (Regex a) = a `seq` ()
 
--- Warning: This exposes the underlying repreentation of a 'Regex' and under no curcumstances should be considered stable.
+-- Warning: This exposes the underlying representation of a 'Regex' and under no curcumstances should be considered stable.
 unwrapRegex :: Regex -> Re.Regex
 unwrapRegex (Regex r) = r
 
