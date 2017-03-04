@@ -1,3 +1,10 @@
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE LambdaCase #-}
+
 import           Control.Lens
 import           Control.Monad.Extra
 import           Data.Aeson.Lens
@@ -37,7 +44,7 @@ copyDirectory source target = do
 -- then `--stack-yaml` command line parameter
 getAndModifyStackYaml :: FilePath -> IO ()
 getAndModifyStackYaml targetPath = do
-    path <- fromMaybe "test/resources/stack.yaml" <$> lookupEnv "STACK_YAML"
+    path <- fromMaybe "stack.yaml" <$> lookupEnv "STACK_YAML"
     Just yamlFile <- decodeFile path
     encodeFile targetPath $ (yamlFile :: Value) & key "packages" .~ packageObject
   where
@@ -48,38 +55,39 @@ getResolver :: IO String
 getResolver = fromMaybe "lts" <$> lookupEnv "STACK_RESOLVER"
 
 
+prepareBuilder :: FilePath -> IO (String -> [String] -> IO (), IO ())
+prepareBuilder dir =
+    lookupEnv "BUILD" >>= \case
+        Just "cabal" ->
+            return
+                ( callProcess
+                , callProcess "cabal" ["build"])
+        _ -> do
+            resolver <- getResolver
+            getAndModifyStackYaml (dir </> "stack.yaml")
+            return
+                ( \cmd args -> callProcess "stack" $ ["exec", "--resolver", resolver, "--stack-yaml", "stack.yaml", "--", cmd] ++ args
+                , callProcess "stack" $ ["build", "--resolver", resolver, "--stack-yaml", "stack.yaml"] ++ stackBuildArgs
+                )
+
+
 -- | This test is used to make sure the initializer produces a compileable project
 runInitAndCompileResult :: IO ()
 runInitAndCompileResult =
     withTempDirectory "." ".test" $ \dir -> do
-        getAndModifyStackYaml (dir </> "stack.yaml")
+        (executor, builder) <- prepareBuilder dir
         withCurrentDirectory dir $ do
-            resolver <- getResolver
-            callProcess "stack"
-                [ "exec"
-                , "--resolver", resolver
-                , "--stack-yaml", "stack.yaml"
-                , "--", "marvin-init"
-                    , "-a", "shell"
-                    , "testbot"]
-            callProcess "stack" $
-                [ "build"
-                , "--stack-yaml", "stack.yaml"
-                , "--resolver", resolver
-                ] ++ stackBuildArgs
+            executor "marvin-init" ["-a", "shell", "testbot"]
+            builder
 
 
 compileIntegration :: IO ()
 compileIntegration =
     withTempDirectory "." ".test" $ \dir -> do
-        resolver <- getResolver
         copyDirectory "test/integration" dir
+        (_, builder) <- prepareBuilder dir
         getAndModifyStackYaml (dir </> "stack.yaml")
-        withCurrentDirectory dir $ callProcess "stack" $
-            [ "build"
-            , "--stack-yaml", "stack.yaml"
-            , "--resolver", resolver
-            ] ++ stackBuildArgs
+        withCurrentDirectory dir builder
 
 
 main :: IO ()

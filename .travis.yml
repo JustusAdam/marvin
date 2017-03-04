@@ -1,36 +1,13 @@
-# This is the complex Travis configuration, which is intended for use
-# on open source libraries which need compatibility across multiple GHC
-# versions, must work with cabal-install, and should be
-# cross-platform. For more information and other options, see:
-#
-# https://docs.haskellstack.org/en/stable/travis_ci/
-#
-# Copy these contents into the root directory of your Github project in a file
-# named .travis.yml
-
-# Use new container infrastructure to enable caching
 sudo: false
 
-# Do not choose a language; we provide our own build tools.
 language: generic
 
-# Caching so the next build will be fast too.
 cache:
   directories:
   - $HOME/.ghc
   - $HOME/.cabal
   - $HOME/.stack
 
-# The different configurations we want to test. We have BUILD=cabal which uses
-# cabal-install, and BUILD=stack which uses Stack. More documentation on each
-# of those below.
-#
-# We set the compiler values here to tell Travis to use a different
-# cache file per set of arguments.
-#
-# If you need to have different apt packages for each combination in the
-# matrix, you can use a line such as:
-#     addons: {apt: {packages: [libfcgi-dev,libgmp-dev]}}
 matrix:
   include:
   # We grab the appropriate GHC and cabal-install versions from hvr's PPA. See:
@@ -48,8 +25,6 @@ matrix:
     compiler: ": #GHC HEAD"
     addons: {apt: {packages: [cabal-install-head,ghc-head,happy-1.19.5,alex-3.1.7], sources: [hvr-ghc]}}
 
-  # The Stack builds. We can pass in arbitrary Stack arguments via the ARGS
-  # variable, such as using --stack-yaml to point to a different file.
   - env: BUILD=stack STACK_RESOLVER="lts" STACK_YAML="etc/travis/lts-8-stack.yaml"
     compiler: ": #stack default"
     addons: {apt: {packages: [libgmp-dev]}}
@@ -62,30 +37,26 @@ matrix:
     compiler: ": #stack 8.0.2"
     addons: {apt: {packages: [libgmp-dev]}}
 
-  # Nightly builds are allowed to fail
   - env: BUILD=stack STACK_RESOLVER="nightly" STACK_YAML="etc/travis/new-stack.yaml"
     compiler: ": #stack nightly"
     addons: {apt: {packages: [libgmp-dev]}}
 
-  # Build on macOS in addition to Linux
 
-  # TODO add this back once you figure out how to install the icu library on mac
+  - env: BUILD=stack STACK_RESOLVER="lts" STACK_YAML="etc/travis/lts-8-stack.yaml"
+    compiler: ": #stack default osx"
+    os: osx
 
-  # - env: BUILD=stack ARGS=""
-  #   compiler: ": #stack default osx"
-  #   os: osx
+  - env: BUILD=stack STACK_RESOLVER="lts-7" STACK_YAML="etc/travis/old-stack.yaml"
+    compiler: ": #stack 8.0.1 osx"
+    os: osx
 
-  # - env: BUILD=stack ARGS="--resolver lts-6"
-  #   compiler: ": #stack 7.10.3 osx"
-  #   os: osx
+  - env: BUILD=stack STACK_RESOLVER="lts-8" STACK_YAML="etc/travis/lts-8-stack.yaml"
+    compiler: ": #stack 8.0.2 osx"
+    os: osx
 
-  # - env: BUILD=stack ARGS="--resolver lts-7"
-  #   compiler: ": #stack 8.0.1 osx"
-  #   os: osx
-
-  # - env: BUILD=stack ARGS="--resolver nightly"
-  #   compiler: ": #stack nightly osx"
-  #   os: osx
+  - env: BUILD=stack STACK_RESOLVER="nightly" STACK_YAML="etc/travis/new-stack.yaml"
+    compiler: ": #stack nightly osx"
+    os: osx
 
   allow_failures:
   - env: BUILD=cabal GHCVER=head  CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
@@ -118,6 +89,13 @@ before_install:
   then
     echo 'jobs: $ncpus' >> $HOME/.cabal/config
   fi
+- | 
+  if [ "$TRAVIS_OS_NAME" = "osx" ] 
+  then
+      brew update
+      brew install icu4c
+      export ARGS="--extra-lib-dirs=/usr/local/opt/icu4c/lib --extra-include-dirs=/usr/local/opt/icu4c/include $ARGS"
+  fi
 
 install:
 - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
@@ -126,7 +104,7 @@ install:
   set -ex
   case "$BUILD" in
     stack)
-      stack --no-terminal --resolver $STACK_RESOLVER --install-ghc test --bench --only-dependencies
+      stack $ARGS --no-terminal --resolver $STACK_RESOLVER --install-ghc test --bench --only-dependencies
       ;;
     cabal)
       cabal --version
@@ -168,3 +146,4 @@ script:
       ;;
   esac
   set +ex
+- bash etc/run-integrations.sh
