@@ -1,5 +1,5 @@
 name:                marvin
-version:             0.2.0
+version:             0.2.1
 synopsis:            A framework for modular, portable chat bots.
 description:         A framework for writing portable chat bots. Inspired by hubot. 
                      . 

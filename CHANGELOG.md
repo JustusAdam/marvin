@@ -1,3 +1,9 @@
+# 0.2.1 - 04.03.2017
+
+- Fixed the templates for the initializer
+- added tests to ensure integration test bot and project created by initializer actually compile
+- Fixed the travis configurations
+
 # 0.2.0 - 25.02.2017
 
 - Implemented an adapter for IRC
