@@ -112,7 +112,7 @@ isMention :: IsAdapter a
           => L.Text     -- ^Bot name
           -> L.Text     -- ^Target of message
           -> L.Text     -- ^The actual message text
-          -> ((User a -> Channel a -> L.Text -> TimeStamp -> MT.Event a), L.Text)
+          -> (User a -> Channel a -> L.Text -> TimeStamp -> MT.Event a, L.Text)
 isMention botname target msg
   | L.head target /= '#' = (CommandEvent, msg)
   | otherwise = case msg of
@@ -125,7 +125,7 @@ setUp :: Chan MarvinIRCMsg -> L.Text -> [L.Text] -> IO ()
 setUp chan username channels = do
     writeChan chan (Nick username)
     writeChan chan (RawMsg $ "User " <> username <> " 0 * :" <> username)
-    forM_ channels (writeChan chan . Join)
+    writeList2Chan chan $ map Join channels
 
 instance IsAdapter IRCAdapter where
     -- | Stores the username
@@ -158,4 +158,6 @@ instance IsAdapter IRCAdapter where
         IRCAdapter{msgOutChan} <- getAdapter
         inChan <- newChan
         async $ processor inChan handler
-        liftIO $ ircClient port host (setUp msgOutChan user channels) (consumer inChan) (producer msgOutChan)
+        liftIO $ do 
+            setUp msgOutChan user channels
+            ircClient port host (return ()) (consumer inChan) (producer msgOutChan)
