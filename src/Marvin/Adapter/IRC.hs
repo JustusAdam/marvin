@@ -11,6 +11,7 @@ See caveats and potential issues with this adapter here <https://marvin.readthed
 -}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE Rank2Types     #-}
+{-# LANGUAGE ViewPatterns   #-}
 module Marvin.Adapter.IRC
     ( IRCAdapter, IRCChannel
     ) where
@@ -75,8 +76,13 @@ processor inChan handler = do
                                         User nick -> (nick, Direct nick)
                                         Channel chan user -> (user, RealChannel chan)
                 case _message ev of
-                    Privmsg _ (Right msg) ->
-                        runHandler $ CommandEvent user channel msg ts
+                    Privmsg target (Right msg) -> do
+                        -- Privmsg can either be a private message directly to
+                        -- the user, or it could be a message going to a
+                        -- channel.
+                        botname <- getBotname
+                        let (cmd, msg') = isMention botname target msg
+                        runHandler $ cmd user channel msg' ts
                     Notice target (Right msg) -> do
                         botname <- getBotname
                         -- Check if bot is addressed
@@ -87,11 +93,32 @@ processor inChan handler = do
                     Topic channel' t -> runHandler $ TopicChangeEvent user (RealChannel channel') t ts
                     Ping a b -> writeChan msgOutChan $ Pong $ fromMaybe a b
                     Invite chan _ -> writeChan msgOutChan $ Join chan
-                    _ -> logDebugN $(isT "Unhadeled event #{rawEv}")
+                    _ -> logDebugN $(isT "Unhandled event #{rawEv}")
     forever $
         handleOneMessage `catch` (\e -> logErrorN $(isT "UserError: #{e :: ErrorCall}"))
   where
     runHandler = void . async . liftIO . handler
+
+-- If the bot is the target of the message, it's a command. Also we should
+-- treat the message as a command if the message starts with the name of the
+-- bot followed by a colon or a comma.
+--
+-- For such message we strip off the name, separator and whitespace and return
+-- just the important bit.
+--
+--  * "marvin: hello" returns (CommandEvent, "hello")
+--  * "hey everyone"  returns (MessageEvent, "hey everyone")
+isMention :: IsAdapter a
+          => L.Text     -- ^Bot name
+          -> L.Text     -- ^Target of message
+          -> L.Text     -- ^The actual message text
+          -> ((User a -> Channel a -> L.Text -> TimeStamp -> MT.Event a), L.Text)
+isMention botname target msg
+  | L.head target /= '#' = (CommandEvent, msg)
+  | otherwise = case msg of
+      (L.stripPrefix (botname <> ", ") -> Just msg') -> (CommandEvent, L.stripStart msg')
+      (L.stripPrefix (botname <> ": ") -> Just msg') -> (CommandEvent, L.stripStart msg')
+      _                                              -> (MessageEvent, msg)
 
 
 setUp :: Chan MarvinIRCMsg -> L.Text -> [L.Text] -> IO ()
