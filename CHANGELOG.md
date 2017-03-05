@@ -1,3 +1,10 @@
+# 0.2.3 - 05.03.2017
+
+- A big thanks to @lubomir for testing the IRC adapter and contributing the following changes
+    - Better command recognition in IRC adapter
+    - Bot now properly registers in IRC
+    - Added config setting to IRC for channels which the bot should join
+
 # 0.2.2 - 05.03.2017
 
 - Removed the integration tests from the cabal package config
