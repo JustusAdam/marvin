@@ -26,6 +26,7 @@ import           Control.Monad.Logger
 import           Data.ByteString                 (ByteString)
 import           Data.Conduit
 import           Data.Maybe
+import           Data.Monoid                     ((<>))
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
 import qualified Data.Text.Lazy                  as L
@@ -93,6 +94,12 @@ processor inChan handler = do
     runHandler = void . async . liftIO . handler
 
 
+setUp :: Chan MarvinIRCMsg -> L.Text -> [L.Text] -> IO ()
+setUp chan username channels = do
+    writeChan chan (Nick username)
+    writeChan chan (RawMsg $ "User " <> username <> " 0 * :" <> username)
+    forM_ channels (writeChan chan . Join)
+
 instance IsAdapter IRCAdapter where
     -- | Stores the username
     type User IRCAdapter = L.Text
@@ -119,7 +126,9 @@ instance IsAdapter IRCAdapter where
     runWithAdapter handler = do
         port <- fromMaybe 7000 <$> lookupFromAdapterConfig "port"
         host <- requireFromAdapterConfig "host"
+        user <- getBotname
+        channels <- requireFromAdapterConfig "channels"
         IRCAdapter{msgOutChan} <- getAdapter
         inChan <- newChan
         async $ processor inChan handler
-        liftIO $ ircClient port host (return ()) (consumer inChan) (producer msgOutChan)
+        liftIO $ ircClient port host (setUp msgOutChan user channels) (consumer inChan) (producer msgOutChan)
