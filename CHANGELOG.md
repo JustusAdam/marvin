@@ -1,3 +1,7 @@
+# 0.2.2 - 05.03.2017
+
+- Removed the integration tests from the cabal package config
+
 # 0.2.1 - 04.03.2017
 
 - Fixed the templates for the initializer
