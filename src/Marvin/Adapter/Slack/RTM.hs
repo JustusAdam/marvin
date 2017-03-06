@@ -15,7 +15,7 @@ module Marvin.Adapter.Slack.RTM
     ) where
 
 
-import           Control.Concurrent.Async.Lifted (async)
+import           Control.Concurrent.Async.Lifted (async, link)
 import           Control.Concurrent.Chan.Lifted
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM          (atomically, newTMVar, putTMVar, takeTMVar)
@@ -120,6 +120,7 @@ instance MkSlack RTM where
     mkAdapterId = "slack-rtm"
     initIOConnections inChan = do
         connTracker <- newEmptyMVar
-        async $ runConnectionLoop inChan connTracker
+        a <- async $ runConnectionLoop inChan connTracker
+        link a
         senderLoop connTracker
 

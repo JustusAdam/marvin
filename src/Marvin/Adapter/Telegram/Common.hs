@@ -183,9 +183,8 @@ runnerImpl :: forall a. MkTelegram a => RunWithAdapter (TelegramAdapter a)
 runnerImpl handler = do
     msgChan <- newChan
     let eventGetter = mkEventGetter msgChan
-    async $ eventGetter `catch` \e -> do
-        logErrorN $(isT "Unexpected exception in event getter: #{e :: SomeException}")
-        throw e
+    a <- async eventGetter
+    link a
 
     forever $ do
         logDebugN "Starting to read"

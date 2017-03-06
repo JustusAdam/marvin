@@ -5,7 +5,7 @@ module Marvin.Adapter.Slack.Common where
 
 import           Control.Applicative             ((<|>))
 import           Control.Arrow                   ((&&&))
-import           Control.Concurrent.Async.Lifted (async)
+import           Control.Concurrent.Async.Lifted (async, link)
 import           Control.Concurrent.Chan.Lifted  (Chan, newChan, readChan, writeChan)
 import           Control.Concurrent.MVar.Lifted  (modifyMVar, modifyMVar_, newMVar, readMVar)
 import           Control.Lens                    hiding ((.=))
@@ -128,7 +128,8 @@ runHandlerLoop evChan handler =
 runnerImpl :: MkSlack a => RunWithAdapter (SlackAdapter a)
 runnerImpl handler = do
     messageChan <- newChan
-    void $ async $ initIOConnections messageChan
+    a <- async $ initIOConnections messageChan
+    link a
     runHandlerLoop messageChan handler
 
 

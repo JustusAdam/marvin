@@ -102,12 +102,13 @@ sendMessageLoop = do
             Right () -> return ()
 
 
--- | Recieve events as a server via HTTP webhook (not implemented yet)
+-- | Recieve events as a server via HTTP webhook
 data EventsAPI
 
 
 instance MkSlack EventsAPI where
     mkAdapterId = "slack-events"
     initIOConnections inChan = do
-        void $ async $ runEventReceiver inChan
+        a <- async $ runEventReceiver inChan
+        link a
         sendMessageLoop
