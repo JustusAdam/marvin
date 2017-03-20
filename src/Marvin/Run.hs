@@ -97,6 +97,7 @@ mkApp log handlers cfg adapter = flip runLoggingT log . genericHandler
     handler (ChannelJoinEvent user chan ts) = changeHandlerHelper joinsV joinsInV (User' user, , ts) chan
     handler (ChannelLeaveEvent user chan ts) = changeHandlerHelper leavesV leavesFromV (User' user, , ts) chan
     handler (TopicChangeEvent user chan topic ts) = changeHandlerHelper topicsV topicsInV (User' user, , topic, ts) chan
+    handler (FileSharedEvent user chan file ts) = changeHandlerHelper fileSharesV fileSharesInV (User' user, , File' file, ts) chan
 
     changeHandlerHelper :: Vector (d -> RunnerM ())
                         -> HM.HashMap L.Text (Vector (d -> RunnerM ()))
@@ -116,11 +117,11 @@ mkApp log handlers cfg adapter = flip runLoggingT log . genericHandler
         mapM_ wait applicablesRunning
 
 
-    handleMessageLike :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp) -> RunnerM ())
+    handleMessageLike :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
                       -> User a
                       -> Channel a
                       -> Message
-                      -> TimeStamp
+                      -> TimeStamp a
                       -> RunnerM ()
     handleMessageLike v user chan msg ts = do
         lDispatches <- doIfMatch v
@@ -134,7 +135,7 @@ mkApp log handlers cfg adapter = flip runLoggingT log . genericHandler
     handleCommand = handleMessageLike respondsV
     handleMessage = handleMessageLike hearsV
 
-    Handlers respondsV hearsV customsV joinsV leavesV topicsV joinsInV leavesFromV topicsInV = handlers
+    Handlers respondsV hearsV customsV joinsV leavesV topicsV fileSharesV joinsInV leavesFromV topicsInV fileSharesInV = handlers
 
 
 application :: IsAdapter a => LoggingFn -> [ScriptInit a] -> C.Config -> a -> RunnerM (EventHandler a)

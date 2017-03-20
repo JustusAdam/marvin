@@ -18,7 +18,11 @@ import           Data.String                    (IsString (..))
 import qualified Data.Text                      as T
 import qualified Data.Text.Lazy                 as L
 import           Marvin.Adapter
+import           Marvin.Types
 import           Network.URI
+import Data.Maybe (fromJust)
+import Data.List (stripPrefix)
+import Util
 
 
 jsonParseURI :: Value -> Parser URI
@@ -48,6 +52,7 @@ class HasIdValue s a | s -> a where idValue :: Lens' s a
 class HasUsername s a | s -> a where username :: Lens' s a
 class HasNameResolver s a | s -> a where nameResolver :: Lens' s a
 class HasInfoCache s a | s -> a where infoCache :: Lens' s a
+class HasCreated s a | s -> a where created :: Lens' s a
 
 declareFields [d|
     data LimitedChannelInfo = LimitedChannelInfo
@@ -103,6 +108,24 @@ data SlackAdapter a = SlackAdapter
     , userInfoCache :: MVar UserCache
     , outChannel    :: Chan (SlackChannelId, L.Text)
     }
+
+instance FromJSON (TimeStamp (SlackAdapter ())) where parseJSON = timestampFromNumber
+
+data SlackFile = SlackFile
+    { slackFileIdValue :: L.Text
+    , slackFileCreated :: TimeStamp (SlackAdapter ())
+    , slackFileName :: Maybe L.Text
+    , slackFileNitle :: Maybe L.Text
+    , slackFileFiletype :: L.Text
+    , slackFilePermalink :: L.Text
+    , slackFileSize :: Int
+    , slackFileEditable :: Bool
+    , slackFilePublic :: Bool
+    , slackFileUser :: SlackUserId
+    }
+
+deriveFromJSON (defaultOptions {fieldLabelModifier = camelTo2 '_' . fromJust . stripPrefix "slackFile" }) ''SlackFile
+makeFields ''SlackFile
 
 
 instance FromJSON RTMData where

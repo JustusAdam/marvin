@@ -106,7 +106,7 @@ onScriptExcept id trigger e = do
 -- | Whenever any message matches the provided regex this handler gets run.
 --
 -- Equivalent to "robot.hear" in hubot
-hear :: Regex -> BotReacting a (User' a, Channel' a, Match, Message, TimeStamp) () -> ScriptDefinition a ()
+hear :: Regex -> BotReacting a (User' a, Channel' a, Match, Message, TimeStamp a) () -> ScriptDefinition a ()
 hear !re ac = ScriptDefinition $ do
     pac <- prepareAction (Just re) ac
     actions . hears %= V.cons (re, pac)
@@ -114,7 +114,7 @@ hear !re ac = ScriptDefinition $ do
 -- | Runs the handler only if the bot was directly addressed.
 --
 -- Equivalent to "robot.respond" in hubot
-respond :: Regex -> BotReacting a (User' a, Channel' a, Match, Message, TimeStamp) () -> ScriptDefinition a ()
+respond :: Regex -> BotReacting a (User' a, Channel' a, Match, Message, TimeStamp a) () -> ScriptDefinition a ()
 respond !re ac = ScriptDefinition $ do
     pac <- prepareAction (Just re) ac
     actions . responds %= V.cons (re, pac)
@@ -123,7 +123,7 @@ respond !re ac = ScriptDefinition $ do
 -- | This handler runs whenever a user enters __any channel__ (which the bot is subscribed to)
 --
 -- The payload contains the entering user and the channel which was entered.
-enter :: BotReacting a (User' a, Channel' a, TimeStamp) () -> ScriptDefinition a ()
+enter :: BotReacting a (User' a, Channel' a, TimeStamp a) () -> ScriptDefinition a ()
 enter ac = ScriptDefinition $ do
     pac <- prepareAction (Just "enter event" :: Maybe T.Text) ac
     actions . joins %= V.cons pac
@@ -132,7 +132,7 @@ enter ac = ScriptDefinition $ do
 -- | This handler runs whenever a user exits __any channel__ (which the bot is subscribed to)
 --
 -- The payload contains the exiting user and the channel which was exited.
-exit :: BotReacting a (User' a, Channel' a, TimeStamp) () -> ScriptDefinition a ()
+exit :: BotReacting a (User' a, Channel' a, TimeStamp a) () -> ScriptDefinition a ()
 exit ac = ScriptDefinition $ do
     pac <- prepareAction (Just "exit event" :: Maybe T.Text) ac
     actions . leaves %= V.cons pac
@@ -147,7 +147,7 @@ alterHelper v = return . maybe (return v) (V.cons v)
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the entering user.
-enterIn :: L.Text -> BotReacting a (User' a, Channel' a, TimeStamp) () -> ScriptDefinition a ()
+enterIn :: L.Text -> BotReacting a (User' a, Channel' a, TimeStamp a) () -> ScriptDefinition a ()
 enterIn !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "enter event in #{chanName}")) ac
     actions . joinsIn %= HM.alter (alterHelper pac) chanName
@@ -158,7 +158,7 @@ enterIn !chanName ac = ScriptDefinition $ do
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the exting user.
-exitFrom :: L.Text -> BotReacting a (User' a, Channel' a, TimeStamp) () -> ScriptDefinition a ()
+exitFrom :: L.Text -> BotReacting a (User' a, Channel' a, TimeStamp a) () -> ScriptDefinition a ()
 exitFrom !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "exit event in #{chanName}")) ac
     actions . leavesFrom %= HM.alter (alterHelper pac) chanName
@@ -167,7 +167,7 @@ exitFrom !chanName ac = ScriptDefinition $ do
 -- | This handler runs when the topic in __any channel__ the bot is subscribed to changes.
 --
 -- The payload contains the new topic and the channel in which it was set.
-topic :: BotReacting a (User' a, Channel' a, Topic, TimeStamp) () -> ScriptDefinition a ()
+topic :: BotReacting a (User' a, Channel' a, Topic, TimeStamp a) () -> ScriptDefinition a ()
 topic ac = ScriptDefinition $ do
     pac <- prepareAction (Just "topic event" :: Maybe T.Text) ac
     actions . topicChange %= V.cons pac
@@ -176,10 +176,22 @@ topic ac = ScriptDefinition $ do
 -- | This handler runs when the topic in __the specified channel__ is changed, provided the bot is subscribed to the channel in question.
 --
 -- The argument is the human readable channel name.
-topicIn :: L.Text -> BotReacting a (User' a, Channel' a, Topic, TimeStamp) () -> ScriptDefinition a ()
+topicIn :: L.Text -> BotReacting a (User' a, Channel' a, Topic, TimeStamp a) () -> ScriptDefinition a ()
 topicIn !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "topic event in #{chanName}")) ac
     actions . topicChangeIn %= HM.alter (alterHelper pac) chanName
+
+
+fileShared :: BotReacting a (User' a, Channel' a, File' a, TimeStamp a) () -> ScriptDefinition a ()
+fileShared ac = ScriptDefinition $ do
+    pac <- prepareAction (Just "file event" :: Maybe T.Text) ac
+    actions . fileShares %= V.cons pac
+
+
+fileSharedIn :: L.Text -> BotReacting a (User' a, Channel' a, File' a, TimeStamp a) () -> ScriptDefinition a ()
+fileSharedIn !chanName ac = ScriptDefinition $ do
+    pac <- prepareAction (Just $(isT "file event in #{chanName}")) ac
+    actions . fileSharesIn %= HM.alter (alterHelper pac) chanName
 
 
 -- | Extension point for the user
@@ -299,6 +311,11 @@ getChannel = (unwrapChannel' :: Channel' a -> Channel a) <$> view (payload . get
 -- | Get the user which was part of the triggered action.
 getUser :: forall m a. Get m (User' a) => BotReacting a m (User a)
 getUser = (unwrapUser' :: User' a -> User a) <$> view (payload . getLens)
+
+
+-- | Get the stored file.
+getFile :: forall a m. Get m (File' a) => BotReacting a m (File a)
+getFile = (unwrapFile' :: File' a -> File a) <$> view (payload . getLens)
 
 
 -- | Get a value out of the config, returns 'Nothing' if the value didn't exist.

@@ -9,6 +9,7 @@ import qualified Data.Version             as V
 import           Marvin.Prelude
 import qualified Paths_marvin_integration as P
 
+-- Add a test that the HasFiles functionality is available as is to be expected
 
 script :: IsAdapter a => ScriptInit a
 script = defineScript "test" $ do

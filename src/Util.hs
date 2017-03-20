@@ -28,7 +28,7 @@ loggingAddSourcePrefix :: T.Text -> (a -> T.Text -> c) -> a -> T.Text -> c
 loggingAddSourcePrefix = adaptLoggingSource . addPrefix
 
 
-timestampFromNumber :: Value -> Parser TimeStamp
+timestampFromNumber :: Value -> Parser (TimeStamp a)
 timestampFromNumber (Number n) = return $ TimeStamp $ posixSecondsToUTCTime $ realToFrac n
 timestampFromNumber (String s) = maybe mzero (return . TimeStamp . posixSecondsToUTCTime . realToFrac) (readMaybe (T.unpack s) :: Maybe Double)
 timestampFromNumber _ = mzero

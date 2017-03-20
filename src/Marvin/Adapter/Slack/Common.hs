@@ -26,7 +26,8 @@ import           Marvin.Interpolate.All
 import           Marvin.Types
 import           Network.Wreq
 import           Util
-
+import Data.Maybe (fromMaybe)
+import Unsafe.Coerce
 
 
 messageParser :: Value -> Parser (Event (SlackAdapter a))
@@ -75,6 +76,8 @@ eventParser v@(Object o) = isErrParser <|> hasTypeParser
                     "group_leave" -> cLeave
                     "channel_topic" ->
                         TopicChangeEvent <$> user <*> channel <*> o .: "topic" <*> ts
+                    "file_share" -> 
+                        FileSharedEvent <$> user <*> channel <*> o .: "file" <*> ts
                     _ -> msgEv
 
             _ -> msgEv
@@ -292,4 +295,17 @@ instance MkSlack a => IsAdapter (SlackAdapter a) where
     getChannelName = getChannelNameImpl
     resolveChannel = resolveChannelImpl
     resolveUser = resolveUserImpl
+
+
+instance HasFiles (SlackAdapter a) where
+    type File (SlackAdapter a) = SlackFile
+
+    getFileName = return . fromMaybe "" . (^.name)
+    getFileType = return . (^.filetype)
+    getFileUrl = return . (^.permalink)
+    readFileContents _ = do
+        logErrorN "Reading file is not implemented"
+        return ""
+    getCreationDate = return . unsafeCoerce . (^.created)
+    getFileSize = return . (^.size)
 

@@ -112,7 +112,7 @@ isMention :: IsAdapter a
           => L.Text     -- ^Bot name
           -> L.Text     -- ^Target of message
           -> L.Text     -- ^The actual message text
-          -> (User a -> Channel a -> L.Text -> TimeStamp -> MT.Event a, L.Text)
+          -> (User a -> Channel a -> L.Text -> TimeStamp a -> MT.Event a, L.Text)
 isMention botname target msg
   | L.head target /= '#' = (CommandEvent, msg)
   | otherwise = case msg of

@@ -34,17 +34,20 @@ type Topic = L.Text
 -- | The contents of a recieved message
 type Message = L.Text
 
--- | A timestamp type. Supplied with most 'Event' types
-newtype TimeStamp = TimeStamp { unwrapTimeStamp :: UTCTime } deriving Show
+-- | A timestamp type. Supplied with most 'Event' types.
+--
+-- The type parameter is inly a tag. It is used so you may declare instances for classes such as 'FromJSON' for this type depending on your adapter. So that different adapters may have different 'FromJSON' instances for the timestamp.
+newtype TimeStamp a = TimeStamp { unwrapTimeStamp :: UTCTime } deriving Show
 
 
 -- | Representation for the types of events which can occur
 data Event a
-    = MessageEvent (User a) (Channel a) Message TimeStamp
-    | CommandEvent (User a) (Channel a) Message TimeStamp
-    | ChannelJoinEvent (User a) (Channel a) TimeStamp
-    | ChannelLeaveEvent (User a) (Channel a) TimeStamp
-    | TopicChangeEvent (User a) (Channel a) Topic TimeStamp
+    = MessageEvent (User a) (Channel a) Message (TimeStamp a)
+    | CommandEvent (User a) (Channel a) Message (TimeStamp a)
+    | ChannelJoinEvent (User a) (Channel a) (TimeStamp a)
+    | ChannelLeaveEvent (User a) (Channel a) (TimeStamp a)
+    | TopicChangeEvent (User a) (Channel a) Topic (TimeStamp a)
+    | HasFiles a => FileSharedEvent (User a) (Channel a) (File a) (TimeStamp a)
 
 -- | Basic monad which most internal actions run in
 type RunnerM = LoggingT IO
@@ -80,11 +83,25 @@ class IsAdapter a where
     resolveUser :: L.Text -> AdapterM a (Maybe (User a))
 
 
--- | Wrapping type for users. Only used to enable 'Get' typeclass instances.
-newtype User' a = User' {unwrapUser' :: User a}
--- | Wrapping type for channels. Only used to enable 'Get' typeclass instances.
-newtype Channel' a = Channel' {unwrapChannel' :: Channel a}
+class HasFiles a where
+    -- | Concrete type of an uploaded file
+    type File a
+    -- | Resolve the name of the file
+    getFileName :: File a -> AdapterM a L.Text
+    getFileType :: File a -> AdapterM a L.Text
+    getFileUrl :: File a -> AdapterM a L.Text
+    readFileContents :: File a -> AdapterM a L.Text
+    getCreationDate :: File a -> AdapterM a (TimeStamp a)
+    getFileSize :: File a -> AdapterM a Int
 
+
+-- | Wrapping type for users. Only used to enable 'Get' typeclass instances.
+newtype User' a = User' { unwrapUser' :: User a }
+-- | Wrapping type for channels. Only used to enable 'Get' typeclass instances.
+newtype Channel' a = Channel' { unwrapChannel' :: Channel a }
+
+-- | Wrapping type for files. Only used to enable 'Get' typeclass instances.
+newtype File' a = File' { unwrapFile' :: File a }
 
 -- | A type, basically a String, which identifies a script to the config and the logging facilities.
 --
@@ -110,6 +127,8 @@ class HasLeaves s a | s -> a where leaves :: Lens' s a
 class HasJoinsIn s a | s -> a where joinsIn :: Lens' s a
 class HasJoins s a | s -> a where joins :: Lens' s a
 class HasHears s a | s -> a where hears :: Lens' s a
+class HasFileShares s a | s -> a where fileShares :: Lens' s a
+class HasFileSharesIn s a | s -> a where fileSharesIn :: Lens' s a
 class HasCustoms s a | s -> a where customs :: Lens' s a
 class HasActions s a | s -> a where actions :: Lens' s a
 
@@ -126,15 +145,17 @@ declareFields [d|
 
 declareFields [d|
     data Handlers a = Handlers
-        { handlersResponds :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp) -> RunnerM ())
-        , handlersHears :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp) -> RunnerM ())
+        { handlersResponds :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
+        , handlersHears :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
         , handlersCustoms :: Vector (Event a -> Maybe (RunnerM ()))
-        , handlersJoins :: Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ())
-        , handlersLeaves :: Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ())
-        , handlersTopicChange :: Vector ((User' a, Channel' a, Topic, TimeStamp) -> RunnerM ())
-        , handlersJoinsIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ()))
-        , handlersLeavesFrom :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp) -> RunnerM ()))
-        , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, Topic, TimeStamp) -> RunnerM ()))
+        , handlersJoins :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
+        , handlersLeaves :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
+        , handlersTopicChange :: Vector ((User' a, Channel' a, Topic, TimeStamp a) -> RunnerM ())
+        , handlersFileShares :: Vector ((User' a, Channel' a, File' a, TimeStamp a) -> RunnerM ())
+        , handlersJoinsIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
+        , handlersLeavesFrom :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
+        , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, Topic, TimeStamp a) -> RunnerM ()))
+        , handlersFileSharesIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, File' a, TimeStamp a) -> RunnerM ()))
         } deriving Generic
     |]
 
@@ -143,10 +164,10 @@ instance NFData (Handlers a)
 
 
 instance Monoid (Handlers a) where
-    mempty = Handlers mempty mempty mempty mempty mempty mempty mempty mempty mempty
-    mappend (Handlers r1 h1 c1 j1 l1 t1 ji1 li1 ti1)
-            (Handlers r2 h2 c2 j2 l2 t2 ji2 li2 ti2)
-        = Handlers (r1 <> r2) (h1 <> h2) (c1 <> c2) (j1 <> j2) (l1 <> l2) (t1 <> t2) (HM.unionWith mappend ji1 ji2) (HM.unionWith mappend li1 li2) (HM.unionWith mappend ti1 ti2)
+    mempty = Handlers mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
+    mappend (Handlers r1 h1 c1 j1 l1 t1 fs1 ji1 li1 ti1 fsi1)
+            (Handlers r2 h2 c2 j2 l2 t2 fs2 ji2 li2 ti2 fsi2)
+        = Handlers (r1 <> r2) (h1 <> h2) (c1 <> c2) (j1 <> j2) (l1 <> l2) (t1 <> t2) (fs1 <> fs2) (HM.unionWith mappend ji1 ji2) (HM.unionWith mappend li1 li2) (HM.unionWith mappend ti1 ti2) (HM.unionWith mappend fsi1 fsi2)
 
 
 
@@ -218,13 +239,13 @@ instance Get (a, Channel' b, c, d) (Channel' b) where
 instance Get (a, Channel' b, c, d, e) (Channel' b) where
     getLens = _2
 
-instance Get (a, b, TimeStamp) TimeStamp where
+instance Get (a, b, TimeStamp c) (TimeStamp c) where
     getLens = _3
 
-instance Get (a, b, c, TimeStamp) TimeStamp where
+instance Get (a, b, c, TimeStamp d) (TimeStamp d) where
     getLens = _4
 
-instance Get (a, b, c, d, TimeStamp) TimeStamp where
+instance Get (a, b, c, d, TimeStamp e) (TimeStamp e) where
     getLens = _5
 
 instance Get (a, b, Match, d, e) Match where
@@ -234,6 +255,9 @@ instance Get (a, b, c, Message, e) Message where
     getLens = _4
 
 instance Get (a, b, Topic, d) Topic where
+    getLens = _3
+
+instance Get (a, b, File' c, d) (File' c) where
     getLens = _3
 
 instance HasConfigAccess (ScriptDefinition a) where
