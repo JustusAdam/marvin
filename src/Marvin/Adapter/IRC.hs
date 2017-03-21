@@ -159,6 +159,6 @@ instance IsAdapter IRCAdapter where
         inChan <- newChan
         a <- async $ processor inChan handler
         link a
-        liftIO $ do 
+        liftIO $ do
             setUp msgOutChan user channels
             ircClient port host (return ()) (consumer inChan) (producer msgOutChan)

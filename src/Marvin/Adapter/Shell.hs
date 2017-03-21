@@ -17,7 +17,9 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Loops
 import           Data.Char                       (isSpace)
+import           Data.Maybe                      (fromJust)
 import qualified Data.Text.Lazy                  as L
+import qualified Data.Text.Lazy.IO               as L
 import           Data.Time.Clock                 (getCurrentTime)
 import           Marvin.Adapter
 import           Marvin.Interpolate.String
@@ -41,7 +43,20 @@ help = L.unlines
     , ":leave <user> ~ make <user> leave the channel"
     , ":leave <user> <channel> ~ make <user> leave the channel <channel>"
     , ":topic <...topic> ~ change the topic to <topic>"
+    , ":file <path> ~ share file with <path> to <channel>"
+    , ":file <channel> <path> ~ share file with <path> to <channel>"
+    , ":file <user> <channel> <path> ~ share file with <path> to <channel>"
     ]
+
+
+instance HasFiles ShellAdapter where
+    type File ShellAdapter = L.Text
+    getFileName = return
+    getFileType = error "not implemented"
+    getFileUrl = return
+    readFileContents = liftIO . L.readFile . L.unpack
+    getCreationDate = error "not implemented"
+    getFileSize = error "not implemented"
 
 
 instance IsAdapter ShellAdapter where
@@ -83,7 +98,10 @@ instance IsAdapter ShellAdapter where
                                 [":join", user, chan] -> handler $ ChannelJoinEvent user chan ts
                                 [":leave", user] -> handler $ ChannelLeaveEvent user "shell" ts
                                 [":leave", user, chan] -> handler $ ChannelLeaveEvent user chan ts
-                                (":topic":t) -> handler $ TopicChangeEvent "shell" "shell" (L.unwords t) ts
+                                (":topic":t) -> handler $ TopicChangeEvent "shell" "shell" (fromJust $ L.stripPrefix ":topic" mtext) ts
+                                [":file", chan, path] -> handler $ FileSharedEvent "shell" chan path ts
+                                [":file", path] -> handler $ FileSharedEvent "shell" "shell" path ts
+                                [":file", user, chan, path] -> handler $ FileSharedEvent user chan path ts
                                 (x:_) | ":" `L.isPrefixOf` x ->
                                     putMVar out $ Just $(isL "Unknown command #{x} or unexpected arguments")
                                 _ ->  -- handle message

@@ -14,15 +14,15 @@ import qualified Data.ByteString.Lazy.Char8     as BS
 import           Data.Foldable                  (toList)
 import           Data.Hashable
 import           Data.HashMap.Strict            (HashMap)
+import           Data.List                      (stripPrefix)
+import           Data.Maybe                     (fromJust)
 import           Data.String                    (IsString (..))
 import qualified Data.Text                      as T
 import qualified Data.Text.Lazy                 as L
 import           Marvin.Adapter
 import           Marvin.Types
 import           Network.URI
-import Data.Maybe (fromJust)
-import Data.List (stripPrefix)
-import Util
+import           Util
 
 
 jsonParseURI :: Value -> Parser URI
@@ -112,16 +112,16 @@ data SlackAdapter a = SlackAdapter
 instance FromJSON (TimeStamp (SlackAdapter ())) where parseJSON = timestampFromNumber
 
 data SlackFile = SlackFile
-    { slackFileIdValue :: L.Text
-    , slackFileCreated :: TimeStamp (SlackAdapter ())
-    , slackFileName :: Maybe L.Text
-    , slackFileNitle :: Maybe L.Text
-    , slackFileFiletype :: L.Text
+    { slackFileIdValue   :: L.Text
+    , slackFileCreated   :: TimeStamp (SlackAdapter ())
+    , slackFileName      :: Maybe L.Text
+    , slackFileNitle     :: Maybe L.Text
+    , slackFileFiletype  :: L.Text
     , slackFilePermalink :: L.Text
-    , slackFileSize :: Int
-    , slackFileEditable :: Bool
-    , slackFilePublic :: Bool
-    , slackFileUser :: SlackUserId
+    , slackFileSize      :: Int
+    , slackFileEditable  :: Bool
+    , slackFilePublic    :: Bool
+    , slackFileUser      :: SlackUserId
     }
 
 deriveFromJSON (defaultOptions {fieldLabelModifier = camelTo2 '_' . fromJust . stripPrefix "slackFile" }) ''SlackFile

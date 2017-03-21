@@ -18,6 +18,7 @@ import qualified Data.ByteString.Lazy.Char8      as BS
 import           Data.Char                       (isSpace)
 import           Data.Foldable                   (asum)
 import qualified Data.HashMap.Strict             as HM
+import           Data.Maybe                      (fromMaybe)
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter                  hiding (mkAdapterId)
@@ -25,9 +26,8 @@ import           Marvin.Adapter.Slack.Types
 import           Marvin.Interpolate.All
 import           Marvin.Types
 import           Network.Wreq
+import           Unsafe.Coerce
 import           Util
-import Data.Maybe (fromMaybe)
-import Unsafe.Coerce
 
 
 messageParser :: Value -> Parser (Event (SlackAdapter a))
@@ -76,7 +76,7 @@ eventParser v@(Object o) = isErrParser <|> hasTypeParser
                     "group_leave" -> cLeave
                     "channel_topic" ->
                         TopicChangeEvent <$> user <*> channel <*> o .: "topic" <*> ts
-                    "file_share" -> 
+                    "file_share" ->
                         FileSharedEvent <$> user <*> channel <*> o .: "file" <*> ts
                     _ -> msgEv
 
