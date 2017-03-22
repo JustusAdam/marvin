@@ -21,7 +21,10 @@ module Marvin
     -- ** Reaction Functions
     , hear, respond, enter, exit, enterIn, exitFrom, topic, topicIn, customTrigger
     -- ** Getting data
+    -- | Some documentation
     , getData, getMessage, getMatch, getTopic, getChannel, getUser, getUsername, getChannelName, resolveUser, resolveChannel
+    -- *** File interactions
+    , getFileName, getFileType, getFileUrl, readFileContents, shareLocalFile, getFileSize
     -- ** Sending messages
     , send, reply, messageChannel, messageChannel'
     -- ** Interaction with the config
@@ -35,5 +38,7 @@ module Marvin
 
 import           Marvin.Adapter        (IsAdapter)
 import           Marvin.Internal
-import           Marvin.Internal.Types hiding (getChannelName, getUsername, messageChannel,
-                                        resolveChannel, resolveUser)
+import           Marvin.Internal.Types hiding (getChannelName, getFileName, getFileSize,
+                                        getFileType, getFileUrl, getUsername, messageChannel,
+                                        readFileContents, resolveChannel, resolveUser,
+                                        shareLocalFile)

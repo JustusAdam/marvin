@@ -64,7 +64,7 @@ consumer = awaitForever . writeChan
 
 -- NOTE: Maybe we can add some verification of how the server was coping with a message of ours.
 -- Perhaps save queries to the server in a queue and associate incoming numerics and such with them?
-processor :: Chan (Either ByteString IrcEvent) -> EventHandler IRCAdapter -> AdapterM IRCAdapter ()
+processor :: Chan (Either ByteString IrcEvent) -> EventConsumer IRCAdapter -> AdapterM IRCAdapter ()
 processor inChan handler = do
     IRCAdapter{msgOutChan} <- getAdapter
     let handleOneMessage = readChan inChan >>= \case
@@ -82,22 +82,20 @@ processor inChan handler = do
                         -- channel.
                         botname <- getBotname
                         let (cmd, msg') = isMention botname target msg
-                        runHandler $ cmd user channel msg' ts
+                        handler $ cmd user channel msg' ts
                     Notice target (Right msg) -> do
                         botname <- getBotname
                         -- Check if bot is addressed
-                        runHandler $ (if target == botname then CommandEvent else MessageEvent) user channel msg ts
-                    Join channel' -> runHandler $ ChannelJoinEvent user (RealChannel channel') ts
-                    Part channel' _ -> runHandler $ ChannelLeaveEvent user (RealChannel channel') ts
-                    Kick channel' nick _ -> runHandler $ ChannelLeaveEvent nick (RealChannel channel') ts
-                    Topic channel' t -> runHandler $ TopicChangeEvent user (RealChannel channel') t ts
+                        handler $ (if target == botname then CommandEvent else MessageEvent) user channel msg ts
+                    Join channel' -> handler $ ChannelJoinEvent user (RealChannel channel') ts
+                    Part channel' _ -> handler $ ChannelLeaveEvent user (RealChannel channel') ts
+                    Kick channel' nick _ -> handler $ ChannelLeaveEvent nick (RealChannel channel') ts
+                    Topic channel' t -> handler $ TopicChangeEvent user (RealChannel channel') t ts
                     Ping a b -> writeChan msgOutChan $ Pong $ fromMaybe a b
                     Invite chan _ -> writeChan msgOutChan $ Join chan
                     _ -> logDebugN $(isT "Unhandled event #{rawEv}")
     forever $
         handleOneMessage `catch` (\e -> logErrorN $(isT "UserError: #{e :: ErrorCall}"))
-  where
-    runHandler = void . async . liftIO . handler
 
 -- If the bot is the target of the message, it's a command. Also we should
 -- treat the message as a command if the message starts with the name of the
@@ -150,7 +148,7 @@ instance IsAdapter IRCAdapter where
     -- | Just returns the value again
     resolveUser = return . Just
     initAdapter = IRCAdapter <$> newChan
-    runWithAdapter handler = do
+    runAdapter handler = do
         port <- fromMaybe 7000 <$> lookupFromAdapterConfig "port"
         host <- requireFromAdapterConfig "host"
         user <- getBotname

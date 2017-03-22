@@ -12,7 +12,7 @@ Portability : POSIX
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Adapter
-    ( RunWithAdapter, EventHandler
+    ( EventConsumer
     , IsAdapter(..), AdapterId, mkAdapterId, unwrapAdapterId
     , AdapterM
     , HasFiles(..)

@@ -98,21 +98,21 @@ stripWhiteSpaceMay t =
         _ -> Nothing
 
 
-runHandlerLoop :: MkSlack a => Chan (InternalType a) -> EventHandler (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
+runHandlerLoop :: MkSlack a => Chan (InternalType a) -> EventConsumer (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
 runHandlerLoop evChan handler =
     forever $ do
         d <- readChan evChan
-        void $ async $ case d of
+        case d of
             SlackEvent ev@(MessageEvent u c m t) -> do
 
                 botname <- L.toLower <$> getBotname
                 let strippedMsg = L.stripStart m
                 let lmsg = L.toLower strippedMsg
-                liftIO $ handler $ case asum $ map ((\prefix -> if prefix `L.isPrefixOf` lmsg then Just $ L.drop (L.length prefix) strippedMsg else Nothing) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname] of
+                handler $ case asum $ map ((\prefix -> if prefix `L.isPrefixOf` lmsg then Just $ L.drop (L.length prefix) strippedMsg else Nothing) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname] of
                     Nothing -> ev
                     Just m' -> CommandEvent u c m' t
 
-            SlackEvent event -> liftIO $ handler event
+            SlackEvent event -> handler event
             Unhandeled type_ ->
                 logDebugN $(isT "Unhandeled event type #{type_} payload")
             Error code msg ->
@@ -128,7 +128,7 @@ runHandlerLoop evChan handler =
             UserChange ui -> void $ refreshSingleUserInfo (ui^.idValue)
 
 
-runnerImpl :: MkSlack a => RunWithAdapter (SlackAdapter a)
+runnerImpl :: MkSlack a => EventConsumer (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
 runnerImpl handler = do
     messageChan <- newChan
     a <- async $ initIOConnections messageChan
@@ -290,7 +290,7 @@ instance MkSlack a => IsAdapter (SlackAdapter a) where
         <*> newChan
     adapterId = mkAdapterId
     messageChannel = messageChannelImpl
-    runWithAdapter = runnerImpl
+    runAdapter = runnerImpl
     getUsername = fmap (^.username) . getUserInfoImpl
     getChannelName = getChannelNameImpl
     resolveChannel = resolveChannelImpl
@@ -300,12 +300,13 @@ instance MkSlack a => IsAdapter (SlackAdapter a) where
 instance HasFiles (SlackAdapter a) where
     type File (SlackAdapter a) = SlackFile
 
-    getFileName = return . fromMaybe "" . (^.name)
+    getFileName = return . (^.name)
     getFileType = return . (^.filetype)
-    getFileUrl = return . (^.permalink)
+    getFileUrl = return . Just . (^.permalink)
     readFileContents _ = do
         logErrorN "Reading file is not implemented"
-        return ""
+        return Nothing
     getCreationDate = return . unsafeCoerce . (^.created)
     getFileSize = return . (^.size)
+    shareLocalFile = error "not implemented yet"
 

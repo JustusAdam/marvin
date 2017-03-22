@@ -179,7 +179,7 @@ stripWhiteSpaceMay t =
         Just (c, _) | isSpace c -> Just $ L.stripStart t
         _ -> Nothing
 
-runnerImpl :: forall a. MkTelegram a => RunWithAdapter (TelegramAdapter a)
+runnerImpl :: forall a. MkTelegram a => EventConsumer (TelegramAdapter a) -> AdapterM (TelegramAdapter a) ()
 runnerImpl handler = do
     msgChan <- newChan
     let eventGetter = mkEventGetter msgChan
@@ -195,11 +195,11 @@ runnerImpl handler = do
                 botname <- L.toLower <$> getBotname
                 let strippedMsg = L.stripStart msg
                 let lmsg = L.toLower strippedMsg
-                liftIO $ handler $ case (chat^.type_, asum $ map ((\prefix -> if prefix `L.isPrefixOf` lmsg then Just $ L.drop (L.length prefix) strippedMsg else Nothing) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname]) of
+                handler $ case (chat^.type_, asum $ map ((\prefix -> if prefix `L.isPrefixOf` lmsg then Just $ L.drop (L.length prefix) strippedMsg else Nothing) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname]) of
                     (PrivateChat, _) -> CommandEvent u chat msg ts
                     (_, Nothing) -> ev
                     (_, Just m') -> CommandEvent u chat m' ts
-            Ev ev -> liftIO $ handler ev
+            Ev ev -> handler ev
             Ignored -> return ()
             Unhandeled -> logDebugN $(isT "Unhadeled event.")
 
@@ -215,7 +215,7 @@ instance MkTelegram a => IsAdapter (TelegramAdapter a) where
     type Channel (TelegramAdapter a) = TelegramChat
     adapterId = mkAdapterId
     initAdapter = return TelegramAdapter
-    runWithAdapter = runnerImpl
+    runAdapter = runnerImpl
     getUsername = getUsernameImpl
     getChannelName = getChannelNameImpl
     resolveChannel _ = do

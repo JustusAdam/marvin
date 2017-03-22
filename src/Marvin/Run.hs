@@ -21,7 +21,8 @@ module Marvin.Run
     ) where
 
 
-import           Control.Concurrent.Async.Lifted (async, wait)
+import           Control.Concurrent.Async.Lifted (async, link, wait)
+import           Control.Concurrent.Chan.Lifted
 import           Control.DeepSeq
 import           Control.Exception.Lifted
 import           Control.Lens                    hiding (cons)
@@ -81,8 +82,9 @@ runWAda :: a -> C.Config -> AdapterM a r -> RunnerM r
 runWAda ada cfg ac = runReaderT (runAdapterAction ac) (cfg, ada)
 
 -- TODO add timeouts for handlers
-mkApp :: forall a. IsAdapter a => LoggingFn -> Handlers a -> C.Config -> a -> EventHandler a
-mkApp log handlers cfg adapter = flip runLoggingT log . genericHandler
+runHandlers :: forall a. IsAdapter a => Handlers a -> C.Config -> a -> Chan (Event a) -> RunnerM ()
+runHandlers handlers cfg adapter eventChan =
+    forever $ readChan eventChan >>= genericHandler
   where
     genericHandler ev = do
         generics <- async $ do
@@ -138,11 +140,11 @@ mkApp log handlers cfg adapter = flip runLoggingT log . genericHandler
     Handlers respondsV hearsV customsV joinsV leavesV topicsV fileSharesV joinsInV leavesFromV topicsInV fileSharesInV = handlers
 
 
-application :: IsAdapter a => LoggingFn -> [ScriptInit a] -> C.Config -> a -> RunnerM (EventHandler a)
-application log inits config ada = do
+initHandlers :: IsAdapter a => [ScriptInit a] -> C.Config -> a -> RunnerM (Handlers a)
+initHandlers inits config ada = do
     logInfoNS logSource "Initializing scripts"
-    !s <- force . foldMap (^.actions) . catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada config) (onInitExcept sid)) inits
-    return $ mkApp log s config ada
+    !handlers <- force . foldMap (^.actions) . catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada config) (onInitExcept sid)) inits
+    return handlers
   where
     logSource = $(isT "#{applicationScriptId}.init")
     onInitExcept :: ScriptId -> SomeException -> RunnerM (Maybe a')
@@ -180,8 +182,12 @@ runMarvin s' = runStderrLoggingT $ do
         oldLogFn <- askLoggerIO
         let runAdaLogging = liftIO . flip runLoggingT (loggingAddSourcePrefix adapterPrefix oldLogFn)
         ada <- runAdaLogging initAdapter
-        handler <- application oldLogFn s' cfg ada
-        runWAda ada cfg $ runWithAdapter handler
+        handlers <- initHandlers s' cfg ada
+        eventChan <- newChan
+        a <- async $ runWAda ada cfg $ runAdapter (writeChan eventChan)
+        link a
+        runHandlers handlers cfg ada eventChan
+
   where
     adapterPrefix = $(isT "adapter.#{adapterId :: AdapterId a}")
     infoParser = info

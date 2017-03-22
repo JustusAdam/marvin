@@ -56,8 +56,7 @@ type RunnerM = LoggingT IO
 newtype AdapterM a r = AdapterM { runAdapterAction :: ReaderT (C.Config, a) RunnerM r } deriving (MonadIO, Monad, Applicative, Functor, MonadLogger, MonadLoggerIO, MonadBase IO)
 
 
-type EventHandler a = Event a -> IO ()
-type RunWithAdapter a = EventHandler a -> AdapterM a ()
+type EventConsumer a = Event a -> AdapterM a ()
 
 -- | Basic functionality required of any adapter
 class IsAdapter a where
@@ -71,8 +70,12 @@ class IsAdapter a where
     messageChannel :: Channel a -> L.Text -> AdapterM a ()
     -- | Initialize the adapter state
     initAdapter :: RunnerM a
-    -- | Run the bot
-    runWithAdapter :: RunWithAdapter a
+    -- | Run the recieving side of the adapter.
+    -- The 'EventConsumer' argument is a function which should be called once for each recieved 'Event'.
+    -- The 'EventConsumer' will trigger the processing of the event by the installed handlers.
+    -- However the 'EventConsumer' is deliberately early retuning, meaning when it returns processing of the 'Event' has been queued but not finished yet. In fact it most likely has just started.
+    -- It its therefore not necessary to run the 'EventConsumer' in parallel, using 'async' for instance.
+    runAdapter :: EventConsumer a -> AdapterM a ()
     -- | Resolve a username given the internal user identifier
     getUsername :: User a -> AdapterM a L.Text
     -- | Resolve the human readable name for a channel given the  internal channel identifier
@@ -87,12 +90,13 @@ class HasFiles a where
     -- | Concrete type of an uploaded file
     type File a
     -- | Resolve the name of the file
-    getFileName :: File a -> AdapterM a L.Text
+    getFileName :: File a -> AdapterM a (Maybe L.Text)
     getFileType :: File a -> AdapterM a L.Text
-    getFileUrl :: File a -> AdapterM a L.Text
-    readFileContents :: File a -> AdapterM a L.Text
+    getFileUrl :: File a -> AdapterM a (Maybe L.Text)
+    readFileContents :: File a -> AdapterM a (Maybe L.Text)
     getCreationDate :: File a -> AdapterM a (TimeStamp a)
     getFileSize :: File a -> AdapterM a Int
+    shareLocalFile :: L.Text -> [Channel a] -> AdapterM a ()
 
 
 -- | Wrapping type for users. Only used to enable 'Get' typeclass instances.

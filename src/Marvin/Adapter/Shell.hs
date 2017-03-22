@@ -12,6 +12,7 @@ module Marvin.Adapter.Shell (ShellAdapter) where
 
 
 import           Control.Concurrent.Async.Lifted
+import           Control.Concurrent.Chan.Lifted
 import           Control.Concurrent.MVar.Lifted
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -30,7 +31,7 @@ import           System.Console.Haskeline
 
 -- | Adapter for a shell prompt
 data ShellAdapter = ShellAdapter
-    { output :: MVar (Maybe L.Text)
+    { output :: Chan L.Text
     }
 
 
@@ -51,12 +52,14 @@ help = L.unlines
 
 instance HasFiles ShellAdapter where
     type File ShellAdapter = L.Text
-    getFileName = return
+    getFileName = return . Just
     getFileType = error "not implemented"
-    getFileUrl = return
-    readFileContents = liftIO . L.readFile . L.unpack
+    getFileUrl = return . Just
+    readFileContents = fmap Just . liftIO . L.readFile . L.unpack
     getCreationDate = error "not implemented"
     getFileSize = error "not implemented"
+    shareLocalFile path chans =
+        forM_ chans $ \c -> messageChannel c $(isL "The bot has shared a file #{path} in this channel")
 
 
 instance IsAdapter ShellAdapter where
@@ -66,9 +69,9 @@ instance IsAdapter ShellAdapter where
     type Channel ShellAdapter = L.Text
 
     adapterId = "shell"
-    messageChannel _ chan = do
+    messageChannel _ msg = do
         ShellAdapter{output} <- getAdapter
-        putMVar output $ Just chan
+        writeChan output msg
     -- | Just returns the value again
     getUsername = return
     -- | Just returns the value again
@@ -77,13 +80,21 @@ instance IsAdapter ShellAdapter where
     resolveChannel = return . Just
     -- | Just returns the value again
     resolveUser = return . Just
-    initAdapter = ShellAdapter <$> newEmptyMVar
-    runWithAdapter handler = do
+    initAdapter = ShellAdapter <$> newChan
+
+    -- TODO test this output method actually works
+    runAdapter handler = do
         bot <- getBotname
         histfile <- lookupFromAdapterConfig "history-file"
         ShellAdapter out <- getAdapter
+        inChan <- newChan
+
+        liftIO $ async $ forever $ readChan out >>= putStrLn . L.unpack
+        async $ forever $ readChan inChan >>= handler
+
         liftIO $ runInputT defaultSettings {historyFile=histfile} $ do
             outputStrLn "Type :? to see a a list of available commands"
+
             forever $ do
                 input <- getInputLine $(isS "#{bot}> ")
                 ts <- liftIO $ TimeStamp <$> getCurrentTime
@@ -91,24 +102,21 @@ instance IsAdapter ShellAdapter where
                     Nothing -> return ()
                     Just i -> do
                         let mtext = L.pack i
-                        h <- liftIO $ async $ do
+                        liftIO $
                             case L.words mtext of
-                                [":?"] -> putMVar out $ Just help
-                                [":join", user] -> handler $ ChannelJoinEvent user "shell" ts
-                                [":join", user, chan] -> handler $ ChannelJoinEvent user chan ts
-                                [":leave", user] -> handler $ ChannelLeaveEvent user "shell" ts
-                                [":leave", user, chan] -> handler $ ChannelLeaveEvent user chan ts
-                                (":topic":t) -> handler $ TopicChangeEvent "shell" "shell" (fromJust $ L.stripPrefix ":topic" mtext) ts
-                                [":file", chan, path] -> handler $ FileSharedEvent "shell" chan path ts
-                                [":file", path] -> handler $ FileSharedEvent "shell" "shell" path ts
-                                [":file", user, chan, path] -> handler $ FileSharedEvent user chan path ts
+                                [":?"] -> writeChan out help
+                                [":join", user] -> writeChan inChan $ ChannelJoinEvent user "shell" ts
+                                [":join", user, chan] -> writeChan inChan $ ChannelJoinEvent user chan ts
+                                [":leave", user] -> writeChan inChan $ ChannelLeaveEvent user "shell" ts
+                                [":leave", user, chan] -> writeChan inChan $ ChannelLeaveEvent user chan ts
+                                (":topic":t) -> writeChan inChan $ TopicChangeEvent "shell" "shell" (fromJust $ L.stripPrefix ":topic" mtext) ts
+                                [":file", chan, path] -> writeChan inChan $ FileSharedEvent "shell" chan path ts
+                                [":file", path] -> writeChan inChan $ FileSharedEvent "shell" "shell" path ts
+                                [":file", user, chan, path] -> writeChan inChan $ FileSharedEvent user chan path ts
                                 (x:_) | ":" `L.isPrefixOf` x ->
-                                    putMVar out $ Just $(isL "Unknown command #{x} or unexpected arguments")
+                                    writeChan out $(isL "Unknown command #{x} or unexpected arguments")
                                 _ ->  -- handle message
-                                    handler $ case L.stripPrefix bot $ L.stripStart mtext of
+                                    writeChan inChan $ case L.stripPrefix bot $ L.stripStart mtext of
                                                 Just cmd | fmap (isSpace . fst) (L.uncons cmd) == Just True ->
                                                     CommandEvent "shell" "shell" (L.stripStart cmd) ts
                                                 _ -> MessageEvent "shell" "shell" mtext ts
-                            putMVar out Nothing
-                        whileJust_ (liftIO $ takeMVar out) $ outputStrLn . L.unpack
-                        liftIO $ wait h
