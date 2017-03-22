@@ -9,10 +9,6 @@ Portability : POSIX
 -}
 {-# LANGUAGE BangPatterns           #-}
 {-# LANGUAGE ExplicitForAll         #-}
-{-# LANGUAGE FlexibleContexts       #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE NamedFieldPuns         #-}
 {-# LANGUAGE Rank2Types             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 module Marvin.Run

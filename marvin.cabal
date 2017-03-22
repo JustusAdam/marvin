@@ -94,6 +94,11 @@ library
                      , GADTs
                      , TemplateHaskell
                      , QuasiQuotes
+                     , FlexibleInstances
+                     , FlexibleContexts
+                     , FunctionalDependencies
+                     , NamedFieldPuns
+                     , TypeSynonymInstances
 
 executable marvin-pp
   hs-source-dirs:      preprocessor

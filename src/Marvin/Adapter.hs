@@ -8,8 +8,6 @@ Stability   : experimental
 Portability : POSIX
 -}
 {-# LANGUAGE ExplicitForAll      #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Adapter
     ( EventConsumer

@@ -7,7 +7,6 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
-{-# LANGUAGE NamedFieldPuns #-}
 module Marvin.Adapter.Shell (ShellAdapter) where
 
 

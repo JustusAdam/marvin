@@ -9,7 +9,6 @@ Portability : POSIX
 
 See caveats and potential issues with this adapter here <https://marvin.readthedocs.io/en/latest/adapters.html#irc>.
 -}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE Rank2Types     #-}
 {-# LANGUAGE ViewPatterns   #-}
 module Marvin.Adapter.IRC

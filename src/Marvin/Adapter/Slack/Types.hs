@@ -1,7 +1,4 @@
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TypeSynonymInstances       #-}
 module Marvin.Adapter.Slack.Types where
 
 import           Control.Concurrent.Chan.Lifted (Chan)

@@ -7,7 +7,6 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
-{-# LANGUAGE NamedFieldPuns #-}
 module Marvin.Adapter.Slack.EventsAPI
     ( SlackAdapter, EventsAPI
     , SlackUserId, SlackChannelId
