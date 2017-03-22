@@ -3,6 +3,4 @@ extra-package-dbs: []
 packages:
 - '.'
 - ../..
-extra-deps:
-- marvin-interpolate-1.0
-resolver: lts-7.14
+resolver: lts-8.5
