@@ -14,5 +14,4 @@ script = defineScript "my-script" $ do
         send "Pong" -- sending messages back
     respond "hello" $ do -- react to direct commands
         user <- getUser
-        username <- getUsername user
-        reply $(isL "Hello to you too, #{username}")
+        reply $(isL "Hello to you too, #{user^.username}")

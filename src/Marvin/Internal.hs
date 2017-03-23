@@ -323,6 +323,23 @@ getChannel = (unwrapChannel' :: Channel' a -> Channel a) <$> view (payload . get
 getUser :: forall m a. Get m (User' a) => BotReacting a m (User a)
 getUser = (unwrapUser' :: User' a -> User a) <$> view (payload . getLens)
 
+-- | Get the username of a registered user. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
+--
+-- This function is deprecated as of version 0.3 and will be removed in version 1.0 use the lens 'username' instead.
+getUsername :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a) 
+            => User a 
+            -> m L.Text
+getUsername u = pure $ u^.username
+{-# DEPRECATED getUsername "Will be remove in version 1.0, use the lens 'username' instead." #-}
+
+
+-- | Get the human readable name of a channel. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
+--
+-- This function is deprecated as of Version 0.3 and will be removed in version 1.0 use the lens 'name' instead.
+getChannelName :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
+               => Channel a -> m L.Text
+getChannelName c = pure $ c^.name
+{-# DEPRECATED getChannelName "Will be remove in version 1.0, use the lens 'name' instead." #-}
 
 -- | Get the stored file.
 getRemoteFile :: forall a m. Get m (RemoteFile' a) => BotReacting a m (RemoteFile a)
