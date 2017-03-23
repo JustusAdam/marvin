@@ -28,6 +28,7 @@ import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text.Lazy
 import           Marvin.Types
 import           System.Console.Haskeline
+import           System.FilePath
 import           Util
 
 
@@ -81,7 +82,7 @@ instance HasFiles ShellAdapter where
 
 
 pathToFile :: L.Text -> IO RFile
-pathToFile = undefined
+pathToFile path = pure $ RFile (Just path) Nothing undefined undefined path Nothing
 
 
 defaultUser :: SimpleWrappedUsername

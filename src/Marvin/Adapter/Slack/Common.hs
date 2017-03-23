@@ -70,9 +70,9 @@ eventParser v@(Object o) = isErrParser <|> hasTypeParser
                     "group_join" -> cJoin
                     "channel_leave" -> cLeave
                     "group_leave" -> cLeave
-                    "channel_topic" -> 
+                    "channel_topic" ->
                         wrapEv $ (\topic ts u c -> TopicChangeEvent u c topic ts) <$> o .: "topic" <*> ts
-                    "file_share" -> 
+                    "file_share" ->
                         wrapEv $ (\topic ts u c -> FileSharedEvent u c topic ts) <$> o .: "file" <*> ts
                     _ -> msgEv
 
@@ -316,5 +316,5 @@ instance HasFiles (SlackAdapter a) where
         return Nothing
     shareFile _ _ =
         logErrorN "Sharing file is not implemented"
-    newLocalFile = return . SlackLocalFile Nothing Nothing 
+    newLocalFile = return . SlackLocalFile Nothing Nothing
 

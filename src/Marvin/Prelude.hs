@@ -25,10 +25,13 @@ module Marvin.Prelude
     , isL, isT, isS
     -- ** Arbitrary IO in scripts
     , MonadIO, liftIO
+    -- ** Lenses
+    , module Control.Lens
     -- ** Useful functions not in the normal Prelude
     , when, unless, for, for_, fromMaybe
     ) where
 
+import           Control.Lens                 (lens, (&), (.~), (^.))
 import           Control.Monad                (unless, when)
 import           Control.Monad.IO.Class       (MonadIO, liftIO)
 import           Control.Monad.Logger

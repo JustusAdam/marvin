@@ -1,15 +1,15 @@
 module Util where
 
 
+import           Control.Lens
 import           Control.Monad
 import           Data.Aeson.Types
 import qualified Data.Text               as T
-import qualified Data.Text.Lazy as L
+import qualified Data.Text.Lazy          as L
 import           Data.Time.Clock.POSIX
 import           Marvin.Internal.Types
 import           Marvin.Interpolate.Text
 import           Text.Read               (readMaybe)
-import Control.Lens
 
 
 notImplemented :: a

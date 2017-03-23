@@ -15,14 +15,14 @@ import           Data.Aeson.Types                (Parser, parseEither)
 import           Data.Char                       (isSpace)
 import           Data.Foldable                   (asum)
 import           Data.Maybe
+import           Data.Monoid                     ((<>))
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter                  hiding (mkAdapterId)
-import           Marvin.Types
 import           Marvin.Interpolate.All
+import           Marvin.Types
 import           Network.Wreq
 import           Util
-import Data.Monoid ((<>))
 
 import           Control.Exception.Lifted
 
@@ -144,18 +144,18 @@ apiResponseParser innerParser = withObject "expected object" $ \o -> do
         else Error <$> o .: "error_code" <*> o .: "description"
 
 
-execAPIMethod :: MkTelegram b 
-              => (Value -> Parser a) 
-              -> String 
-              -> [FormParam] 
+execAPIMethod :: MkTelegram b
+              => (Value -> Parser a)
+              -> String
+              -> [FormParam]
               -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
 execAPIMethod = execAPIMethodWith defaults
 
-execAPIMethodWith :: MkTelegram b 
-                  => Options 
-                  -> (Value -> Parser a) 
-                  -> String 
-                  -> [FormParam] 
+execAPIMethodWith :: MkTelegram b
+                  => Options
+                  -> (Value -> Parser a)
+                  -> String
+                  -> [FormParam]
                   -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
 execAPIMethodWith opts innerParser methodName params = do
     token <- requireFromAdapterConfig "token"

@@ -9,11 +9,11 @@ module Marvin.Internal
     -- * Exposed API
     defineScript
     -- ** Reacting
-    , hear, respond, topic, topicIn, enter, exit, enterIn, exitFrom, customTrigger
+    , hear, respond, topic, topicIn, enter, exit, enterIn, exitFrom, fileShared, fileSharedIn, customTrigger
     -- ** Sending messages
     , send, reply, messageChannel, messageChannel'
     -- ** Getting Data
-    , getData, getUser, getMatch, getMessage, getChannel, getTopic, getBotName, resolveChannel, resolveUser
+    , getData, getUser, getMatch, getMessage, getChannel, getTopic, getRemoteFile, getBotName, resolveChannel, resolveUser
     -- *** File interactions
     , readTextFile, readFileBytes, newLocalFile, shareFile
     -- ** Interacting with the config
@@ -57,8 +57,8 @@ import qualified Data.Vector               as V
 import           Marvin.Adapter            (IsAdapter)
 import qualified Marvin.Adapter            as A
 import           Marvin.Internal.Types     hiding (getChannelName, messageChannel, newLocalFile,
-                                            readTextFile, readFileBytes, resolveChannel, resolveChannel,
-                                            resolveUser, shareFile)
+                                            readFileBytes, readTextFile, resolveChannel,
+                                            resolveChannel, resolveUser, shareFile)
 import           Marvin.Internal.Values
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text
@@ -325,8 +325,8 @@ getUser = (unwrapUser' :: User' a -> User a) <$> view (payload . getLens)
 
 
 -- | Get the stored file.
-getFile :: forall a m. Get m (RemoteFile' a) => BotReacting a m (RemoteFile a)
-getFile = (unwrapFile' :: RemoteFile' a -> RemoteFile a) <$> view (payload . getLens)
+getRemoteFile :: forall a m. Get m (RemoteFile' a) => BotReacting a m (RemoteFile a)
+getRemoteFile = (unwrapFile' :: RemoteFile' a -> RemoteFile a) <$> view (payload . getLens)
 
 
 -- | Get a value out of the config, returns 'Nothing' if the value didn't exist.

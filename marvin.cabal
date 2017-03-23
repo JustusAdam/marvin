@@ -85,6 +85,7 @@ library
                      , transformers >= 0.4
                      , conduit >= 1.2
                      , irc-conduit >= 0.2
+                     , filepath >= 1.4
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies

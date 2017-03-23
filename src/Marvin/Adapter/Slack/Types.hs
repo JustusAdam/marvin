@@ -124,13 +124,13 @@ declareFields [d|
 
 
 data SlackLocalFile = SlackLocalFile
-    { slackLocalFileName :: Maybe L.Text
-    , slackLocalFileType_ :: Maybe L.Text
+    { slackLocalFileName    :: Maybe L.Text
+    , slackLocalFileType_   :: Maybe L.Text
     , slackLocalFileContent :: FileContent
     }
 
 instance FromJSON (SlackRemoteFile a) where
-    parseJSON = withObject "file must be object" $ \o -> SlackRemoteFile 
+    parseJSON = withObject "file must be object" $ \o -> SlackRemoteFile
         <$> o .: "id"
         <*> o .: "created"
         <*> o .:? "name"
@@ -162,14 +162,14 @@ helloParser = withObject "expected object" $ \o -> do
 
 userInfoParser :: Value -> Parser UserInfo
 userInfoParser = withObject "expected object" $ \o ->
-    o .: "user" >>= 
+    o .: "user" >>=
         withObject "expected object" (\o' -> do
             o2 <- o' .: "profile"
             UserInfo <$> o' .: "name" <*> o' .: "id"
                 <*> o2 .:? "real_name"
                 <*> o2 .:? "first_name"
                 <*> o2 .:? "last_name"
-                
+
         )
 
 

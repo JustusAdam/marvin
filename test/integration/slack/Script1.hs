@@ -20,8 +20,8 @@ script = defineScript "test" $ do
     respond "hello" $
         reply "Hello to you too"
     exit $ do
-        name <- getUser >>= getUsername
-        send $(isL "Goodbye #{name}")
+        user <- getUser
+        send $(isL "Goodbye #{user^.username}")
     topic $ do
         t <- getTopic
         send $(isL "The new topic is #{t}")
@@ -33,8 +33,8 @@ script = defineScript "test" $ do
         t <- getTopic
         messageChannel "#random" $(isL "The new topic in testing is \"#{t}\"")
     enterIn "#random" $ do
-        u <- getUser >>= getUsername
-        send $(isL "#{u} just entered random")
+        u <- getUser
+        send $(isL "#{u^.username} just entered random")
 
     respond "^version\\??$" $ send $(isL "marvins integration test, version #{V.showVersion P.version}")
 

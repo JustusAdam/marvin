@@ -15,14 +15,14 @@ module Marvin
     -- * The Script
       Script, defineScript, ScriptInit
     , ScriptId
-    , ScriptDefinition, IsAdapter
+    , ScriptDefinition, IsAdapter, HasFiles
     -- * Reacting
     , BotReacting
     -- ** Reaction Functions
-    , hear, respond, enter, exit, enterIn, exitFrom, topic, topicIn, customTrigger
+    , hear, respond, enter, exit, enterIn, exitFrom, topic, topicIn, fileShared, fileSharedIn, customTrigger
     -- ** Getting data
     -- | Some documentation
-    , getData, getMessage, getMatch, getTopic, getChannel, getUser, resolveUser, resolveChannel
+    , getData, getMessage, getMatch, getTopic, getChannel, getUser, getRemoteFile, resolveUser, resolveChannel
     -- *** File interactions
     , readTextFile, readFileBytes, newLocalFile, shareFile
     -- ** Sending messages
@@ -42,5 +42,5 @@ import           Marvin.Adapter        (IsAdapter)
 import           Marvin.Internal
 import           Marvin.Internal.Types hiding (getChannelName, getFileName, getFileSize,
                                         getFileType, getFileUrl, getUsername, messageChannel,
-                                        readFileContents, resolveChannel, resolveUser,
-                                        shareLocalFile, readTextFile, readFileBytes, newLocalFile, shareFile)
+                                        newLocalFile, readFileBytes, readFileContents, readTextFile,
+                                        resolveChannel, resolveUser, shareFile, shareLocalFile)

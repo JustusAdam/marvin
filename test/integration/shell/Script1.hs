@@ -10,7 +10,7 @@ import           Marvin.Prelude
 import qualified Paths_marvin_integration as P
 
 
-script :: IsAdapter a => ScriptInit a
+script :: (IsAdapter a, HasFiles a) => ScriptInit a
 script = defineScript "test" $ do
     hear (r [CaseInsensitive] "^ping$") $ do
         msg <- getMessage
@@ -19,8 +19,8 @@ script = defineScript "test" $ do
     respond "hello" $
         reply "Hello to you too"
     exit $ do
-        name <- getUser >>= getUsername
-        send $(isL "Goodbye #{name}")
+        user <- getUser
+        send $(isL "Goodbye #{user^.username}")
     topic $ do
         t <- getTopic
         send $(isL "The new topic is #{t}")
@@ -32,11 +32,17 @@ script = defineScript "test" $ do
         t <- getTopic
         messageChannel "#random" $(isL "The new topic in testing is \"#{t}\"")
     enterIn "#random" $ do
-        u <- getUser >>= getUsername
-        send $(isL "#{u} just entered random")
+        u <- getUser
+        send $(isL "#{u^.username} just entered random")
 
     respond "^version\\??$" $ send $(isL "marvins integration test, version #{V.showVersion P.version}")
 
     hear "^bot name\\??$" $ do
         n <- getBotName
         send $(isL "My name is #{n}, nice to meet you.")
+
+    fileShared $ do
+        f <- getRemoteFile
+        content <- readTextFile f
+        send $(isL "A file of name #{f^.name}")
+        maybe (return ()) send content
