@@ -234,6 +234,11 @@ instance MonadBaseControl IO (AdapterM a) where
     restoreM = AdapterM . restoreM
 
 
+instance MonadBaseControl IO (BotReacting a d) where
+    type StM (BotReacting a d) r = r
+    liftBaseWith f = BotReacting $ liftBaseWith $ \q -> f (q . runReaction)
+    restoreM = BotReacting . restoreM
+
 
 -- | Class which says that there is a way to get to @b@ from this type @a@.
 --

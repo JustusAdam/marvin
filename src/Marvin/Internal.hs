@@ -220,7 +220,7 @@ send msg = do
     messageChannel' o msg
 
 
--- | Try to get the channel with a particular human readable name. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
+-- | Try to get the channel with a particular human readable name. 
 resolveChannel :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
                => L.Text -> m (Maybe (Channel a))
 resolveChannel =  A.liftAdapterAction . A.resolveChannel
@@ -250,7 +250,7 @@ shareFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, Monad
 shareFile f = A.liftAdapterAction . A.shareFile f
 
 
--- | Try to get the user with a particular username. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
+-- | Try to get the user with a particular username. 
 resolveUser :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
             => L.Text -> m (Maybe (User a))
 resolveUser = A.liftAdapterAction . A.resolveUser
@@ -330,7 +330,7 @@ getChannel = (unwrapChannel' :: Channel' a -> Channel a) <$> view (payload . get
 getUser :: forall m a. Get m (User' a) => BotReacting a m (User a)
 getUser = (unwrapUser' :: User' a -> User a) <$> view (payload . getLens)
 
--- | Get the username of a registered user. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
+-- | Get the username of a registered user. 
 --
 -- This function is deprecated as of version 0.3 and will be removed in version 1.0 use the lens 'username' instead.
 getUsername :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a) 
@@ -340,7 +340,7 @@ getUsername u = pure $ u^.username
 {-# DEPRECATED getUsername "Will be remove in version 1.0, use the lens 'username' instead." #-}
 
 
--- | Get the human readable name of a channel. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
+-- | Get the human readable name of a channel. 
 --
 -- This function is deprecated as of Version 0.3 and will be removed in version 1.0 use the lens 'name' instead.
 getChannelName :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)

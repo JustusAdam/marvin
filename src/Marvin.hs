@@ -21,7 +21,7 @@ module Marvin
     -- ** Reaction Functions
     , hear, respond, enter, exit, enterIn, exitFrom, topic, topicIn, fileShared, fileSharedIn, customTrigger
     -- ** Getting data
-    -- | Some documentation
+    -- | The type signature for the functions in this section is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
     , getData, getMessage, getMatch, getTopic, getChannel, getUser, getRemoteFile, resolveUser, resolveChannel
     -- *** File interactions
     , readTextFile, readFileBytes, newLocalFile, shareFile
@@ -31,7 +31,7 @@ module Marvin
     , getConfigVal, requireConfigVal, getBotName
     -- ** Handler Types
     , Message, User, Channel, Topic
-    -- Lenses
+    -- ** Lenses
     , HasActions(actions), HasUsername(username), HasName(name), HasFirstName(firstName), HasLastName(lastName), HasType_(type_), HasUrl(url), HasCreationDate(creationDate), HasSize(size), HasContent(content)
     -- ** Advanced actions
     , extractAction, extractReaction
