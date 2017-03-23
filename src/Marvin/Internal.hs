@@ -182,12 +182,18 @@ topicIn !chanName ac = ScriptDefinition $ do
     actions . topicChangeIn %= HM.alter (alterHelper pac) chanName
 
 
+-- | This handler runs when a file is shared in __any channel__ the bot is subscribed to.
+--
+-- The payload contains information about the file and the channel to which it was shared.
 fileShared :: BotReacting a (User' a, Channel' a, RemoteFile' a, TimeStamp a) () -> ScriptDefinition a ()
 fileShared ac = ScriptDefinition $ do
     pac <- prepareAction (Just "file event" :: Maybe T.Text) ac
     actions . fileShares %= V.cons pac
 
 
+-- | This handler runs when a file is shared in __the specified channel__ is changed, provided the bot is subscribed to the channel in question.
+--
+-- The argument is the human readable channel name.
 fileSharedIn :: L.Text -> BotReacting a (User' a, Channel' a, RemoteFile' a, TimeStamp a) () -> ScriptDefinition a ()
 fileSharedIn !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "file event in #{chanName}")) ac
@@ -232,6 +238,7 @@ readFileBytes :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, M
 readFileBytes = A.liftAdapterAction . A.readFileBytes
 
 
+-- | Create a new 'LocalFile' object for upload with the specified content.
 newLocalFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
             => FileContent -> m (LocalFile a)
 newLocalFile = A.liftAdapterAction . A.newLocalFile
@@ -341,7 +348,7 @@ getChannelName :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, A
 getChannelName c = pure $ c^.name
 {-# DEPRECATED getChannelName "Will be remove in version 1.0, use the lens 'name' instead." #-}
 
--- | Get the stored file.
+-- | Get the stored information about a remote file.
 getRemoteFile :: forall a m. Get m (RemoteFile' a) => BotReacting a m (RemoteFile a)
 getRemoteFile = (unwrapFile' :: RemoteFile' a -> RemoteFile a) <$> view (payload . getLens)
 
