@@ -13,9 +13,9 @@ module Marvin.Internal
     -- ** Sending messages
     , send, reply, messageChannel, messageChannel'
     -- ** Getting Data
-    , getData, getUser, getMatch, getMessage, getChannel, getTopic, getBotName, getChannelName, resolveChannel, getUsername, resolveUser
+    , getData, getUser, getMatch, getMessage, getChannel, getTopic, getBotName, resolveChannel, resolveUser
     -- *** File interactions
-    , getFileName, getFileType, getFileUrl, readFileContents, shareLocalFile, getFileSize
+    , readTextFile, readFileBytes, newLocalFile, shareFile
     -- ** Interacting with the config
     , getConfigVal, requireConfigVal
     -- *** Access config (advanced, internal)
@@ -44,6 +44,7 @@ import           Control.Lens              hiding (cons)
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
+import           Data.ByteString           (ByteString)
 import qualified Data.Configurator         as C
 import qualified Data.Configurator.Types   as C
 import qualified Data.HashMap.Strict       as HM
@@ -55,10 +56,9 @@ import           Data.Vector               (Vector)
 import qualified Data.Vector               as V
 import           Marvin.Adapter            (IsAdapter)
 import qualified Marvin.Adapter            as A
-import           Marvin.Internal.Types     hiding (getChannelName, getFileName, getFileSize,
-                                            getFileType, getFileUrl, getUsername, messageChannel,
-                                            readFileContents, resolveChannel, resolveChannel,
-                                            resolveUser, shareLocalFile)
+import           Marvin.Internal.Types     hiding (getChannelName, messageChannel, newLocalFile,
+                                            readTextFile, readFileBytes, resolveChannel, resolveChannel,
+                                            resolveUser, shareFile)
 import           Marvin.Internal.Values
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text
@@ -182,13 +182,13 @@ topicIn !chanName ac = ScriptDefinition $ do
     actions . topicChangeIn %= HM.alter (alterHelper pac) chanName
 
 
-fileShared :: BotReacting a (User' a, Channel' a, File' a, TimeStamp a) () -> ScriptDefinition a ()
+fileShared :: BotReacting a (User' a, Channel' a, RemoteFile' a, TimeStamp a) () -> ScriptDefinition a ()
 fileShared ac = ScriptDefinition $ do
     pac <- prepareAction (Just "file event" :: Maybe T.Text) ac
     actions . fileShares %= V.cons pac
 
 
-fileSharedIn :: L.Text -> BotReacting a (User' a, Channel' a, File' a, TimeStamp a) () -> ScriptDefinition a ()
+fileSharedIn :: L.Text -> BotReacting a (User' a, Channel' a, RemoteFile' a, TimeStamp a) () -> ScriptDefinition a ()
 fileSharedIn !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "file event in #{chanName}")) ac
     actions . fileSharesIn %= HM.alter (alterHelper pac) chanName
@@ -214,64 +214,33 @@ send msg = do
     messageChannel' o msg
 
 
--- | Get the username of a registered user. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
-getUsername :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
-            => User a -> m L.Text
-getUsername = A.liftAdapterAction . A.getUsername
-
-
 -- | Try to get the channel with a particular human readable name. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
 resolveChannel :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
                => L.Text -> m (Maybe (Channel a))
 resolveChannel =  A.liftAdapterAction . A.resolveChannel
 
 
--- | Get the human readable name of a channel. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
-getChannelName :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
-               => Channel a -> m L.Text
-getChannelName = A.liftAdapterAction . A.getChannelName
-
-
--- | Get the name of the file, if it has one.
-getFileName :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
-            => File a -> m (Maybe L.Text)
-getFileName = A.liftAdapterAction . A.getFileName
-
-
--- | Get the type of the file. For example "text".
-getFileType :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
-            => File a -> m L.Text
-getFileType = A.liftAdapterAction . A.getFileType
-
-
--- | A url where this file may be downloaded. Should be at least public enough for the bot to be able to access it.
-getFileUrl :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
-           => File a -> m (Maybe L.Text)
-getFileUrl = A.liftAdapterAction . A.getFileUrl
-
-
 -- | Return the contents of the file as text. If the file is not public, or cannot be interpreted as text returns 'Nothing'.
-readFileContents :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
-           => File a -> m (Maybe L.Text)
-readFileContents = A.liftAdapterAction . A.readFileContents
+readTextFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
+           => RemoteFile a -> m (Maybe L.Text)
+readTextFile = A.liftAdapterAction . A.readTextFile
 
 
--- | Return a timestamp for when this file was created.
-getCreationDate :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
-                => File a -> m (TimeStamp a)
-getCreationDate = A.liftAdapterAction . A.getCreationDate
+-- | Return the contents of the file as bytes. If the file is not public, or cannot be interpreted as text returns 'Nothing'.
+readFileBytes :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
+           => RemoteFile a -> m (Maybe ByteString)
+readFileBytes = A.liftAdapterAction . A.readFileBytes
 
 
--- | Return a size of this file in bytes.
-getFileSize :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
-            => File a -> m Int
-getFileSize = A.liftAdapterAction . A.getFileSize
+newLocalFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
+            => FileContent -> m (LocalFile a)
+newLocalFile = A.liftAdapterAction . A.newLocalFile
 
 
 -- | Share a local file to the supplied list of channels
-shareLocalFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
-            => L.Text -> [Channel a] -> m ()
-shareLocalFile path = A.liftAdapterAction . A.shareLocalFile path
+shareFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
+            => LocalFile a -> [Channel a] -> m ()
+shareFile f = A.liftAdapterAction . A.shareFile f
 
 
 -- | Try to get the user with a particular username. The type signature is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
@@ -286,7 +255,7 @@ resolveUser = A.liftAdapterAction . A.resolveUser
 reply :: (IsAdapter a, Get d (User' a), Get d (Channel' a)) => L.Text -> BotReacting a d ()
 reply msg = do
     chan <- getChannel
-    user <- getUser >>= getUsername
+    user <- (^.username) <$> getUser
     messageChannel' chan $ user <> " " <> msg
 
 
@@ -356,8 +325,8 @@ getUser = (unwrapUser' :: User' a -> User a) <$> view (payload . getLens)
 
 
 -- | Get the stored file.
-getFile :: forall a m. Get m (File' a) => BotReacting a m (File a)
-getFile = (unwrapFile' :: File' a -> File a) <$> view (payload . getLens)
+getFile :: forall a m. Get m (RemoteFile' a) => BotReacting a m (RemoteFile a)
+getFile = (unwrapFile' :: RemoteFile' a -> RemoteFile a) <$> view (payload . getLens)
 
 
 -- | Get a value out of the config, returns 'Nothing' if the value didn't exist.

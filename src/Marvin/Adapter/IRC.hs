@@ -9,8 +9,8 @@ Portability : POSIX
 
 See caveats and potential issues with this adapter here <https://marvin.readthedocs.io/en/latest/adapters.html#irc>.
 -}
-{-# LANGUAGE Rank2Types     #-}
-{-# LANGUAGE ViewPatterns   #-}
+{-# LANGUAGE Rank2Types   #-}
+{-# LANGUAGE ViewPatterns #-}
 module Marvin.Adapter.IRC
     ( IRCAdapter, IRCChannel
     ) where
@@ -36,6 +36,7 @@ import           Marvin.Adapter
 import           Marvin.Interpolate.All
 import           Marvin.Types                    as MT
 import           Network.IRC.Conduit             as IRC
+import           Util
 
 
 type MarvinIRCMsg = IRC.Message L.Text
@@ -45,6 +46,8 @@ type MarvinIRCMsg = IRC.Message L.Text
 data IRCChannel
     = RealChannel { chanName :: L.Text }
     | Direct      { chanName :: L.Text }
+
+instance HasName IRCChannel L.Text where name = lens chanName (\a b -> a {chanName = b})
 
 
 data IRCAdapter = IRCAdapter
@@ -72,8 +75,8 @@ processor inChan handler = do
                 let ev = fmap (L.fromStrict . T.decodeUtf8) rawEv
                 ts <- liftIO $ TimeStamp <$> getCurrentTime
                 let (user, channel) = case _source ev of
-                                        User nick -> (nick, Direct nick)
-                                        Channel chan user -> (user, RealChannel chan)
+                                        User nick -> (SimpleWrappedUsername nick, Direct nick)
+                                        Channel chan user -> (SimpleWrappedUsername user, RealChannel chan)
                 case _message ev of
                     Privmsg target (Right msg) -> do
                         -- Privmsg can either be a private message directly to
@@ -88,7 +91,7 @@ processor inChan handler = do
                         handler $ (if target == botname then CommandEvent else MessageEvent) user channel msg ts
                     Join channel' -> handler $ ChannelJoinEvent user (RealChannel channel') ts
                     Part channel' _ -> handler $ ChannelLeaveEvent user (RealChannel channel') ts
-                    Kick channel' nick _ -> handler $ ChannelLeaveEvent nick (RealChannel channel') ts
+                    Kick channel' nick _ -> handler $ ChannelLeaveEvent (SimpleWrappedUsername nick) (RealChannel channel') ts
                     Topic channel' t -> handler $ TopicChangeEvent user (RealChannel channel') t ts
                     Ping a b -> writeChan msgOutChan $ Pong $ fromMaybe a b
                     Invite chan _ -> writeChan msgOutChan $ Join chan
@@ -126,7 +129,7 @@ setUp chan username channels = do
 
 instance IsAdapter IRCAdapter where
     -- | Stores the username
-    type User IRCAdapter = L.Text
+    type User IRCAdapter = SimpleWrappedUsername
     -- | Stores channel name
     type Channel IRCAdapter = IRCChannel
 
@@ -141,11 +144,9 @@ instance IsAdapter IRCAdapter where
 
     -- TODO Perhaps these resolving funtions should be changed such that
     -- they return Nothing if the user doesn't exist.
-    getUsername = return
-    getChannelName = return . chanName
     resolveChannel = return . Just . RealChannel
     -- | Just returns the value again
-    resolveUser = return . Just
+    resolveUser = return . Just . SimpleWrappedUsername
     initAdapter = IRCAdapter <$> newChan
     runAdapter handler = do
         port <- fromMaybe 7000 <$> lookupFromAdapterConfig "port"

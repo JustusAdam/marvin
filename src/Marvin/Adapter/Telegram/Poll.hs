@@ -18,7 +18,6 @@ module Marvin.Adapter.Telegram.Poll
     , TelegramChat(..), ChatType(..)
     , TelegramUser(..)
     , MkTelegram
-    , HasUsername(username), HasLastName(lastName), HasId_(id_), HasFirstName(firstName), HasType_(type_)
     ) where
 
 

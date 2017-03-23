@@ -44,9 +44,7 @@ deriveJSON defaultOptions { unwrapUnaryRecords = True } ''SlackUserId
 deriveJSON defaultOptions { unwrapUnaryRecords = True } ''SlackChannelId
 
 class HasTopic s a | s -> a where topic :: Lens' s a
-class HasName s a | s -> a where name :: Lens' s a
 class HasIdValue s a | s -> a where idValue :: Lens' s a
-class HasUsername s a | s -> a where username :: Lens' s a
 class HasNameResolver s a | s -> a where nameResolver :: Lens' s a
 class HasInfoCache s a | s -> a where infoCache :: Lens' s a
 class HasCreated s a | s -> a where created :: Lens' s a
@@ -61,8 +59,11 @@ declareFields [d|
 
 declareFields [d|
     data UserInfo = UserInfo
-        { userInfoUsername :: L.Text
-        , userInfoIdValue  :: SlackUserId
+        { userInfoUsername  :: L.Text
+        , userInfoIdValue   :: SlackUserId
+        , userInfoName      :: Maybe L.Text
+        , userInfoFirstName :: Maybe L.Text
+        , userInfoLastName  :: Maybe L.Text
         }
     |]
 
@@ -70,7 +71,7 @@ declareFields [d|
 declareFields [d|
     data ChannelCache = ChannelCache
         { channelCacheInfoCache    :: HashMap SlackChannelId LimitedChannelInfo
-        , channelCacheNameResolver :: HashMap L.Text SlackChannelId
+        , channelCacheNameResolver :: HashMap L.Text LimitedChannelInfo
         }
     |]
 
@@ -78,14 +79,12 @@ declareFields [d|
 declareFields [d|
     data UserCache = UserCache
         { userCacheInfoCache    :: HashMap SlackUserId UserInfo
-        , userCacheNameResolver :: HashMap L.Text SlackUserId
+        , userCacheNameResolver :: HashMap L.Text UserInfo
         }
     |]
 
-
-
 data InternalType a
-    = SlackEvent (Event (SlackAdapter a))
+    = SlackEvent (SlackUserId, SlackChannelId, UserInfo -> LimitedChannelInfo -> Event (SlackAdapter a))
     | Error
         { code :: Int
         , msg  :: String
@@ -106,24 +105,45 @@ data SlackAdapter a = SlackAdapter
     , outChannel    :: Chan (SlackChannelId, L.Text)
     }
 
-instance FromJSON (TimeStamp (SlackAdapter ())) where parseJSON = timestampFromNumber
+instance FromJSON (TimeStamp (SlackAdapter a)) where parseJSON = timestampFromNumber
 
-data SlackFile = SlackFile
-    { slackFileIdValue   :: L.Text
-    , slackFileCreated   :: TimeStamp (SlackAdapter ())
-    , slackFileName      :: Maybe L.Text
-    , slackFileNitle     :: Maybe L.Text
-    , slackFileFiletype  :: L.Text
-    , slackFilePermalink :: L.Text
-    , slackFileSize      :: Int
-    , slackFileEditable  :: Bool
-    , slackFilePublic    :: Bool
-    , slackFileUser      :: SlackUserId
+declareFields [d|
+    data SlackRemoteFile a = SlackRemoteFile
+        { slackRemoteFileIdValue        :: L.Text
+        , slackRemoteFileCreationDate   :: TimeStamp (SlackAdapter a)
+        , slackRemoteFileName           :: Maybe L.Text
+        , slackRemoteFileTitle          :: Maybe L.Text
+        , slackRemoteFileType_          :: Maybe L.Text
+        , slackRemoteFileUrl            :: Maybe L.Text
+        , slackRemoteFileSize           :: Int
+        , slackRemoteFileEditable       :: Bool
+        , slackRemoteFilePublic         :: Bool
+        , slackRemoteFileUser           :: SlackUserId
+        }
+    |]
+
+
+data SlackLocalFile = SlackLocalFile
+    { slackLocalFileName :: Maybe L.Text
+    , slackLocalFileType_ :: Maybe L.Text
+    , slackLocalFileContent :: FileContent
     }
 
-deriveFromJSON (defaultOptions {fieldLabelModifier = camelTo2 '_' . fromJust . stripPrefix "slackFile" }) ''SlackFile
-makeFields ''SlackFile
+instance FromJSON (SlackRemoteFile a) where
+    parseJSON = withObject "file must be object" $ \o -> SlackRemoteFile 
+        <$> o .: "id"
+        <*> o .: "created"
+        <*> o .:? "name"
+        <*> o .:? "title"
+        <*> o .:? "filetype"
+        <*> o .:? "permalink"
+        <*> o .: "size"
+        <*> o .: "editable"
+        <*> o .: "public"
+        <*> o .: "user"
 
+makeFields ''SlackRemoteFile
+makeFields ''SlackLocalFile
 
 instance FromJSON RTMData where
     parseJSON = withObject "expected object" $ \o ->
@@ -142,7 +162,15 @@ helloParser = withObject "expected object" $ \o -> do
 
 userInfoParser :: Value -> Parser UserInfo
 userInfoParser = withObject "expected object" $ \o ->
-    o .: "user" >>= withObject "expected object" (\o' -> UserInfo <$> o' .: "name" <*> o' .: "id")
+    o .: "user" >>= 
+        withObject "expected object" (\o' -> do
+            o2 <- o' .: "profile"
+            UserInfo <$> o' .: "name" <*> o' .: "id"
+                <*> o2 .:? "real_name"
+                <*> o2 .:? "first_name"
+                <*> o2 .:? "last_name"
+                
+        )
 
 
 userInfoListParser :: Value -> Parser [UserInfo]

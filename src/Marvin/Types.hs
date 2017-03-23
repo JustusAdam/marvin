@@ -14,12 +14,12 @@ module Marvin.Types
     , applicationScriptId, IsScript, getScriptId
     , HasConfigAccess, TimeStamp(..)
     , AccessAdapter(AdapterT)
-    , User'(..), Channel'(..)
+    , User'(..), Channel'(..), RemoteFile'(..), FileContent
     , Get(getLens)
     , Event(..), RunnerM
     , BotActionState
-    , HasScriptId(scriptId), HasAdapter(adapter), HasPayload(..)
-    , HasActions(actions)
+    , HasScriptId(scriptId), HasAdapter(adapter), HasPayload(payload)
+    , HasActions(actions), HasUsername(username), HasName(name), HasFirstName(firstName), HasLastName(lastName), HasType_(type_), HasUrl(url), HasCreationDate(creationDate), HasSize(size), HasContent(content)
     ) where
 
 

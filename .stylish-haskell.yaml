@@ -160,3 +160,8 @@ language_extensions:
   - ExistentialQuantification
   - TemplateHaskell
   - QuasiQuotes
+  - FlexibleInstances
+  - FlexibleContexts
+  - FunctionalDependencies
+  - NamedFieldPuns
+  - TypeSynonymInstances

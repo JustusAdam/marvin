@@ -13,9 +13,11 @@ module Marvin.Adapter.Shell (ShellAdapter) where
 import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
 import           Control.Concurrent.MVar.Lifted
+import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Loops
+import qualified Data.ByteString                 as B
 import           Data.Char                       (isSpace)
 import           Data.Maybe                      (fromJust)
 import qualified Data.Text.Lazy                  as L
@@ -26,6 +28,7 @@ import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text.Lazy
 import           Marvin.Types
 import           System.Console.Haskeline
+import           Util
 
 
 -- | Adapter for a shell prompt
@@ -49,36 +52,60 @@ help = L.unlines
     ]
 
 
+declareFields [d|
+    data RFile = RFile
+        { rFileName :: Maybe L.Text
+        , rFileType_ :: Maybe L.Text
+        , rFileSize :: Int
+        , rFileCreationDate :: TimeStamp ShellAdapter
+        , rFilePath :: L.Text
+        , rFileUrl :: Maybe L.Text
+        }
+    data LFile = LFile
+        { lFileName :: Maybe L.Text
+        , lFileType_ :: Maybe L.Text
+        , lFileCreationDate :: TimeStamp ShellAdapter
+        , lFileContent :: FileContent
+        }
+    |]
+
+
 instance HasFiles ShellAdapter where
-    type File ShellAdapter = L.Text
-    getFileName = return . Just
-    getFileType = error "not implemented"
-    getFileUrl = return . Just
-    readFileContents = fmap Just . liftIO . L.readFile . L.unpack
-    getCreationDate = error "not implemented"
-    getFileSize = error "not implemented"
-    shareLocalFile path chans =
-        forM_ chans $ \c -> messageChannel c $(isL "The bot has shared a file #{path} in this channel")
+    type RemoteFile ShellAdapter = RFile
+    type LocalFile ShellAdapter = LFile
+    newLocalFile = return . LFile Nothing Nothing undefined
+    readTextFile f = Just <$> liftIO (L.readFile (L.unpack (f^.path)))
+    readFileBytes f = Just <$> liftIO (B.readFile (L.unpack (f^.path)))
+    shareFile file chans =
+        forM_ chans $ \c -> messageChannel c $(isL "The bot has shared a file #{file^.name} in this channel")
+
+
+pathToFile :: L.Text -> IO RFile
+pathToFile = undefined
+
+
+defaultUser :: SimpleWrappedUsername
+defaultUser = SimpleWrappedUsername "shell"
+
+
+defaultChannel :: SimpleWrappedChannelName
+defaultChannel = SimpleWrappedChannelName "shell"
 
 
 instance IsAdapter ShellAdapter where
     -- | Stores the username
-    type User ShellAdapter = L.Text
+    type User ShellAdapter = SimpleWrappedUsername
     -- | Stores channel name
-    type Channel ShellAdapter = L.Text
+    type Channel ShellAdapter = SimpleWrappedChannelName
 
     adapterId = "shell"
     messageChannel _ msg = do
         ShellAdapter{output} <- getAdapter
         writeChan output msg
     -- | Just returns the value again
-    getUsername = return
+    resolveChannel = return . Just . SimpleWrappedChannelName
     -- | Just returns the value again
-    getChannelName = return
-    -- | Just returns the value again
-    resolveChannel = return . Just
-    -- | Just returns the value again
-    resolveUser = return . Just
+    resolveUser = return . Just . SimpleWrappedUsername
     initAdapter = ShellAdapter <$> newChan
 
     -- TODO test this output method actually works
@@ -104,18 +131,24 @@ instance IsAdapter ShellAdapter where
                         liftIO $
                             case L.words mtext of
                                 [":?"] -> writeChan out help
-                                [":join", user] -> writeChan inChan $ ChannelJoinEvent user "shell" ts
-                                [":join", user, chan] -> writeChan inChan $ ChannelJoinEvent user chan ts
-                                [":leave", user] -> writeChan inChan $ ChannelLeaveEvent user "shell" ts
-                                [":leave", user, chan] -> writeChan inChan $ ChannelLeaveEvent user chan ts
-                                (":topic":t) -> writeChan inChan $ TopicChangeEvent "shell" "shell" (fromJust $ L.stripPrefix ":topic" mtext) ts
-                                [":file", chan, path] -> writeChan inChan $ FileSharedEvent "shell" chan path ts
-                                [":file", path] -> writeChan inChan $ FileSharedEvent "shell" "shell" path ts
-                                [":file", user, chan, path] -> writeChan inChan $ FileSharedEvent user chan path ts
+                                [":join", user] -> writeChan inChan $ ChannelJoinEvent (SimpleWrappedUsername user) defaultChannel ts
+                                [":join", user, chan] -> writeChan inChan $ ChannelJoinEvent (SimpleWrappedUsername user) (SimpleWrappedChannelName chan) ts
+                                [":leave", user] -> writeChan inChan $ ChannelLeaveEvent (SimpleWrappedUsername user) defaultChannel ts
+                                [":leave", user, chan] -> writeChan inChan $ ChannelLeaveEvent (SimpleWrappedUsername user) (SimpleWrappedChannelName chan) ts
+                                (":topic":t) -> writeChan inChan $ TopicChangeEvent defaultUser defaultChannel (fromJust $ L.stripPrefix ":topic" mtext) ts
+                                [":file", chan, path] -> do
+                                    f <- pathToFile path
+                                    writeChan inChan $ FileSharedEvent defaultUser (SimpleWrappedChannelName chan) f ts
+                                [":file", path] -> do
+                                    f <- pathToFile path
+                                    writeChan inChan $ FileSharedEvent defaultUser defaultChannel f ts
+                                [":file", user, chan, path] -> do
+                                    f <- pathToFile path
+                                    writeChan inChan $ FileSharedEvent (SimpleWrappedUsername user) (SimpleWrappedChannelName chan) f ts
                                 (x:_) | ":" `L.isPrefixOf` x ->
                                     writeChan out $(isL "Unknown command #{x} or unexpected arguments")
                                 _ ->  -- handle message
                                     writeChan inChan $ case L.stripPrefix bot $ L.stripStart mtext of
                                                 Just cmd | fmap (isSpace . fst) (L.uncons cmd) == Just True ->
-                                                    CommandEvent "shell" "shell" (L.stripStart cmd) ts
-                                                _ -> MessageEvent "shell" "shell" mtext ts
+                                                    CommandEvent defaultUser defaultChannel (L.stripStart cmd) ts
+                                                _ -> MessageEvent defaultUser defaultChannel mtext ts

@@ -28,13 +28,11 @@ import           Unsafe.Coerce
 import           Util
 
 
-messageParser :: Value -> Parser (Event (SlackAdapter a))
-messageParser = withObject "expected object" $ \o ->
-    MessageEvent
-        <$> o .: "user"
-        <*> o .: "channel"
-        <*> o .: "text"
-        <*> (o .: "ts" >>= timestampFromNumber)
+messageParser :: Value -> Parser (SlackUserId, SlackChannelId, UserInfo -> LimitedChannelInfo -> Event (SlackAdapter a))
+messageParser = withObject "expected object" $ \o -> do
+    content <- o .: "text"
+    ts <- o .: "ts" >>= timestampFromNumber
+    (,,\u c -> MessageEvent u c content ts) <$> o .: "user" <*> o .: "channel"
 
 
 eventParser :: Value -> Parser (InternalType a)
@@ -72,20 +70,21 @@ eventParser v@(Object o) = isErrParser <|> hasTypeParser
                     "group_join" -> cJoin
                     "channel_leave" -> cLeave
                     "group_leave" -> cLeave
-                    "channel_topic" ->
-                        TopicChangeEvent <$> user <*> channel <*> o .: "topic" <*> ts
-                    "file_share" ->
-                        FileSharedEvent <$> user <*> channel <*> o .: "file" <*> ts
+                    "channel_topic" -> 
+                        wrapEv $ (\topic ts u c -> TopicChangeEvent u c topic ts) <$> o .: "topic" <*> ts
+                    "file_share" -> 
+                        wrapEv $ (\topic ts u c -> FileSharedEvent u c topic ts) <$> o .: "file" <*> ts
                     _ -> msgEv
 
             _ -> msgEv
       where
-        ts = o .: "ts" >>= timestampFromNumber
-        msgEv = messageParser v
         user = o .: "user"
         channel = o .: "channel"
-        cJoin = ChannelJoinEvent <$> user <*> channel <*> ts
-        cLeave = ChannelLeaveEvent <$> user <*> channel <*> ts
+        ts = o .: "ts" >>= timestampFromNumber
+        msgEv = messageParser v
+        wrapEv f = (,,) <$> user <*> channel <*> f
+        cJoin = wrapEv $ (\t u c -> ChannelJoinEvent u c t) <$> ts
+        cLeave = wrapEv $ (\t u c -> ChannelLeaveEvent u c t) <$> ts
 eventParser _ = fail "expected object"
 
 
@@ -101,16 +100,21 @@ runHandlerLoop evChan handler =
     forever $ do
         d <- readChan evChan
         case d of
-            SlackEvent ev@(MessageEvent u c m t) -> do
+            SlackEvent (uid, cid, f) -> do
+                uinfo <- getUserInfo uid
+                lci <- getChannelInfo cid
 
-                botname <- L.toLower <$> getBotname
-                let strippedMsg = L.stripStart m
-                let lmsg = L.toLower strippedMsg
-                handler $ case asum $ map ((\prefix -> if prefix `L.isPrefixOf` lmsg then Just $ L.drop (L.length prefix) strippedMsg else Nothing) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname] of
-                    Nothing -> ev
-                    Just m' -> CommandEvent u c m' t
+                case f uinfo lci of
+                    ev@(MessageEvent u c m t) -> do
 
-            SlackEvent event -> handler event
+                        botname <- L.toLower <$> getBotname
+                        let strippedMsg = L.stripStart m
+                        let lmsg = L.toLower strippedMsg
+                        handler $ case asum $ map ((\prefix -> if prefix `L.isPrefixOf` lmsg then Just $ L.drop (L.length prefix) strippedMsg else Nothing) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname] of
+                            Nothing -> ev
+                            Just m' -> CommandEvent u c m' t
+
+                    ev -> handler ev
             Unhandeled type_ ->
                 logDebugN $(isT "Unhandeled event type #{type_} payload")
             Error code msg ->
@@ -147,11 +151,18 @@ messageChannelImpl cid msg = do
     writeChan outChannel (cid, msg)
 
 
-getUserInfoImpl :: MkSlack a => SlackUserId -> AdapterM (SlackAdapter a) UserInfo
-getUserInfoImpl user = do
+getUserInfo :: MkSlack a => SlackUserId -> AdapterM (SlackAdapter a) UserInfo
+getUserInfo user = do
     adapter <- getAdapter
     uc <- readMVar $ userInfoCache adapter
     maybe (refreshSingleUserInfo user) return $ uc ^? infoCache. ix user
+
+
+getChannelInfo :: MkSlack a => SlackChannelId -> AdapterM (SlackAdapter a) LimitedChannelInfo
+getChannelInfo cid = do
+    adapter <- getAdapter
+    cc <- readMVar $ channelCache adapter
+    return $ cc ^?! infoCache. ix cid
 
 
 refreshSingleUserInfo :: MkSlack a => SlackUserId -> AdapterM (SlackAdapter a) UserInfo
@@ -172,7 +183,7 @@ refreshChannels = do
         Left err -> return $ Left $ "Error when getting channel data " ++ err
         Right v -> do
             let cmap = HM.fromList $ map ((^. idValue) &&& id) v
-                nmap = HM.fromList $ map ((^. name) &&& (^. idValue)) v
+                nmap = HM.fromList $ map ((^. name) &&& id) v
                 cache = ChannelCache cmap nmap
             return $ Right cache
 
@@ -188,7 +199,7 @@ refreshSingleChannelInfo chan = do
             return v
 
 
-resolveChannelImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe SlackChannelId)
+resolveChannelImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe LimitedChannelInfo)
 resolveChannelImpl name' = do
     adapter <- getAdapter
     modifyMVar (channelCache adapter) $ \cc ->
@@ -209,12 +220,12 @@ refreshUserInfo = do
         Left err -> return $ Left $ "Error when getting channel data " ++ err
         Right v -> do
             let cmap = HM.fromList $ map ((^. idValue) &&& id) v
-                nmap = HM.fromList $ map ((^. username) &&& (^. idValue)) v
+                nmap = HM.fromList $ map ((^. username) &&& id) v
                 cache = UserCache cmap nmap
             return $ Right cache
 
 
-resolveUserImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe SlackUserId)
+resolveUserImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe UserInfo)
 resolveUserImpl name = do
     adapter <- getAdapter
     modifyMVar (userInfoCache adapter) $ \cc ->
@@ -244,7 +255,7 @@ putChannel  channelInfo@(LimitedChannelInfo id name _) = do
     modifyMVar_ channelCache $ \cache ->
         return $ cache
             & infoCache . at id .~ Just channelInfo
-            & nameResolver . at name .~ Just id
+            & nameResolver . at name .~ Just channelInfo
 
 
 deleteChannel :: SlackChannelId -> AdapterM (SlackAdapter a) ()
@@ -266,7 +277,7 @@ renameChannel channelInfo@(LimitedChannelInfo id name _) = do
         return $
             let inserted = cache
                                 & infoCache . at id .~ Just channelInfo
-                                & nameResolver . at name .~ Just id
+                                & nameResolver . at name .~ Just channelInfo
             in case cache ^? infoCache . ix id of
                 Just (LimitedChannelInfo _ oldName _) | oldName /= name ->
                     inserted & nameResolver . at oldName .~ Nothing
@@ -280,31 +291,30 @@ class MkSlack a where
 
 
 instance MkSlack a => IsAdapter (SlackAdapter a) where
-    type User (SlackAdapter a) = SlackUserId
-    type Channel (SlackAdapter a) = SlackChannelId
+    type User (SlackAdapter a) = UserInfo
+    type Channel (SlackAdapter a) = LimitedChannelInfo
     initAdapter = SlackAdapter
         <$> newMVar (ChannelCache mempty mempty)
         <*> newMVar (UserCache mempty mempty)
         <*> newChan
     adapterId = mkAdapterId
-    messageChannel = messageChannelImpl
+    messageChannel = messageChannelImpl . (^.idValue)
     runAdapter = runnerImpl
-    getUsername = fmap (^.username) . getUserInfoImpl
-    getChannelName = getChannelNameImpl
     resolveChannel = resolveChannelImpl
     resolveUser = resolveUserImpl
 
 
 instance HasFiles (SlackAdapter a) where
-    type File (SlackAdapter a) = SlackFile
+    type RemoteFile (SlackAdapter a) = SlackRemoteFile a
+    type LocalFile (SlackAdapter a) = SlackLocalFile
 
-    getFileName = return . (^.name)
-    getFileType = return . (^.filetype)
-    getFileUrl = return . Just . (^.permalink)
-    readFileContents _ = do
+    readTextFile _ = do
         logErrorN "Reading file is not implemented"
         return Nothing
-    getCreationDate = return . unsafeCoerce . (^.created)
-    getFileSize = return . (^.size)
-    shareLocalFile = error "not implemented yet"
+    readFileBytes _ = do
+        logErrorN "Reading file is not implemented"
+        return Nothing
+    shareFile _ _ =
+        logErrorN "Sharing file is not implemented"
+    newLocalFile = return . SlackLocalFile Nothing Nothing 
 

@@ -12,6 +12,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Trans.Control
+import           Data.ByteString             (ByteString)
 import           Data.Char                   (isAlphaNum, isLetter)
 import qualified Data.Configurator.Types     as C
 import qualified Data.HashMap.Strict         as HM
@@ -25,6 +26,33 @@ import           GHC.Generics
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text
 import           Marvin.Util.Regex
+
+
+class HasContent s a | s -> a where content :: Lens' s a
+class HasUrl s a | s -> a where url :: Lens' s a
+class HasName s a | s -> a where name :: Lens' s a
+class HasLastName s a | s -> a where lastName :: Lens' s a
+class HasFirstName s a | s -> a where firstName :: Lens' s a
+class HasCreationDate s a | s -> a where creationDate :: Lens' s a
+class HasSize s a | s -> a where size :: Lens' s a
+class HasUsername s a | s -> a where username :: Lens' s a
+class HasType_ s a | s -> a where type_ :: Lens' s a
+class HasScriptId s a | s -> a where scriptId :: Lens' s a
+class HasConfig s a | s -> a where config :: Lens' s a
+class HasAdapter s a | s -> a where adapter :: Lens' s a
+class HasPayload s a | s -> a where payload :: Lens' s a
+class HasTopicChangeIn s a | s -> a where topicChangeIn :: Lens' s a
+class HasTopicChange s a | s -> a where topicChange :: Lens' s a
+class HasResponds s a | s -> a where responds :: Lens' s a
+class HasLeavesFrom s a | s -> a where leavesFrom :: Lens' s a
+class HasLeaves s a | s -> a where leaves :: Lens' s a
+class HasJoinsIn s a | s -> a where joinsIn :: Lens' s a
+class HasJoins s a | s -> a where joins :: Lens' s a
+class HasHears s a | s -> a where hears :: Lens' s a
+class HasFileShares s a | s -> a where fileShares :: Lens' s a
+class HasFileSharesIn s a | s -> a where fileSharesIn :: Lens' s a
+class HasCustoms s a | s -> a where customs :: Lens' s a
+class HasActions s a | s -> a where actions :: Lens' s a
 
 
 -- | The topic in a channel
@@ -45,7 +73,7 @@ data Event a
     | ChannelJoinEvent (User a) (Channel a) (TimeStamp a)
     | ChannelLeaveEvent (User a) (Channel a) (TimeStamp a)
     | TopicChangeEvent (User a) (Channel a) Topic (TimeStamp a)
-    | HasFiles a => FileSharedEvent (User a) (Channel a) (File a) (TimeStamp a)
+    | HasFiles a => FileSharedEvent (User a) (Channel a) (RemoteFile a) (TimeStamp a)
 
 -- | Basic monad which most internal actions run in
 type RunnerM = LoggingT IO
@@ -57,7 +85,12 @@ newtype AdapterM a r = AdapterM { runAdapterAction :: ReaderT (C.Config, a) Runn
 type EventConsumer a = Event a -> AdapterM a ()
 
 -- | Basic functionality required of any adapter
-class IsAdapter a where
+class ( HasUsername (User a) L.Text
+      , HasName (User a) (Maybe L.Text)
+      , HasFirstName (User a) (Maybe L.Text)
+      , HasLastName (User a) (Maybe L.Text)
+      , HasName (Channel a) L.Text
+      ) => IsAdapter a where
     -- | Concrete, adapter specific representation of a user. Could be an id string or a full object for instance
     type User a
     -- | Concrete, adapter specific representation of a channel. Could be an id string or a full object for instance
@@ -74,27 +107,32 @@ class IsAdapter a where
     -- However the 'EventConsumer' is deliberately early retuning, meaning when it returns processing of the 'Event' has been queued but not finished yet. In fact it most likely has just started.
     -- It its therefore not necessary to run the 'EventConsumer' in parallel, using 'async' for instance.
     runAdapter :: EventConsumer a -> AdapterM a ()
-    -- | Resolve a username given the internal user identifier
-    getUsername :: User a -> AdapterM a L.Text
-    -- | Resolve the human readable name for a channel given the  internal channel identifier
-    getChannelName :: Channel a -> AdapterM a L.Text
     -- | Resolve to the internal channel structure given a human readable name
     resolveChannel :: L.Text -> AdapterM a (Maybe (Channel a))
     -- | Resolve to the internal user structure given a human readable name
     resolveUser :: L.Text -> AdapterM a (Maybe (User a))
 
 
-class HasFiles a where
+data FileContent = FileOnDisk L.Text | FileInMemory ByteString
+
+
+class ( HasName (RemoteFile a) (Maybe L.Text)
+      , HasUrl (RemoteFile a) (Maybe L.Text)
+      , HasType_ (RemoteFile a) (Maybe L.Text)
+      , HasCreationDate (RemoteFile a) (TimeStamp a)
+      , HasSize (RemoteFile a) Int
+      , HasContent (LocalFile a) FileContent
+      , HasName (LocalFile a) (Maybe L.Text)
+      , HasType_ (LocalFile a) (Maybe L.Text)
+      ) => HasFiles a where
     -- | Concrete type of an uploaded file
-    type File a
+    type RemoteFile a
+    type LocalFile a
     -- | Resolve the name of the file
-    getFileName :: File a -> AdapterM a (Maybe L.Text)
-    getFileType :: File a -> AdapterM a L.Text
-    getFileUrl :: File a -> AdapterM a (Maybe L.Text)
-    readFileContents :: File a -> AdapterM a (Maybe L.Text)
-    getCreationDate :: File a -> AdapterM a (TimeStamp a)
-    getFileSize :: File a -> AdapterM a Int
-    shareLocalFile :: L.Text -> [Channel a] -> AdapterM a ()
+    newLocalFile :: FileContent -> AdapterM a (LocalFile a)
+    readTextFile :: RemoteFile a -> AdapterM a (Maybe L.Text)
+    readFileBytes :: RemoteFile a -> AdapterM a (Maybe ByteString)
+    shareFile :: LocalFile a -> [Channel a] -> AdapterM a ()
 
 
 -- | Wrapping type for users. Only used to enable 'Get' typeclass instances.
@@ -103,7 +141,7 @@ newtype User' a = User' { unwrapUser' :: User a }
 newtype Channel' a = Channel' { unwrapChannel' :: Channel a }
 
 -- | Wrapping type for files. Only used to enable 'Get' typeclass instances.
-newtype File' a = File' { unwrapFile' :: File a }
+newtype RemoteFile' a = File' { unwrapFile' :: RemoteFile a }
 
 -- | A type, basically a String, which identifies a script to the config and the logging facilities.
 --
@@ -116,23 +154,6 @@ newtype ScriptId = ScriptId { unwrapScriptId :: T.Text } deriving (Show, Eq)
 -- For conversion please use 'mkAdapterId' and 'unwrapAdapterId'. They will perform necessary checks.
 newtype AdapterId a = AdapterId { unwrapAdapterId :: T.Text } deriving (Show, Eq)
 
-
-class HasScriptId s a | s -> a where scriptId :: Lens' s a
-class HasConfig s a | s -> a where config :: Lens' s a
-class HasAdapter s a | s -> a where adapter :: Lens' s a
-class HasPayload s a | s -> a where payload :: Lens' s a
-class HasTopicChangeIn s a | s -> a where topicChangeIn :: Lens' s a
-class HasTopicChange s a | s -> a where topicChange :: Lens' s a
-class HasResponds s a | s -> a where responds :: Lens' s a
-class HasLeavesFrom s a | s -> a where leavesFrom :: Lens' s a
-class HasLeaves s a | s -> a where leaves :: Lens' s a
-class HasJoinsIn s a | s -> a where joinsIn :: Lens' s a
-class HasJoins s a | s -> a where joins :: Lens' s a
-class HasHears s a | s -> a where hears :: Lens' s a
-class HasFileShares s a | s -> a where fileShares :: Lens' s a
-class HasFileSharesIn s a | s -> a where fileSharesIn :: Lens' s a
-class HasCustoms s a | s -> a where customs :: Lens' s a
-class HasActions s a | s -> a where actions :: Lens' s a
 
 -- | Read only data available to a handler when the bot reacts to an event.
 declareFields [d|
@@ -153,11 +174,11 @@ declareFields [d|
         , handlersJoins :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
         , handlersLeaves :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
         , handlersTopicChange :: Vector ((User' a, Channel' a, Topic, TimeStamp a) -> RunnerM ())
-        , handlersFileShares :: Vector ((User' a, Channel' a, File' a, TimeStamp a) -> RunnerM ())
+        , handlersFileShares :: Vector ((User' a, Channel' a, RemoteFile' a, TimeStamp a) -> RunnerM ())
         , handlersJoinsIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
         , handlersLeavesFrom :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
         , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, Topic, TimeStamp a) -> RunnerM ()))
-        , handlersFileSharesIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, File' a, TimeStamp a) -> RunnerM ()))
+        , handlersFileSharesIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, RemoteFile' a, TimeStamp a) -> RunnerM ()))
         } deriving Generic
     |]
 
@@ -259,7 +280,7 @@ instance Get (a, b, c, Message, e) Message where
 instance Get (a, b, Topic, d) Topic where
     getLens = _3
 
-instance Get (a, b, File' c, d) (File' c) where
+instance Get (a, b, RemoteFile' c, d) (RemoteFile' c) where
     getLens = _3
 
 instance HasConfigAccess (ScriptDefinition a) where

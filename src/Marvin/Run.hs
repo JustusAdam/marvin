@@ -7,10 +7,10 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 -}
-{-# LANGUAGE BangPatterns           #-}
-{-# LANGUAGE ExplicitForAll         #-}
-{-# LANGUAGE Rank2Types             #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE BangPatterns        #-}
+{-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE Rank2Types          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Run
     ( runMarvin, ScriptInit, IsAdapter
     , requireFromAppConfig, lookupFromAppConfig, defaultConfigName
@@ -103,9 +103,7 @@ runHandlers handlers cfg adapter eventChan =
                         -> Channel a
                         -> RunnerM ()
     changeHandlerHelper wildcards specifics other chan = do
-        cName <- runWAda adapter cfg $ A.getChannelName chan
-
-        let applicables = fromMaybe mempty $ specifics^?ix cName
+        let applicables = fromMaybe mempty $ specifics^?ix (chan ^.name)
 
         wildcardsRunning <- for wildcards (async . ($ other (Channel' chan)))
 

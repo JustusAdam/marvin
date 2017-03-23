@@ -22,15 +22,17 @@ module Marvin
     , hear, respond, enter, exit, enterIn, exitFrom, topic, topicIn, customTrigger
     -- ** Getting data
     -- | Some documentation
-    , getData, getMessage, getMatch, getTopic, getChannel, getUser, getUsername, getChannelName, resolveUser, resolveChannel
+    , getData, getMessage, getMatch, getTopic, getChannel, getUser, resolveUser, resolveChannel
     -- *** File interactions
-    , getFileName, getFileType, getFileUrl, readFileContents, shareLocalFile, getFileSize
+    , readTextFile, readFileBytes, newLocalFile, shareFile
     -- ** Sending messages
     , send, reply, messageChannel, messageChannel'
     -- ** Interaction with the config
     , getConfigVal, requireConfigVal, getBotName
     -- ** Handler Types
     , Message, User, Channel, Topic
+    -- Lenses
+    , HasActions(actions), HasUsername(username), HasName(name), HasFirstName(firstName), HasLastName(lastName), HasType_(type_), HasUrl(url), HasCreationDate(creationDate), HasSize(size), HasContent(content)
     -- ** Advanced actions
     , extractAction, extractReaction
     ) where
@@ -41,4 +43,4 @@ import           Marvin.Internal
 import           Marvin.Internal.Types hiding (getChannelName, getFileName, getFileSize,
                                         getFileType, getFileUrl, getUsername, messageChannel,
                                         readFileContents, resolveChannel, resolveUser,
-                                        shareLocalFile)
+                                        shareLocalFile, readTextFile, readFileBytes, newLocalFile, shareFile)

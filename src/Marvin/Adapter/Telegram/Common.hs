@@ -1,5 +1,5 @@
-{-# LANGUAGE ExplicitForAll         #-}
-{-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Adapter.Telegram.Common where
 
 import           Control.Applicative
@@ -18,9 +18,11 @@ import           Data.Maybe
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter                  hiding (mkAdapterId)
+import           Marvin.Types
 import           Marvin.Interpolate.All
 import           Network.Wreq
 import           Util
+import Data.Monoid ((<>))
 
 import           Control.Exception.Lifted
 
@@ -46,22 +48,22 @@ data ChatType
     | SupergroupChat
     | ChannelChat
 
-
-class HasUsername s a | s -> a where username :: Lens' s a
-class HasLastName s a | s -> a where lastName :: Lens' s a
 class HasId_ s a | s -> a where id_ :: Lens' s a
-class HasFirstName s a | s -> a where firstName :: Lens' s a
-class HasType_ s a | s -> a where type_ :: Lens' s a
 
 -- | A user object as contained in the telegram update objects
 declareFields [d|
     data TelegramUser = TelegramUser
         { telegramUserId_       :: Integer
-        , telegramUserFirstName :: L.Text
+        , telegramUserFirstName :: Maybe L.Text
         , telegramUserLastName  :: Maybe L.Text
-        , telegramUserUsername  :: Maybe L.Text
+        , telegramUserUsername  :: L.Text
         }
     |]
+
+
+instance HasName TelegramUser (Maybe L.Text) where
+    name = undefined
+
 
 -- | A telegram chat object as contained in telegram updates
 declareFields [d|
@@ -73,6 +75,11 @@ declareFields [d|
         , telegramChatLastName  :: Maybe L.Text
         }
     |]
+
+instance HasName TelegramChat L.Text where
+    name = lens
+        (\c -> fromMaybe "" $ c^.username)
+        (\c n -> c&username.~(case n of "" -> Nothing;a->Just a))
 
 instance FromJSON ChatType where
     parseJSON = withText "expected string" $
@@ -87,9 +94,9 @@ instance FromJSON TelegramUser where
     parseJSON = withObject "user must be object" $ \o ->
         TelegramUser
             <$> o .: "id"
-            <*> o .: "first_name"
+            <*> (Just <$> o .: "first_name")
             <*> o .:? "last_name"
-            <*> o .:? "username"
+            <*> (maybe (o .: "first_name") return =<< o .:? "username")
 
 instance FromJSON TelegramChat where
     parseJSON = withObject "channel must be object" $ \o ->
@@ -137,10 +144,19 @@ apiResponseParser innerParser = withObject "expected object" $ \o -> do
         else Error <$> o .: "error_code" <*> o .: "description"
 
 
-execAPIMethod :: MkTelegram b => (Value -> Parser a) -> String -> [FormParam] -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
+execAPIMethod :: MkTelegram b 
+              => (Value -> Parser a) 
+              -> String 
+              -> [FormParam] 
+              -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
 execAPIMethod = execAPIMethodWith defaults
 
-execAPIMethodWith :: MkTelegram b => Options -> (Value -> Parser a) -> String -> [FormParam] -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
+execAPIMethodWith :: MkTelegram b 
+                  => Options 
+                  -> (Value -> Parser a) 
+                  -> String 
+                  -> [FormParam] 
+                  -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
 execAPIMethodWith opts innerParser methodName params = do
     token <- requireFromAdapterConfig "token"
     res <- retry 3 (liftIO (postWith opts $(isS "https://api.telegram.org/bot#{token :: String}/#{methodName}") params))
@@ -150,11 +166,6 @@ execAPIMethodWith opts innerParser methodName params = do
                                                 then -- TODO only catch appropriate exceptions
                                                     return $ Left $ displayException (e :: SomeException)
                                                 else retry (succ n) a
-
-
-getUsernameImpl :: TelegramUser -> AdapterM (TelegramAdapter a) L.Text
-getUsernameImpl u = return $ fromMaybe (u^.firstName) $ u^.username
-
 
 getChannelNameImpl :: TelegramChat -> AdapterM (TelegramAdapter a) L.Text
 getChannelNameImpl c = return $ fromMaybe "<unnamed>" $
@@ -213,8 +224,6 @@ instance MkTelegram a => IsAdapter (TelegramAdapter a) where
     adapterId = mkAdapterId
     initAdapter = return TelegramAdapter
     runAdapter = runnerImpl
-    getUsername = getUsernameImpl
-    getChannelName = getChannelNameImpl
     resolveChannel _ = do
         logErrorN "Channel resolving not supported"
         return Nothing
