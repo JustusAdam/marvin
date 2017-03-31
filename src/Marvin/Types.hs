@@ -9,7 +9,7 @@ Stability   : experimental
 Portability : POSIX
 -}
 module Marvin.Types
-    ( User(..), Channel(..), Message(..), Script
+    ( User, Channel, Message, Topic, Script
     , ScriptId, mkScriptId, unwrapScriptId
     , applicationScriptId, IsScript, getScriptId
     , HasConfigAccess, TimeStamp(..)
@@ -23,5 +23,6 @@ module Marvin.Types
     ) where
 
 
+import           Marvin.Internal.LensClasses
 import           Marvin.Internal.Types
 import           Marvin.Internal.Values

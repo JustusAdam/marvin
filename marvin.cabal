@@ -45,6 +45,7 @@ library
                      , Marvin.Internal
                      , Marvin.Internal.Types
                      , Marvin.Internal.Values
+                     , Marvin.Internal.LensClasses
                      , Marvin.Adapter.Slack.Types
                      , Marvin.Adapter.Slack.Common
                      , Marvin.Adapter.Telegram.Common

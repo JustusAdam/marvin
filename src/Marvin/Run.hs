@@ -34,9 +34,8 @@ import qualified Data.Text.Lazy                  as L
 import           Data.Traversable                (for)
 import           Data.Vector                     (Vector)
 import qualified Data.Vector                     as V
-import qualified Marvin.Adapter                  as A
-import           Marvin.Internal
-import           Marvin.Internal.Types           hiding (channel)
+import           Marvin.Internal.LensClasses
+import           Marvin.Internal.Types
 import           Marvin.Internal.Values
 import           Marvin.Interpolate.Text
 import           Marvin.Util.Regex
@@ -45,6 +44,7 @@ import           Prelude                         hiding (dropWhile, splitAt)
 import           Util
 
 
+vcatMaybes :: Vector (Maybe b) -> Vector b
 vcatMaybes = V.map fromJust . V.filter isJust
 
 
@@ -78,8 +78,8 @@ runWAda :: a -> C.Config -> AdapterM a r -> RunnerM r
 runWAda ada cfg ac = runReaderT (runAdapterAction ac) (cfg, ada)
 
 -- TODO add timeouts for handlers
-runHandlers :: forall a. IsAdapter a => Handlers a -> C.Config -> a -> Chan (Event a) -> RunnerM ()
-runHandlers handlers cfg adapter eventChan =
+runHandlers :: forall a. IsAdapter a => Handlers a -> Chan (Event a) -> RunnerM ()
+runHandlers handlers eventChan =
     forever $ readChan eventChan >>= genericHandler
   where
     genericHandler ev = do
@@ -180,7 +180,7 @@ runMarvin s' = runStderrLoggingT $ do
         eventChan <- newChan
         a <- async $ runWAda ada cfg $ runAdapter (writeChan eventChan)
         link a
-        runHandlers handlers cfg ada eventChan
+        runHandlers handlers eventChan
 
   where
     adapterPrefix = $(isT "adapter.#{adapterId :: AdapterId a}")

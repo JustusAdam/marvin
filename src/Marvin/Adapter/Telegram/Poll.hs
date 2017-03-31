@@ -28,7 +28,6 @@ import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Logger
 import           Data.Aeson                     hiding (Error, Success)
-import           Data.Aeson.Types               hiding (Error, Success)
 import           Data.IORef.Lifted
 import           Marvin.Adapter
 import           Marvin.Adapter.Telegram.Common

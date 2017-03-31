@@ -12,11 +12,9 @@ module Marvin.Adapter.Shell (ShellAdapter) where
 
 import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
-import           Control.Concurrent.MVar.Lifted
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Loops
 import qualified Data.ByteString                 as B
 import           Data.Char                       (isSpace)
 import           Data.Maybe                      (fromJust)
@@ -28,7 +26,6 @@ import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text.Lazy
 import           Marvin.Types
 import           System.Console.Haskeline
-import           System.FilePath
 import           Util
 
 
@@ -116,8 +113,8 @@ instance IsAdapter ShellAdapter where
         ShellAdapter out <- getAdapter
         inChan <- newChan
 
-        liftIO $ async $ forever $ readChan out >>= L.putStrLn
-        async $ forever $ readChan inChan >>= handler
+        void $ liftIO $ async $ forever $ readChan out >>= L.putStrLn
+        void $ async $ forever $ readChan inChan >>= handler
 
         liftIO $ runInputT defaultSettings {historyFile=histfile} $ do
             outputStrLn "Type :? to see a a list of available commands"
@@ -136,7 +133,7 @@ instance IsAdapter ShellAdapter where
                                 [":join", user, chan] -> writeChan inChan $ ChannelJoinEvent (SimpleWrappedUsername user) (SimpleWrappedChannelName chan) ts
                                 [":leave", user] -> writeChan inChan $ ChannelLeaveEvent (SimpleWrappedUsername user) defaultChannel ts
                                 [":leave", user, chan] -> writeChan inChan $ ChannelLeaveEvent (SimpleWrappedUsername user) (SimpleWrappedChannelName chan) ts
-                                (":topic":t) -> writeChan inChan $ TopicChangeEvent defaultUser defaultChannel (fromJust $ L.stripPrefix ":topic" mtext) ts
+                                (":topic":_) -> writeChan inChan $ TopicChangeEvent defaultUser defaultChannel (fromJust $ L.stripPrefix ":topic" mtext) ts
                                 [":file", chan, path] -> do
                                     f <- pathToFile path
                                     writeChan inChan $ FileSharedEvent defaultUser (SimpleWrappedChannelName chan) f ts

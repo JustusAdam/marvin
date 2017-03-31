@@ -11,8 +11,6 @@ import qualified Data.ByteString.Lazy.Char8     as BS
 import           Data.Foldable                  (toList)
 import           Data.Hashable
 import           Data.HashMap.Strict            (HashMap)
-import           Data.List                      (stripPrefix)
-import           Data.Maybe                     (fromJust)
 import           Data.String                    (IsString (..))
 import qualified Data.Text                      as T
 import qualified Data.Text.Lazy                 as L

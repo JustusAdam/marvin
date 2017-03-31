@@ -27,10 +27,8 @@ import           Data.ByteString                 (ByteString)
 import           Data.Conduit
 import           Data.Maybe
 import           Data.Monoid                     ((<>))
-import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
 import qualified Data.Text.Lazy                  as L
-import qualified Data.Text.Lazy.Encoding         as L
 import           Data.Time.Clock                 (getCurrentTime)
 import           Marvin.Adapter
 import           Marvin.Interpolate.All
@@ -61,6 +59,7 @@ producer chan = forever $ do
     yield $ T.encodeUtf8 . L.toStrict <$> msg
 
 
+consumer :: Chan i -> ConduitM i o IO ()
 consumer = awaitForever . writeChan
 
 
@@ -74,28 +73,33 @@ processor inChan handler = do
             Right rawEv -> do
                 let ev = fmap (L.fromStrict . T.decodeUtf8) rawEv
                 ts <- liftIO $ TimeStamp <$> getCurrentTime
-                let (user, channel) = case _source ev of
-                                        User nick -> (SimpleWrappedUsername nick, Direct nick)
-                                        Channel chan user -> (SimpleWrappedUsername user, RealChannel chan)
-                case _message ev of
-                    Privmsg target (Right msg) -> do
-                        -- Privmsg can either be a private message directly to
-                        -- the user, or it could be a message going to a
-                        -- channel.
-                        botname <- getBotname
-                        let (cmd, msg') = isMention botname target msg
-                        handler $ cmd user channel msg' ts
-                    Notice target (Right msg) -> do
-                        botname <- getBotname
-                        -- Check if bot is addressed
-                        handler $ (if target == botname then CommandEvent else MessageEvent) user channel msg ts
-                    Join channel' -> handler $ ChannelJoinEvent user (RealChannel channel') ts
-                    Part channel' _ -> handler $ ChannelLeaveEvent user (RealChannel channel') ts
-                    Kick channel' nick _ -> handler $ ChannelLeaveEvent (SimpleWrappedUsername nick) (RealChannel channel') ts
-                    Topic channel' t -> handler $ TopicChangeEvent user (RealChannel channel') t ts
-                    Ping a b -> writeChan msgOutChan $ Pong $ fromMaybe a b
-                    Invite chan _ -> writeChan msgOutChan $ Join chan
-                    _ -> logDebugN $(isT "Unhandled event #{rawEv}")
+                let origin = case _source ev of
+                                        User nick -> Just (SimpleWrappedUsername nick, Direct nick)
+                                        Channel chan user -> Just (SimpleWrappedUsername user, RealChannel chan)
+                                        Server _ -> Nothing
+                                        -- TODO What do we do if the server sends a message here?
+                case origin of
+                    Nothing -> logInfoN "Ignoring message from server"
+                    Just (user, channel) ->
+                        case _message ev of
+                            Privmsg target (Right msg) -> do
+                                -- Privmsg can either be a private message directly to
+                                -- the user, or it could be a message going to a
+                                -- channel.
+                                botname <- getBotname
+                                let (cmd, msg') = isMention botname target msg
+                                handler $ cmd user channel msg' ts
+                            Notice target (Right msg) -> do
+                                botname <- getBotname
+                                -- Check if bot is addressed
+                                handler $ (if target == botname then CommandEvent else MessageEvent) user channel msg ts
+                            Join channel' -> handler $ ChannelJoinEvent user (RealChannel channel') ts
+                            Part channel' _ -> handler $ ChannelLeaveEvent user (RealChannel channel') ts
+                            Kick channel' nick _ -> handler $ ChannelLeaveEvent (SimpleWrappedUsername nick) (RealChannel channel') ts
+                            Topic channel' t -> handler $ TopicChangeEvent user (RealChannel channel') t ts
+                            Ping a b -> writeChan msgOutChan $ Pong $ fromMaybe a b
+                            Invite chan _ -> writeChan msgOutChan $ Join chan
+                            _ -> logDebugN $(isT "Unhandled event #{rawEv}")
     forever $
         handleOneMessage `catch` (\e -> logErrorN $(isT "UserError: #{e :: ErrorCall}"))
 

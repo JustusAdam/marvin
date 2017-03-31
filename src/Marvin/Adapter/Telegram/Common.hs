@@ -5,7 +5,6 @@ module Marvin.Adapter.Telegram.Common where
 import           Control.Applicative
 import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
-import           Control.Concurrent.Lifted
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
@@ -15,7 +14,6 @@ import           Data.Aeson.Types                (Parser, parseEither)
 import           Data.Char                       (isSpace)
 import           Data.Foldable                   (asum)
 import           Data.Maybe
-import           Data.Monoid                     ((<>))
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter                  hiding (mkAdapterId)
@@ -159,7 +157,7 @@ execAPIMethodWith :: MkTelegram b
                   -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
 execAPIMethodWith opts innerParser methodName params = do
     token <- requireFromAdapterConfig "token"
-    res <- retry 3 (liftIO (postWith opts $(isS "https://api.telegram.org/bot#{token :: String}/#{methodName}") params))
+    res <- retry (3 :: Int) (liftIO (postWith opts $(isS "https://api.telegram.org/bot#{token :: String}/#{methodName}") params))
     return $ res >>= eitherDecode . (^. responseBody) >>= parseEither (apiResponseParser innerParser)
   where
     retry n a = (Right <$> a) `catch` \e -> if n <= 0

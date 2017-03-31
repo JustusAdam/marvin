@@ -51,6 +51,7 @@ pushEventGetter evChan = do
             ]
         case r of
             Right Success{ result = True } -> return ()
+            Right Success{ result = False } -> error $(isS "Setting webhok failed. Review your settings and try again.")
             Left err -> error $(isS "Parsing result from setting webhook failed #{err}")
             Right Error{errDescription} -> error $(isS "Setting the webhook failed: #{errDescription}")
     useTLS <- fromMaybe True <$> lookupFromAdapterConfig "use-tls"

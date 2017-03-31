@@ -12,11 +12,9 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson                      hiding (Error)
 import           Data.Aeson.Types                hiding (Error)
-import qualified Data.ByteString.Lazy.Char8      as BS
 import           Data.Char                       (isSpace)
 import           Data.Foldable                   (asum)
 import qualified Data.HashMap.Strict             as HM
-import           Data.Maybe                      (fromMaybe)
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter                  hiding (mkAdapterId)
@@ -24,7 +22,6 @@ import           Marvin.Adapter.Slack.Types
 import           Marvin.Interpolate.All
 import           Marvin.Types
 import           Network.Wreq
-import           Unsafe.Coerce
 import           Util
 
 
