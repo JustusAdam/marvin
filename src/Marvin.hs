@@ -22,7 +22,7 @@ module Marvin
     , hear, respond, enter, exit, enterIn, exitFrom, topic, topicIn, fileShared, fileSharedIn, customTrigger
     -- ** Getting data
     -- | The type signature for the functions in this section is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
-    , getData, getMessage, getMatch, getTopic, getChannel, getUser, getRemoteFile, resolveUser, resolveChannel
+    , getData, getMessage, getMatch, getTopic, getChannel, getUser, getRemoteFile, getTimeStamp, resolveUser, resolveChannel
     -- *** File interactions
     , readTextFile, readFileBytes, newLocalFile, shareFile
     -- ** Sending messages
@@ -32,7 +32,7 @@ module Marvin
     -- ** Handler Types
     , Message, User, Channel, Topic
     -- ** Lenses
-    , HasActions(actions), HasUsername(username), HasName(name), HasFirstName(firstName), HasLastName(lastName), HasType_(type_), HasUrl(url), HasCreationDate(creationDate), HasSize(size), HasContent(content)
+    , HasActions(actions), HasUsername(username), HasName(name), HasFirstName(firstName), HasLastName(lastName), HasFileType(fileType), HasUrl(url), HasCreationDate(creationDate), HasSize(size), HasContent(content)
     -- ** Advanced actions
     , extractAction, extractReaction
     ) where

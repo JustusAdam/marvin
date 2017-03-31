@@ -55,18 +55,18 @@ help = L.unlines
 
 declareFields [d|
     data RFile = RFile
-        { rFileName :: Maybe L.Text
-        , rFileType_ :: Maybe L.Text
-        , rFileSize :: Int
+        { rFileName         :: Maybe L.Text
+        , rFileFileType     :: Maybe L.Text
+        , rFileSize         :: Int
         , rFileCreationDate :: TimeStamp ShellAdapter
-        , rFilePath :: L.Text
-        , rFileUrl :: Maybe L.Text
+        , rFilePath         :: L.Text
+        , rFileUrl          :: Maybe L.Text
         }
     data LFile = LFile
-        { lFileName :: Maybe L.Text
-        , lFileType_ :: Maybe L.Text
+        { lFileName         :: Maybe L.Text
+        , lFileFileType     :: Maybe L.Text
         , lFileCreationDate :: TimeStamp ShellAdapter
-        , lFileContent :: FileContent
+        , lFileContent      :: FileContent
         }
     |]
 
@@ -116,7 +116,7 @@ instance IsAdapter ShellAdapter where
         ShellAdapter out <- getAdapter
         inChan <- newChan
 
-        liftIO $ async $ forever $ readChan out >>= putStrLn . L.unpack
+        liftIO $ async $ forever $ readChan out >>= L.putStrLn
         async $ forever $ readChan inChan >>= handler
 
         liftIO $ runInputT defaultSettings {historyFile=histfile} $ do

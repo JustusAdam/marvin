@@ -1,3 +1,11 @@
+# 0.3
+
+- Added optional support for recieving remote files and uploading local files.
+- Changed bot runner in IsAdapter to be simpler to implement.
+- Changed the IsAdapter API.
+    - The new API is lens based. Adapter dependend types are constrained via the requirement for certain lens class instances.
+    - Deprecated getUsername and getChannelName, these are now accessible via the lense class instances.
+
 # 0.2.3 - 05.03.2017
 
 - A big thanks to @lubomir for testing the IRC adapter and contributing the following changes

@@ -113,7 +113,7 @@ declareFields [d|
         , slackRemoteFileCreationDate   :: TimeStamp (SlackAdapter a)
         , slackRemoteFileName           :: Maybe L.Text
         , slackRemoteFileTitle          :: Maybe L.Text
-        , slackRemoteFileType_          :: Maybe L.Text
+        , slackRemoteFileFileType       :: Maybe L.Text
         , slackRemoteFileUrl            :: Maybe L.Text
         , slackRemoteFileSize           :: Int
         , slackRemoteFileEditable       :: Bool
@@ -122,12 +122,13 @@ declareFields [d|
         }
     |]
 
-
-data SlackLocalFile = SlackLocalFile
-    { slackLocalFileName    :: Maybe L.Text
-    , slackLocalFileType_   :: Maybe L.Text
-    , slackLocalFileContent :: FileContent
-    }
+declareFields [d|
+    data SlackLocalFile = SlackLocalFile
+        { slackLocalFileName     :: Maybe L.Text
+        , slackLocalFileFileType :: Maybe L.Text
+        , slackLocalFileContent  :: FileContent
+        }
+    |]
 
 instance FromJSON (SlackRemoteFile a) where
     parseJSON = withObject "file must be object" $ \o -> SlackRemoteFile
@@ -142,8 +143,8 @@ instance FromJSON (SlackRemoteFile a) where
         <*> o .: "public"
         <*> o .: "user"
 
-makeFields ''SlackRemoteFile
-makeFields ''SlackLocalFile
+-- makeFields ''SlackRemoteFile
+-- makeFields ''SlackLocalFile
 
 instance FromJSON RTMData where
     parseJSON = withObject "expected object" $ \o ->

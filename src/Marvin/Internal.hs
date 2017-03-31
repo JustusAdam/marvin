@@ -13,7 +13,7 @@ module Marvin.Internal
     -- ** Sending messages
     , send, reply, messageChannel, messageChannel'
     -- ** Getting Data
-    , getData, getUser, getMatch, getMessage, getChannel, getTopic, getRemoteFile, getBotName, resolveChannel, resolveUser
+    , getData, getUser, getMatch, getMessage, getChannel, getTopic, getRemoteFile, getTimeStamp, getBotName, resolveChannel, resolveUser
     -- *** File interactions
     , readTextFile, readFileBytes, newLocalFile, shareFile
     -- ** Interacting with the config
@@ -220,7 +220,7 @@ send msg = do
     messageChannel' o msg
 
 
--- | Try to get the channel with a particular human readable name. 
+-- | Try to get the channel with a particular human readable name.
 resolveChannel :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
                => L.Text -> m (Maybe (Channel a))
 resolveChannel =  A.liftAdapterAction . A.resolveChannel
@@ -250,7 +250,7 @@ shareFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, Monad
 shareFile f = A.liftAdapterAction . A.shareFile f
 
 
--- | Try to get the user with a particular username. 
+-- | Try to get the user with a particular username.
 resolveUser :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
             => L.Text -> m (Maybe (User a))
 resolveUser = A.liftAdapterAction . A.resolveUser
@@ -330,17 +330,21 @@ getChannel = (unwrapChannel' :: Channel' a -> Channel a) <$> view (payload . get
 getUser :: forall m a. Get m (User' a) => BotReacting a m (User a)
 getUser = (unwrapUser' :: User' a -> User a) <$> view (payload . getLens)
 
--- | Get the username of a registered user. 
+-- | Get the timestamp for when an event took place
+getTimeStamp :: forall m a. Get m (TimeStamp a) => BotReacting a m (TimeStamp a)
+getTimeStamp = view (payload . getLens)
+
+-- | Get the username of a registered user.
 --
 -- This function is deprecated as of version 0.3 and will be removed in version 1.0 use the lens 'username' instead.
-getUsername :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a) 
-            => User a 
+getUsername :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
+            => User a
             -> m L.Text
 getUsername u = pure $ u^.username
 {-# DEPRECATED getUsername "Will be remove in version 1.0, use the lens 'username' instead." #-}
 
 
--- | Get the human readable name of a channel. 
+-- | Get the human readable name of a channel.
 --
 -- This function is deprecated as of Version 0.3 and will be removed in version 1.0 use the lens 'name' instead.
 getChannelName :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)

@@ -36,7 +36,7 @@ class HasFirstName s a | s -> a where firstName :: Lens' s a
 class HasCreationDate s a | s -> a where creationDate :: Lens' s a
 class HasSize s a | s -> a where size :: Lens' s a
 class HasUsername s a | s -> a where username :: Lens' s a
-class HasType_ s a | s -> a where type_ :: Lens' s a
+class HasFileType s a | s -> a where fileType :: Lens' s a
 class HasScriptId s a | s -> a where scriptId :: Lens' s a
 class HasConfig s a | s -> a where config :: Lens' s a
 class HasAdapter s a | s -> a where adapter :: Lens' s a
@@ -118,12 +118,12 @@ data FileContent = FileOnDisk L.Text | FileInMemory ByteString
 
 class ( HasName (RemoteFile a) (Maybe L.Text)
       , HasUrl (RemoteFile a) (Maybe L.Text)
-      , HasType_ (RemoteFile a) (Maybe L.Text)
+      , HasFileType (RemoteFile a) (Maybe L.Text)
       , HasCreationDate (RemoteFile a) (TimeStamp a)
       , HasSize (RemoteFile a) Int
       , HasContent (LocalFile a) FileContent
       , HasName (LocalFile a) (Maybe L.Text)
-      , HasType_ (LocalFile a) (Maybe L.Text)
+      , HasFileType (LocalFile a) (Maybe L.Text)
       ) => HasFiles a where
     -- | Concrete type of an uploaded file
     type RemoteFile a
