@@ -15,6 +15,7 @@ case "${BUILD:-stack}" in
         stack runhaskell $STACKARGS etc/IntegrationSpec.hs
     ;;
     cabal)
+        cabal install 'directory >= 1.2.3.0'
         cabal install $CABALARGS $PACKAGES
         runhaskell $CABALARGS etc/IntegrationSpec.hs
     ;;
