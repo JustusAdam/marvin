@@ -15,7 +15,7 @@ import           Control.Concurrent.Chan.Lifted
 import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
-import qualified Data.ByteString                 as B
+import qualified Data.ByteString.Lazy            as B
 import           Data.Char                       (isSpace)
 import           Data.Maybe                      (fromJust)
 import qualified Data.Text.Lazy                  as L

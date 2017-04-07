@@ -12,7 +12,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Control.Monad.Trans.Control
-import           Data.ByteString             (ByteString)
+import           Data.ByteString.Lazy        (ByteString)
 import           Data.Char                   (isAlphaNum, isLetter)
 import qualified Data.Configurator.Types     as C
 import qualified Data.HashMap.Strict         as HM

@@ -16,12 +16,15 @@ import           Data.Aeson.Types                hiding (Error)
 import           Data.Char                       (isSpace)
 import           Data.Foldable                   (asum)
 import qualified Data.HashMap.Strict             as HM
+import           Data.Maybe                      (isJust)
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
+import qualified Data.Text.Lazy.Encoding         as L
 import           Marvin.Adapter                  hiding (mkAdapterId)
 import           Marvin.Adapter.Slack.Types
 import           Marvin.Interpolate.All
 import           Marvin.Types
+import           Network.HTTP.Types.Status       (ok200)
 import           Network.Wreq
 import           Util
 
@@ -146,7 +149,10 @@ execAPIMethod :: MkSlack a => (Object -> Parser v) -> String -> [FormParam] -> A
 execAPIMethod innerParser method params = do
     token <- requireFromAdapterConfig "token"
     response <- liftIO $ post $(isS "https://slack.com/api/#{method}") (("token" := (token :: T.Text)):params)
-    return $ eitherDecode (response^.responseBody) >>= join . parseEither (apiResponseParser innerParser)
+    if response^.responseStatus == ok200
+        then return $ eitherDecode (response^.responseBody) >>= join . parseEither (apiResponseParser innerParser)
+        else do
+            return $ Left $(isS "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
 
 
 messageChannelImpl :: SlackChannelId -> L.Text -> AdapterM (SlackAdapter a) ()
@@ -312,12 +318,22 @@ instance HasFiles (SlackAdapter a) where
     type RemoteFile (SlackAdapter a) = SlackRemoteFile a
     type LocalFile (SlackAdapter a) = SlackLocalFile
 
-    readTextFile _ = do
-        logErrorN "Reading file is not implemented"
-        return Nothing
-    readFileBytes _ = do
-        logErrorN "Reading file is not implemented"
-        return Nothing
+    readTextFile = fmap (fmap L.decodeUtf8) . readFileBytes
+    readFileBytes file
+        | file^.public =
+            case file^.publicPermalink of
+                Just pLink -> do
+                    r <- liftIO $ get (L.unpack pLink)
+                    if r^.responseStatus == ok200
+                        then return $ Just $ r^.responseBody
+                        else do
+                            logErrorN $(isT "Unexpected status from server: #{r^.responseStatus.statusMessage}")
+                            return Nothing
+                _ -> logErrorN "Public file had no permalink_public field" >> return Nothing
+        | otherwise = do
+            logWarnN "Reading file contents is only supported for public files"
+            when (isJust $ file^.publicPermalink) $ logWarnN "Detected public permalink on private file"
+            return Nothing
     shareFile _ _ =
         logErrorN "Sharing file is not implemented"
     newLocalFile = return . SlackLocalFile Nothing Nothing

@@ -113,11 +113,12 @@ declareFields [d|
         , slackRemoteFileName           :: Maybe L.Text
         , slackRemoteFileTitle          :: Maybe L.Text
         , slackRemoteFileFileType       :: Maybe L.Text
-        , slackRemoteFileUrl            :: Maybe L.Text
+        , slackRemoteFilePublicPermalink :: Maybe L.Text
         , slackRemoteFileSize           :: Integer
         , slackRemoteFileEditable       :: Bool
         , slackRemoteFilePublic         :: Bool
         , slackRemoteFileUser           :: SlackUserId
+        , slackRemoteFileUrl :: Maybe L.Text
         }
     |]
 
@@ -136,11 +137,12 @@ instance FromJSON (SlackRemoteFile a) where
         <*> o .:? "name"
         <*> o .:? "title"
         <*> o .:? "filetype"
-        <*> o .:? "permalink"
+        <*> o .:? "permalink_public"
         <*> o .: "size"
         <*> o .: "editable"
         <*> o .: "public"
         <*> o .: "user"
+        <*> o .:? "permalink_public"
 
 -- makeFields ''SlackRemoteFile
 -- makeFields ''SlackLocalFile

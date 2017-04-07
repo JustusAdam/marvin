@@ -46,7 +46,7 @@ import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Control.Monad.Logger
 import           Control.Monad.Reader        (ask, runReaderT)
 import           Control.Monad.State         (MonadState)
-import           Data.ByteString             (ByteString)
+import           Data.ByteString.Lazy        (ByteString)
 import qualified Data.Configurator           as C
 import qualified Data.Configurator.Types     as C
 import qualified Data.HashMap.Strict         as HM
