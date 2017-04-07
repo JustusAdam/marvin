@@ -94,6 +94,7 @@ data InternalType a
     | ChannelDeleted SlackChannelId
     | ChannelRename LimitedChannelInfo
     | UserChange UserInfo
+    | OkResponseEvent T.Text
 
 
 -- | Adapter for interacting with Slack API\'s. Polymorphic over the method for retrieving events.

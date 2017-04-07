@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Adapter.Slack.Common where
 
 
@@ -33,12 +34,16 @@ messageParser = withObject "expected object" $ \o -> do
 
 
 eventParser :: Value -> Parser (InternalType a)
-eventParser v@(Object o) = isErrParser <|> hasTypeParser
+eventParser v@(Object o) = isErrParser <|> isOkParser <|> hasTypeParser
   where
     isErrParser = do
         e <- o .: "error"
         flip (withObject "expected object") e $ \eo ->
             Error <$> eo .: "code" <*> eo .: "msg"
+    isOkParser = do
+        ok :: Bool <- o .: "ok"
+        msg <- o .: "text"
+        if ok then return $ OkResponseEvent msg else fail "expected ok response"
     hasTypeParser = do
         t <- o .: "type"
 
@@ -117,6 +122,8 @@ runHandlerLoop evChan handler =
             Error code msg ->
                 logErrorN $(isT "Error from remote code: #{code} msg: #{msg}")
             Ignored -> return ()
+            OkResponseEvent msg_ ->
+                logDebugN $(isT "Message successfully sent: #{msg_}")
             ChannelArchiveStatusChange _ _ ->
                 -- TODO implement once we track the archiving status
                 return ()
