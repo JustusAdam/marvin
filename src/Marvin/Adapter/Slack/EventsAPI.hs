@@ -43,8 +43,8 @@ eventAPIeventParser = withObject "expected object" $ \o -> do
 
     (token,) <$> case (type_ :: T.Text) of
         "url_verification" -> Left <$> o .: "challenge"
-        "event_callback" -> Right <$> (o .: "event" >>= eventParser)
-        _ -> fail "unknown wrapper event type"
+        "event_callback"   -> Right <$> (o .: "event" >>= eventParser)
+        _                  -> fail "unknown wrapper event type"
 
 
 runEventReceiver :: Chan (InternalType EventsAPI) -> AdapterM (SlackAdapter EventsAPI) ()

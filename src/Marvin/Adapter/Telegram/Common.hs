@@ -60,7 +60,15 @@ declareFields [d|
 
 
 instance HasName TelegramUser (Maybe L.Text) where
-    name = undefined
+    name = lens
+        (\u -> (mappend <$> u^.firstName <*> (mappend " " <$> u^.lastName)) <|> u^.firstName <|> u^.lastName)
+        (flip set)
+      where
+        set Nothing = (firstName .~ Nothing) . (lastName .~ Nothing)
+        set (Just n) = (firstName .~ Just first) . (lastName .~ if L.null rest then Nothing else Just rest)
+          where
+            (first, rest') = L.break (== ' ') n
+            rest = L.tail rest'
 
 
 -- | A telegram chat object as contained in telegram updates
@@ -183,7 +191,7 @@ stripWhiteSpaceMay :: L.Text -> Maybe L.Text
 stripWhiteSpaceMay t =
     case L.uncons t of
         Just (c, _) | isSpace c -> Just $ L.stripStart t
-        _ -> Nothing
+        _           -> Nothing
 
 runnerImpl :: forall a. MkTelegram a => EventConsumer (TelegramAdapter a) -> AdapterM (TelegramAdapter a) ()
 runnerImpl handler = do
@@ -203,8 +211,8 @@ runnerImpl handler = do
                 let lmsg = L.toLower strippedMsg
                 handler $ case (chat^.type_, asum $ map ((\prefix -> if prefix `L.isPrefixOf` lmsg then Just $ L.drop (L.length prefix) strippedMsg else Nothing) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname]) of
                     (PrivateChat, _) -> CommandEvent u chat msg ts
-                    (_, Nothing) -> ev
-                    (_, Just m') -> CommandEvent u chat m' ts
+                    (_, Nothing)     -> ev
+                    (_, Just m')     -> CommandEvent u chat m' ts
             Ev ev -> handler ev
             Ignored -> return ()
             Unhandeled -> logDebugN $(isT "Unhadeled event.")

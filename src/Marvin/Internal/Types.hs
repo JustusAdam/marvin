@@ -39,6 +39,14 @@ type Message = L.Text
 newtype TimeStamp a = TimeStamp { unwrapTimeStamp :: UTCTime } deriving Show
 
 
+declareFields [d|
+    data AdapterMEnv a = AdapterMEnv
+        { adapterMEnvConfig :: C.Config
+        , adapterMEnvAdapter :: a
+        }
+    |]
+
+
 -- | Representation for the types of events which can occur
 data Event a
     = MessageEvent (User a) (Channel a) Message (TimeStamp a)
@@ -50,10 +58,6 @@ data Event a
 
 -- | Basic monad which most internal actions run in
 type RunnerM = LoggingT IO
-
--- | Monad in which adapter actions run in
-newtype AdapterM a r = AdapterM { runAdapterAction :: ReaderT (C.Config, a) RunnerM r } deriving (MonadIO, Monad, Applicative, Functor, MonadLogger, MonadLoggerIO, MonadBase IO)
-
 
 type EventConsumer a = Event a -> AdapterM a ()
 
@@ -86,6 +90,10 @@ class ( HasUsername (User a) L.Text
     resolveUser :: L.Text -> AdapterM a (Maybe (User a))
 
 
+-- | Monad in which adapter actions run in
+newtype AdapterM a r = AdapterM { runAdapterAction :: ReaderT (AdapterMEnv a) RunnerM r } deriving (MonadIO, Monad, Applicative, Functor, MonadLogger, MonadLoggerIO, MonadBase IO, MonadReader (AdapterMEnv a))
+
+
 data FileContent = FileOnDisk L.Text | FileInMemory ByteString
 
 
@@ -93,7 +101,7 @@ class ( HasName (RemoteFile a) (Maybe L.Text)
       , HasUrl (RemoteFile a) (Maybe L.Text)
       , HasFileType (RemoteFile a) (Maybe L.Text)
       , HasCreationDate (RemoteFile a) (TimeStamp a)
-      , HasSize (RemoteFile a) Int
+      , HasSize (RemoteFile a) Integer
       , HasContent (LocalFile a) FileContent
       , HasName (LocalFile a) (Maybe L.Text)
       , HasFileType (LocalFile a) (Maybe L.Text)
@@ -299,7 +307,7 @@ instance AccessAdapter (BotReacting a b) where
 
 instance AccessAdapter (AdapterM a) where
     type AdapterT (AdapterM a) = a
-    getAdapter = AdapterM $ snd <$> ask
+    getAdapter = view adapter
 
 instance ShowT ScriptId where showT = unwrapScriptId
 
@@ -348,10 +356,10 @@ class (IsScript m, MonadIO m) => HasConfigAccess m where
 instance C.Configured LogLevel where
     convert (C.String s) =
         case T.strip $ T.toLower s of
-            "debug" -> Just LevelDebug
+            "debug"   -> Just LevelDebug
             "warning" -> Just LevelWarn
-            "error" -> Just LevelError
-            "info" -> Just LevelInfo
-            _ -> Nothing
+            "error"   -> Just LevelError
+            "info"    -> Just LevelInfo
+            _         -> Nothing
     convert _            = Nothing
 

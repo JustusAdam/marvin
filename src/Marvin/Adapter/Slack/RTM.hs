@@ -46,7 +46,7 @@ runConnectionLoop eventChan connectionTracker = forever $ do
     void $ async $ forever $ do
         msg <- readChan messageChan
         case eitherDecode msg >>= parseEither eventParser of
-            Left e -> logErrorN $(isT "Error parsing json: #{e} original data: #{rawBS msg}")
+            Left e  -> logErrorN $(isT "Error parsing json: #{e} original data: #{rawBS msg}")
             Right v -> writeChan eventChan v
     logDebugN "initializing socket"
     r <- liftIO $ post "https://slack.com/api/rtm.start" [ "token" := (token :: T.Text) ]

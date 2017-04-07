@@ -46,7 +46,7 @@ r opts = Regex . Re.regex opts . L.toStrict
 
 instance IsString Regex where
     fromString "" = error "Empty regex is not permitted, use '.*' or similar instead"
-    fromString s = r [] (L.pack s)
+    fromString s  = r [] (L.pack s)
 
 
 -- | Match a regex against a string and return the first match found (if any).

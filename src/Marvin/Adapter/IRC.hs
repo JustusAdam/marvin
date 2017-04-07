@@ -143,7 +143,7 @@ instance IsAdapter IRCAdapter where
         writeChan msgOutChan $ msgType $ Right msg
       where
         msgType = case chan of
-                      Direct n -> Privmsg n
+                      Direct n      -> Privmsg n
                       RealChannel c -> Notice c
 
     -- TODO Perhaps these resolving funtions should be changed such that

@@ -26,13 +26,17 @@ import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text.Lazy
 import           Marvin.Types
 import           System.Console.Haskeline
+import           System.Directory
+import           System.IO
 import           Util
 
 
 -- | Adapter for a shell prompt
-data ShellAdapter = ShellAdapter
-    { output :: Chan L.Text
-    }
+declareFields [d|
+    data ShellAdapter = ShellAdapter
+        { shellAdapterOutput :: Chan L.Text
+        }
+    |]
 
 
 help :: L.Text
@@ -54,7 +58,7 @@ declareFields [d|
     data RFile = RFile
         { rFileName         :: Maybe L.Text
         , rFileFileType     :: Maybe L.Text
-        , rFileSize         :: Int
+        , rFileSize         :: Integer
         , rFileCreationDate :: TimeStamp ShellAdapter
         , rFilePath         :: L.Text
         , rFileUrl          :: Maybe L.Text
@@ -74,12 +78,15 @@ instance HasFiles ShellAdapter where
     newLocalFile = return . LFile Nothing Nothing undefined
     readTextFile f = Just <$> liftIO (L.readFile (L.unpack (f^.path)))
     readFileBytes f = Just <$> liftIO (B.readFile (L.unpack (f^.path)))
-    shareFile file chans =
-        forM_ chans $ \c -> messageChannel c $(isL "The bot has shared a file #{file^.name} in this channel")
+    shareFile file =
+        mapM_ (`messageChannel` $(isL "The bot has shared a file #{file^.name} in this channel"))
 
 
 pathToFile :: L.Text -> IO RFile
-pathToFile path = pure $ RFile (Just path) Nothing undefined undefined path Nothing
+pathToFile path = do
+    fileSize <- liftIO $ withFile (L.unpack path) ReadMode hFileSize
+    ctime <- liftIO $ getModificationTime (L.unpack path)
+    pure $ RFile (Just path) Nothing fileSize (TimeStamp ctime) path Nothing
 
 
 defaultUser :: SimpleWrappedUsername
@@ -98,8 +105,8 @@ instance IsAdapter ShellAdapter where
 
     adapterId = "shell"
     messageChannel _ msg = do
-        ShellAdapter{output} <- getAdapter
-        writeChan output msg
+        o <- view (adapter . output)
+        writeChan o msg
     -- | Just returns the value again
     resolveChannel = return . Just . SimpleWrappedChannelName
     -- | Just returns the value again

@@ -11,7 +11,7 @@ import qualified Data.ByteString.Lazy.Char8     as BS
 import           Data.Foldable                  (toList)
 import           Data.Hashable
 import           Data.HashMap.Strict            (HashMap)
-import           Data.String                    (IsString (..))
+import           Data.String                    (IsString(..))
 import qualified Data.Text                      as T
 import qualified Data.Text.Lazy                 as L
 import           Marvin.Adapter
@@ -114,7 +114,7 @@ declareFields [d|
         , slackRemoteFileTitle          :: Maybe L.Text
         , slackRemoteFileFileType       :: Maybe L.Text
         , slackRemoteFileUrl            :: Maybe L.Text
-        , slackRemoteFileSize           :: Int
+        , slackRemoteFileSize           :: Integer
         , slackRemoteFileEditable       :: Bool
         , slackRemoteFilePublic         :: Bool
         , slackRemoteFileUser           :: SlackUserId

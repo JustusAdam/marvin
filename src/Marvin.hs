@@ -55,14 +55,14 @@ import           Data.Monoid                 ((<>))
 import qualified Data.Text                   as T
 import qualified Data.Text.Lazy              as L
 import qualified Data.Vector                 as V
-import           Marvin.Adapter              (HasFiles (LocalFile, RemoteFile), IsAdapter)
+import           Marvin.Adapter              (HasFiles(LocalFile, RemoteFile), IsAdapter)
 import qualified Marvin.Adapter              as A
 import           Marvin.Internal
 import           Marvin.Internal.LensClasses
-import           Marvin.Internal.Types       (BotActionState (BotActionState),
-                                              BotReacting (BotReacting, runReaction),
-                                              ScriptDefinition (ScriptDefinition),
-                                              ScriptInit (ScriptInit))
+import           Marvin.Internal.Types       (BotActionState(BotActionState),
+                                              BotReacting(BotReacting, runReaction),
+                                              ScriptDefinition(ScriptDefinition),
+                                              ScriptInit(ScriptInit))
 import           Marvin.Internal.Values      (defaultBotName)
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text

@@ -10,8 +10,8 @@ import           Control.Exception.Lifted
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
-import qualified Data.Configurator         as C
-import qualified Data.Configurator.Types   as C
+import qualified Data.Configurator        as C
+import qualified Data.Configurator.Types  as C
 import           Marvin.Internal.Types
 import           Marvin.Internal.Values
 import           Marvin.Interpolate.Text

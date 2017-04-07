@@ -75,7 +75,7 @@ lookupFromAppConfig cfg = C.lookup (C.subconfig (unwrapScriptId applicationScrip
 
 
 runWAda :: a -> C.Config -> AdapterM a r -> RunnerM r
-runWAda ada cfg ac = runReaderT (runAdapterAction ac) (cfg, ada)
+runWAda ada cfg ac = runReaderT (runAdapterAction ac) (AdapterMEnv cfg ada)
 
 -- TODO add timeouts for handlers
 runHandlers :: forall a. IsAdapter a => Handlers a -> Chan (Event a) -> RunnerM ()

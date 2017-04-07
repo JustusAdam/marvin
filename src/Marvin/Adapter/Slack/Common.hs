@@ -49,20 +49,20 @@ eventParser v@(Object o) = isErrParser <|> isOkParser <|> hasTypeParser
 
         -- https://api.slack.com/rtm
         case t of
-            "error" -> Error <$> o .: "code" <*> o .: "msg"
-            "message" -> messageTypeEvent
-            "message.channels" -> messageTypeEvent
-            "message.groups" -> messageTypeEvent
-            "message.im" -> messageTypeEvent
-            "message.mpim" -> messageTypeEvent
-            "reconnect_url" -> return Ignored
-            "channel_archive" -> ChannelArchiveStatusChange <$> o .: "channel" <*> pure True
+            "error"             -> Error <$> o .: "code" <*> o .: "msg"
+            "message"           -> messageTypeEvent
+            "message.channels"  -> messageTypeEvent
+            "message.groups"    -> messageTypeEvent
+            "message.im"        -> messageTypeEvent
+            "message.mpim"      -> messageTypeEvent
+            "reconnect_url"     -> return Ignored
+            "channel_archive"   -> ChannelArchiveStatusChange <$> o .: "channel" <*> pure True
             "channel_unarchive" -> ChannelArchiveStatusChange <$> o .: "channel" <*> pure False
-            "channel_created" -> ChannelCreated <$> (o .: "channel" >>= lciParser)
-            "channel_deleted" -> ChannelDeleted <$> o .: "channel"
-            "channel_rename" -> ChannelRename <$> (o .: "channel" >>= lciParser)
-            "user_change" -> UserChange <$> (o .: "user" >>= userInfoParser)
-            _ -> return $ Unhandeled t
+            "channel_created"   -> ChannelCreated <$> (o .: "channel" >>= lciParser)
+            "channel_deleted"   -> ChannelDeleted <$> o .: "channel"
+            "channel_rename"    -> ChannelRename <$> (o .: "channel" >>= lciParser)
+            "user_change"       -> UserChange <$> (o .: "user" >>= userInfoParser)
+            _                   -> return $ Unhandeled t
     messageTypeEvent = do
         subt <- o .:? "subtype"
         SlackEvent <$> case (subt :: Maybe T.Text) of
@@ -94,7 +94,7 @@ stripWhiteSpaceMay :: L.Text -> Maybe L.Text
 stripWhiteSpaceMay t =
     case L.uncons t of
         Just (c, _) | isSpace c -> Just $ L.stripStart t
-        _ -> Nothing
+        _           -> Nothing
 
 
 runHandlerLoop :: MkSlack a => Chan (InternalType a) -> EventConsumer (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
@@ -211,7 +211,7 @@ resolveChannelImpl name' = do
             Nothing -> do
                 refreshed <- refreshChannels
                 case refreshed of
-                    Left err -> logErrorN $(isT "#{err}") >> return (cc, Nothing)
+                    Left err  -> logErrorN $(isT "#{err}") >> return (cc, Nothing)
                     Right ncc -> return (ncc, ncc ^? nameResolver . ix name)
             Just found -> return (cc, Just found)
   where name = L.tail name'
@@ -237,7 +237,7 @@ resolveUserImpl name = do
             Nothing -> do
                 refreshed <- refreshUserInfo
                 case refreshed of
-                    Left err -> logErrorN $(isT "#{err}") >> return (cc, Nothing)
+                    Left err  -> logErrorN $(isT "#{err}") >> return (cc, Nothing)
                     Right ncc -> return (ncc, ncc ^? nameResolver . ix name)
             Just found -> return (cc, Just found)
 
@@ -248,7 +248,7 @@ getChannelNameImpl channel = do
     cc <- readMVar $ channelCache adapter
     L.cons '#' <$>
         case cc ^? infoCache . ix channel of
-            Nothing -> (^.name) <$> refreshSingleChannelInfo channel
+            Nothing    -> (^.name) <$> refreshSingleChannelInfo channel
             Just found -> return $ found ^. name
 
 
