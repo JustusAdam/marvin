@@ -1,8 +1,0 @@
-flags: {}
-extra-deps:
-- marvin-interpolate-1.1
-- mustache-2.1.2
-- wreq-0.5.0.0
-resolver: lts-8.3
-docker:
-    enable: true

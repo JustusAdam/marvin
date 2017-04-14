@@ -151,8 +151,7 @@ execAPIMethod innerParser method params = do
     response <- liftIO $ post $(isS "https://slack.com/api/#{method}") (("token" := (token :: T.Text)):params)
     if response^.responseStatus == ok200
         then return $ eitherDecode (response^.responseBody) >>= join . parseEither (apiResponseParser innerParser)
-        else do
-            return $ Left $(isS "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
+        else return $ Left $(isS "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
 
 
 messageChannelImpl :: SlackChannelId -> L.Text -> AdapterM (SlackAdapter a) ()

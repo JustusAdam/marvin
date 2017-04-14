@@ -108,17 +108,17 @@ instance FromJSON (TimeStamp (SlackAdapter a)) where parseJSON = timestampFromNu
 
 declareFields [d|
     data SlackRemoteFile a = SlackRemoteFile
-        { slackRemoteFileIdValue        :: L.Text
-        , slackRemoteFileCreationDate   :: TimeStamp (SlackAdapter a)
-        , slackRemoteFileName           :: Maybe L.Text
-        , slackRemoteFileTitle          :: Maybe L.Text
-        , slackRemoteFileFileType       :: Maybe L.Text
+        { slackRemoteFileIdValue         :: L.Text
+        , slackRemoteFileCreationDate    :: TimeStamp (SlackAdapter a)
+        , slackRemoteFileName            :: Maybe L.Text
+        , slackRemoteFileTitle           :: Maybe L.Text
+        , slackRemoteFileFileType        :: Maybe L.Text
         , slackRemoteFilePublicPermalink :: Maybe L.Text
-        , slackRemoteFileSize           :: Integer
-        , slackRemoteFileEditable       :: Bool
-        , slackRemoteFilePublic         :: Bool
-        , slackRemoteFileUser           :: SlackUserId
-        , slackRemoteFileUrl :: Maybe L.Text
+        , slackRemoteFileSize            :: Integer
+        , slackRemoteFileEditable        :: Bool
+        , slackRemoteFilePublic          :: Bool
+        , slackRemoteFileUser            :: SlackUserId
+        , slackRemoteFileUrl             :: Maybe L.Text
         }
     |]
 

@@ -140,7 +140,7 @@ instance IsAdapter ShellAdapter where
                                 [":join", user, chan] -> writeChan inChan $ ChannelJoinEvent (SimpleWrappedUsername user) (SimpleWrappedChannelName chan) ts
                                 [":leave", user] -> writeChan inChan $ ChannelLeaveEvent (SimpleWrappedUsername user) defaultChannel ts
                                 [":leave", user, chan] -> writeChan inChan $ ChannelLeaveEvent (SimpleWrappedUsername user) (SimpleWrappedChannelName chan) ts
-                                (":topic":_) -> writeChan inChan $ TopicChangeEvent defaultUser defaultChannel (fromJust $ L.stripPrefix ":topic" mtext) ts
+                                (":topic":_) -> writeChan inChan $ TopicChangeEvent defaultUser defaultChannel (L.stripStart $ fromJust $ L.stripPrefix ":topic" mtext) ts
                                 [":file", chan, path] -> do
                                     f <- pathToFile path
                                     writeChan inChan $ FileSharedEvent defaultUser (SimpleWrappedChannelName chan) f ts
