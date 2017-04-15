@@ -5,6 +5,9 @@
 - Changed the IsAdapter API.
     - The new API is lens based. Adapter dependend types are constrained via the requirement for certain lens class instances.
     - Deprecated getUsername and getChannelName, these are now accessible via the lense class instances.
+- Changed Util API
+    - Marvin.Util.HTTP has been removed (was empty) until an API has been found
+    - Marvin.Util.Mutable has been removed as BotReacting now has a `MonadBase` and `MonadBaseControl` instance meaning the functions from `lifted-base` can be used without modification.
 
 # 0.2.3 - 05.03.2017
 

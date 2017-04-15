@@ -11,8 +11,6 @@ module Marvin.Prelude
     (
     -- ** Common functions and Types for scripts
       module Marvin
-    -- ** Mutable references in marvin scripts
-    , module Marvin.Util.Mutable
     -- ** Logging in Scripts
     , module Control.Monad.Logger
     -- ** Random numbers and convenience functions
@@ -28,11 +26,11 @@ module Marvin.Prelude
     -- ** Lenses
     , module Control.Lens
     -- ** Useful functions not in the normal Prelude
-    , when, unless, for, for_, fromMaybe
+    , when, unless, for, for_, filterM, fromMaybe
     ) where
 
-import           Control.Lens                 (lens, (&), (.~), (^.))
-import           Control.Monad                (unless, when)
+import           Control.Lens                 (lens, (&), (.~), (^.), at, ix, (^?), (^?!))
+import           Control.Monad                (unless, when, filterM)
 import           Control.Monad.IO.Class       (MonadIO, liftIO)
 import           Control.Monad.Logger
 import           Data.Foldable                (for_)
@@ -43,6 +41,5 @@ import           Marvin.Interpolate.String    (isS)
 import           Marvin.Interpolate.Text      (isT)
 import           Marvin.Interpolate.Text.Lazy (isL)
 import           Marvin.Util.JSON
-import           Marvin.Util.Mutable
 import           Marvin.Util.Random
 import           Marvin.Util.Regex

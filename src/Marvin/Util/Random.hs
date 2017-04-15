@@ -27,13 +27,11 @@ randomValFromRange :: (MonadIO m, Random a) => (a, a) -> m a
 randomValFromRange = liftIO . randomRIO
 
 
--- | Get a random value out of an integer indexed sequence, like ('Vector', '[a]', 'Seq' or 'Set')
--- This uses the sequences 'length' and therefore does not terminate for infinite sequences.
+-- | Get a random value out of a list of values.
+-- This uses 'length' and therefore does not terminate for infinite lists.
 --
 -- Uses the global random number generator.
 --
 -- Usable in all IO capable monads, such as 'BotReacting' and 'ScriptDefinition'.
 randomFrom :: MonadIO m => [e] -> m e
-randomFrom list = do
-  n <- randomValFromRange (0, pred $ length list)
-  return $ list !! n
+randomFrom list = (list !!) <$> randomValFromRange (0, pred $ length list)

@@ -41,7 +41,7 @@ newtype TimeStamp a = TimeStamp { unwrapTimeStamp :: UTCTime } deriving Show
 
 declareFields [d|
     data AdapterMEnv a = AdapterMEnv
-        { adapterMEnvConfig :: C.Config
+        { adapterMEnvConfig  :: C.Config
         , adapterMEnvAdapter :: a
         }
     |]
@@ -141,25 +141,25 @@ declareFields [d|
     data BotActionState a d = BotActionState
         { botActionStateScriptId :: ScriptId
         , botActionStateConfig   :: C.Config
-        , botActionStateAdapter :: a
-        , botActionStatePayload :: d
+        , botActionStateAdapter  :: a
+        , botActionStatePayload  :: d
         }
     |]
 
 
 declareFields [d|
     data Handlers a = Handlers
-        { handlersResponds :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
-        , handlersHears :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
-        , handlersCustoms :: Vector (Event a -> Maybe (RunnerM ()))
-        , handlersJoins :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
-        , handlersLeaves :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
-        , handlersTopicChange :: Vector ((User' a, Channel' a, Topic, TimeStamp a) -> RunnerM ())
-        , handlersFileShares :: Vector ((User' a, Channel' a, RemoteFile' a, TimeStamp a) -> RunnerM ())
-        , handlersJoinsIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
-        , handlersLeavesFrom :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
+        { handlersResponds      :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
+        , handlersHears         :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
+        , handlersCustoms       :: Vector (Event a -> Maybe (RunnerM ()))
+        , handlersJoins         :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
+        , handlersLeaves        :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
+        , handlersTopicChange   :: Vector ((User' a, Channel' a, Topic, TimeStamp a) -> RunnerM ())
+        , handlersFileShares    :: Vector ((User' a, Channel' a, RemoteFile' a, TimeStamp a) -> RunnerM ())
+        , handlersJoinsIn       :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
+        , handlersLeavesFrom    :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
         , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, Topic, TimeStamp a) -> RunnerM ()))
-        , handlersFileSharesIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, RemoteFile' a, TimeStamp a) -> RunnerM ()))
+        , handlersFileSharesIn  :: HM.HashMap L.Text (Vector ((User' a, Channel' a, RemoteFile' a, TimeStamp a) -> RunnerM ()))
         } deriving Generic
     |]
 
@@ -196,7 +196,7 @@ declareFields [d|
         { scriptActions   :: Handlers a
         , scriptScriptId  :: ScriptId
         , scriptConfig    :: C.Config
-        , scriptAdapter :: a
+        , scriptAdapter   :: a
         }
     |]
 

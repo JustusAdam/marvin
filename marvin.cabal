@@ -29,11 +29,11 @@ library
                      , Marvin.Prelude
                      , Marvin.Types
                      , Marvin.Run
-                     , Marvin.Util.Mutable
+                    --  , Marvin.Util.Mutable
                      , Marvin.Util.Regex
                      , Marvin.Util.Random
                      , Marvin.Util.JSON
-                     , Marvin.Util.HTTP
+                    --  , Marvin.Util.HTTP
                      , Marvin.Adapter
                      , Marvin.Adapter.Shell
                      , Marvin.Adapter.IRC
