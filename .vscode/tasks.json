@@ -12,6 +12,8 @@
             "args": [
             ],
             "isBuildCommand": true
+        }, {
+            "taskName": "test"
         }
         // ,
         // {

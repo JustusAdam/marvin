@@ -22,7 +22,7 @@ randomVal :: (MonadIO m, Random a) => m a
 randomVal = liftIO randomIO
 
 
--- | Generate a random value frbounded by a range. See 'randomR' for how the range works.
+-- | Generate a random value bounded by a range. See 'randomR' for how the range works.
 randomValFromRange :: (MonadIO m, Random a) => (a, a) -> m a
 randomValFromRange = liftIO . randomRIO
 
