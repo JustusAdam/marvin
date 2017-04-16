@@ -103,39 +103,37 @@ stripWhiteSpaceMay t =
 
 runHandlerLoop :: MkSlack a => Chan (InternalType a) -> EventConsumer (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
 runHandlerLoop evChan handler =
-    forever $ do
-        d <- readChan evChan
-        case d of
-            SlackEvent (uid, cid, f) -> do
-                uinfo <- getUserInfo uid
-                lci <- getChannelInfo cid
+    forever $ readChan evChan >>= \case
+        SlackEvent (uid, cid, f) -> do
+            uinfo <- getUserInfo uid
+            lci <- getChannelInfo cid
 
-                case f uinfo lci of
-                    ev@(MessageEvent u c m t) -> do
+            case f uinfo lci of
+                ev@(MessageEvent u c m t) -> do
 
-                        botname <- L.toLower <$> getBotname
-                        let strippedMsg = L.stripStart m
-                        let lmsg = L.toLower strippedMsg
-                        handler $ case asum $ map ((\prefix -> if prefix `L.isPrefixOf` lmsg then Just $ L.drop (L.length prefix) strippedMsg else Nothing) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname] of
-                            Nothing -> ev
-                            Just m' -> CommandEvent u c m' t
+                    botname <- L.toLower <$> getBotname
+                    let strippedMsg = L.stripStart m
+                    let lmsg = L.toLower strippedMsg
+                    handler $ case asum $ map ((\prefix -> if prefix `L.isPrefixOf` lmsg then Just $ L.drop (L.length prefix) strippedMsg else Nothing) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname] of
+                        Nothing -> ev
+                        Just m' -> CommandEvent u c m' t
 
-                    ev -> handler ev
-            Unhandeled type_ ->
-                logDebugN $(isT "Unhandeled event type #{type_} payload")
-            Error code msg ->
-                logErrorN $(isT "Error from remote code: #{code} msg: #{msg}")
-            Ignored -> return ()
-            OkResponseEvent msg_ ->
-                logDebugN $(isT "Message successfully sent: #{msg_}")
-            ChannelArchiveStatusChange _ _ ->
-                -- TODO implement once we track the archiving status
-                return ()
-            ChannelCreated info ->
-                putChannel info
-            ChannelDeleted chan -> deleteChannel chan
-            ChannelRename info -> renameChannel info
-            UserChange ui -> void $ refreshSingleUserInfo (ui^.idValue)
+                ev -> handler ev
+        Unhandeled type_ ->
+            logDebugN $(isT "Unhandeled event type #{type_} payload")
+        Error code msg ->
+            logErrorN $(isT "Error from remote code: #{code} msg: #{msg}")
+        Ignored -> return ()
+        OkResponseEvent msg_ ->
+            logDebugN $(isT "Message successfully sent: #{msg_}")
+        ChannelArchiveStatusChange _ _ ->
+            -- TODO implement once we track the archiving status
+            return ()
+        ChannelCreated info ->
+            putChannel info
+        ChannelDeleted chan -> deleteChannel chan
+        ChannelRename info -> renameChannel info
+        UserChange ui -> void $ refreshSingleUserInfo (ui^.idValue)
 
 
 runnerImpl :: MkSlack a => EventConsumer (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
@@ -178,8 +176,7 @@ getChannelInfo cid = do
 refreshSingleUserInfo :: MkSlack a => SlackUserId -> AdapterM (SlackAdapter a) UserInfo
 refreshSingleUserInfo user@(SlackUserId user') = do
     adapter <- getAdapter
-    usr <- execAPIMethod (\o -> o .: "user" >>= userInfoParser) "users.info" ["user" := user']
-    case usr of
+    execAPIMethod (\o -> o .: "user" >>= userInfoParser) "users.info" ["user" := user'] >>= \case
         Left err -> error $(isS "Parse error when getting user data: #{err}")
         Right v -> do
             modifyMVar_ (userInfoCache adapter) (return . (infoCache . at user .~ Just v))
@@ -187,9 +184,8 @@ refreshSingleUserInfo user@(SlackUserId user') = do
 
 
 refreshChannels :: MkSlack a => AdapterM (SlackAdapter a) (Either L.Text ChannelCache)
-refreshChannels = do
-    chans <- execAPIMethod (\o -> o .: "channels" >>= lciListParser) "channels.list" []
-    case chans of
+refreshChannels =
+    execAPIMethod (\o -> o .: "channels" >>= lciListParser) "channels.list" [] >>= \case
         Left err -> return $ Left $(isL "Error when getting channel data: #{err}")
         Right v -> do
             let cmap = HM.fromList $ map ((^. idValue) &&& id) v
@@ -199,9 +195,8 @@ refreshChannels = do
 
 
 refreshSingleChannelInfo :: MkSlack a => SlackChannelId -> AdapterM (SlackAdapter a) LimitedChannelInfo
-refreshSingleChannelInfo chan = do
-    res <- execAPIMethod (\o -> o .: "channel" >>= lciParser) "channels.info" []
-    case res of
+refreshSingleChannelInfo chan =
+    execAPIMethod (\o -> o .: "channel" >>= lciParser) "channels.info" [] >>= \case
         Left err -> error $(isS "Parse error when getting channel data: #{err}")
         Right v -> do
             adapter <- getAdapter
@@ -224,9 +219,8 @@ resolveChannelImpl name' = do
 
 
 refreshUserInfo ::  MkSlack a => AdapterM (SlackAdapter a) (Either L.Text UserCache)
-refreshUserInfo = do
-    users <- execAPIMethod (\o -> o .: "members" >>= userInfoListParser) "users.list" []
-    case users of
+refreshUserInfo =
+    execAPIMethod (\o -> o .: "members" >>= userInfoListParser) "users.list" [] >>= \case
         Left err -> return $ Left $(isL "Error when getting channel data: #{err}")
         Right v -> do
             let cmap = HM.fromList $ map ((^. idValue) &&& id) v

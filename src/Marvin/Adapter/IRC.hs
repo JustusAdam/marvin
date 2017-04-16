@@ -68,40 +68,42 @@ consumer = awaitForever . writeChan
 processor :: Chan (Either ByteString IrcEvent) -> EventConsumer IRCAdapter -> AdapterM IRCAdapter ()
 processor inChan handler = do
     IRCAdapter{msgOutChan} <- getAdapter
-    let handleOneMessage = readChan inChan >>= \case
-            Left bs -> logInfoN $(isT "Undecodable message: #{T.decodeUtf8 bs}")
-            Right rawEv -> do
-                let ev = fmap (L.fromStrict . T.decodeUtf8) rawEv
-                ts <- liftIO $ TimeStamp <$> getCurrentTime
-                let origin = case _source ev of
-                                        User nick -> Just (SimpleWrappedUsername nick, Direct nick)
-                                        Channel chan user -> Just (SimpleWrappedUsername user, RealChannel chan)
-                                        Server _ -> Nothing
-                                        -- TODO What do we do if the server sends a message here?
-                case origin of
-                    Nothing -> logInfoN "Ignoring message from server"
-                    Just (user, channel) ->
-                        case _message ev of
-                            Privmsg target (Right msg) -> do
-                                -- Privmsg can either be a private message directly to
-                                -- the user, or it could be a message going to a
-                                -- channel.
-                                botname <- getBotname
-                                let (cmd, msg') = isMention botname target msg
-                                handler $ cmd user channel msg' ts
-                            Notice target (Right msg) -> do
-                                botname <- getBotname
-                                -- Check if bot is addressed
-                                handler $ (if target == botname then CommandEvent else MessageEvent) user channel msg ts
-                            Join channel' -> handler $ ChannelJoinEvent user (RealChannel channel') ts
-                            Part channel' _ -> handler $ ChannelLeaveEvent user (RealChannel channel') ts
-                            Kick channel' nick _ -> handler $ ChannelLeaveEvent (SimpleWrappedUsername nick) (RealChannel channel') ts
-                            Topic channel' t -> handler $ TopicChangeEvent user (RealChannel channel') t ts
-                            Ping a b -> writeChan msgOutChan $ Pong $ fromMaybe a b
-                            Invite chan _ -> writeChan msgOutChan $ Join chan
-                            _ -> logDebugN $(isT "Unhandled event #{rawEv}")
     forever $
-        handleOneMessage `catch` (\e -> logErrorN $(isT "UserError: #{e :: ErrorCall}"))
+        handleOneMessage msgOutChan `catch` (\e -> logErrorN $(isT "UserError: #{e :: ErrorCall}"))
+  where
+    handleOneMessage msgOutChan = readChan inChan >>= \case
+        Left bs -> logInfoN $(isT "Undecodable message: #{T.decodeUtf8 bs}")
+        Right rawEv -> do
+            ts <- liftIO $ TimeStamp <$> getCurrentTime
+            case origin of
+                Nothing -> logInfoN "Ignoring message from server"
+                Just (user, channel) ->
+                    case _message ev of
+                        Privmsg target (Right msg) -> do
+                            -- Privmsg can either be a private message directly to
+                            -- the user, or it could be a message going to a
+                            -- channel.
+                            botname <- getBotname
+                            let (cmd, msg') = isMention botname target msg
+                            handler $ cmd user channel msg' ts
+                        Notice target (Right msg) -> do
+                            botname <- getBotname
+                            -- Check if bot is addressed
+                            handler $ (if target == botname then CommandEvent else MessageEvent) user channel msg ts
+                        Join channel' -> handler $ ChannelJoinEvent user (RealChannel channel') ts
+                        Part channel' _ -> handler $ ChannelLeaveEvent user (RealChannel channel') ts
+                        Kick channel' nick _ -> handler $ ChannelLeaveEvent (SimpleWrappedUsername nick) (RealChannel channel') ts
+                        Topic channel' t -> handler $ TopicChangeEvent user (RealChannel channel') t ts
+                        Ping a b -> writeChan msgOutChan $ Pong $ fromMaybe a b
+                        Invite chan _ -> writeChan msgOutChan $ Join chan
+                        _ -> logDebugN $(isT "Unhandled event #{rawEv}")
+          where
+            ev = fmap (L.fromStrict . T.decodeUtf8) rawEv
+            origin = case _source ev of
+                        User nick -> Just (SimpleWrappedUsername nick, Direct nick)
+                        Channel chan user -> Just (SimpleWrappedUsername user, RealChannel chan)
+                        Server _ -> Nothing
+                        -- TODO What do we do if the server sends a message here?
 
 -- If the bot is the target of the message, it's a command. Also we should
 -- treat the message as a command if the message starts with the name of the

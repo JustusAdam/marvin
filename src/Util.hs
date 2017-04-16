@@ -19,8 +19,8 @@ notImplemented = error "Not implemented"
 
 addPrefix :: T.Text -> T.Text -> T.Text
 addPrefix prefix source
-        | T.null source = prefix
-        | otherwise = $(isT "#{prefix}.#{source}")
+    | T.null source = prefix
+    | otherwise = $(isT "#{prefix}.#{source}")
 
 
 adaptLoggingSource :: (d -> b)  -> (a -> b -> c) -> a -> d -> c
@@ -34,7 +34,7 @@ loggingAddSourcePrefix = adaptLoggingSource . addPrefix
 timestampFromNumber :: Value -> Parser (TimeStamp a)
 timestampFromNumber (Number n) = return $ TimeStamp $ posixSecondsToUTCTime $ realToFrac n
 timestampFromNumber (String s) = maybe mzero (return . TimeStamp . posixSecondsToUTCTime . realToFrac) (readMaybe (T.unpack s) :: Maybe Double)
-timestampFromNumber _ = mzero
+timestampFromNumber _ = fail "Timestamp must be number or string"
 
 
 
@@ -53,3 +53,7 @@ instance HasName SimpleWrappedChannelName L.Text where name = lens unwrapChannel
 
 mapLeft :: (a -> c) -> Either a b -> Either c b
 mapLeft f = either (Left . f) Right
+
+
+mapRight :: (b -> c) -> Either a b -> Either a c
+mapRight = fmap

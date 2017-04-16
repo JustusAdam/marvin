@@ -1,6 +1,7 @@
-# 0.3
+# 0.3 - not yet released
 
 - Added optional support for recieving remote files and uploading local files.
+- Added files support to the Shell and Slack adapter
 - Changed bot runner in IsAdapter to be simpler to implement.
 - Changed the IsAdapter API.
     - The new API is lens based. Adapter dependend types are constrained via the requirement for certain lens class instances.
