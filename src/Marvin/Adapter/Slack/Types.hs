@@ -33,9 +33,9 @@ type APIResponse a = Either String a
 
 
 -- | Identifier for a user (internal and not equal to the username)
-newtype SlackUserId = SlackUserId T.Text deriving (IsString, Eq, Hashable)
+newtype SlackUserId = SlackUserId { unwrapSlackUserId :: T.Text } deriving (IsString, Eq, Hashable)
 -- | Identifier for a channel (internal and not equal to the channel name)
-newtype SlackChannelId = SlackChannelId T.Text deriving (IsString, Eq, Show, Hashable)
+newtype SlackChannelId = SlackChannelId { unwrapSlackChannelId :: T.Text } deriving (IsString, Eq, Show, Hashable)
 
 
 deriveJSON defaultOptions { unwrapUnaryRecords = True } ''SlackUserId
@@ -124,8 +124,10 @@ declareFields [d|
 
 declareFields [d|
     data SlackLocalFile = SlackLocalFile
-        { slackLocalFileName     :: Maybe L.Text
+        { slackLocalFileName     :: L.Text
         , slackLocalFileFileType :: Maybe L.Text
+        , slackLocalFileTitle    :: Maybe L.Text
+        , slackLocalFileComment  :: Maybe L.Text
         , slackLocalFileContent  :: FileContent
         }
     |]

@@ -49,3 +49,7 @@ instance HasName SimpleWrappedUsername (Maybe L.Text) where name = lens (const N
 newtype SimpleWrappedChannelName = SimpleWrappedChannelName { unwrapChannelName :: L.Text }
 
 instance HasName SimpleWrappedChannelName L.Text where name = lens unwrapChannelName (const SimpleWrappedChannelName)
+
+
+mapLeft :: (a -> c) -> Either a b -> Either c b
+mapLeft f = either (Left . f) Right

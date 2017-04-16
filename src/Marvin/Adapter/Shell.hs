@@ -19,6 +19,7 @@ import qualified Data.ByteString.Lazy            as B
 import           Data.Char                       (isSpace)
 import           Data.Maybe                      (fromJust)
 import qualified Data.Text.Lazy                  as L
+import qualified Data.Text.Lazy.Encoding         as L
 import qualified Data.Text.Lazy.IO               as L
 import           Data.Time.Clock                 (getCurrentTime)
 import           Marvin.Adapter
@@ -35,6 +36,7 @@ import           Util
 declareFields [d|
     data ShellAdapter = ShellAdapter
         { shellAdapterOutput :: Chan L.Text
+        -- , shellAdapterFiles :: IORef (HashMap L.Text ByteString)
         }
     |]
 
@@ -60,11 +62,11 @@ declareFields [d|
         , rFileFileType     :: Maybe L.Text
         , rFileSize         :: Integer
         , rFileCreationDate :: TimeStamp ShellAdapter
-        , rFilePath         :: L.Text
+        , rFileContent      :: FileContent
         , rFileUrl          :: Maybe L.Text
         }
     data LFile = LFile
-        { lFileName         :: Maybe L.Text
+        { lFileName         :: L.Text
         , lFileFileType     :: Maybe L.Text
         , lFileCreationDate :: TimeStamp ShellAdapter
         , lFileContent      :: FileContent
@@ -72,21 +74,48 @@ declareFields [d|
     |]
 
 
+rFileFromLFile :: LFile -> AdapterM ShellAdapter RFile
+rFileFromLFile (LFile name type_ date content) = do
+    (size, url) <- case content of
+               FileOnDisk path -> (,path) <$> sizeOfFile path
+               FileInMemory bytes -> -- do
+                --    fileCache <- view $ adapter . files
+                --    atomicModifyIORef' fileCache $ at url .~ Just bytes
+                   pure (fromIntegral $ B.length bytes, url)
+                 where url = $(isL "memory://#{name}")
+
+    return $ RFile (Just name) type_ size date content (Just url)
+
+
+sizeOfFile :: MonadIO m => L.Text -> m Integer
+sizeOfFile path = liftIO $ withFile (L.unpack path) ReadMode hFileSize
+
+
 instance HasFiles ShellAdapter where
     type RemoteFile ShellAdapter = RFile
     type LocalFile ShellAdapter = LFile
-    newLocalFile = return . LFile Nothing Nothing undefined
-    readTextFile f = Just <$> liftIO (L.readFile (L.unpack (f^.path)))
-    readFileBytes f = Just <$> liftIO (B.readFile (L.unpack (f^.path)))
-    shareFile file =
-        mapM_ (`messageChannel` $(isL "The bot has shared a file #{file^.name} in this channel"))
+    newLocalFile name content = do
+        t <- liftIO $ TimeStamp <$> case content of
+                FileOnDisk path -> getModificationTime (L.unpack path)
+                FileInMemory _  -> getCurrentTime
+        return $ LFile name Nothing t content
+    readTextFile f =
+        case f^.content of
+            FileOnDisk path    -> Just <$> liftIO (L.readFile (L.unpack path))
+            FileInMemory bytes -> pure $ Just $ L.decodeUtf8 bytes
+    readFileBytes f =
+        case f^.content of
+            FileOnDisk path    -> Just <$> liftIO (B.readFile (L.unpack path))
+            FileInMemory bytes -> pure $ Just bytes
+    shareFile file chans =
+        mapM_ (`messageChannel` $(isL "The bot has shared a file #{file^.name} in this channel")) chans >> Right <$> rFileFromLFile file
 
 
 pathToFile :: L.Text -> IO RFile
 pathToFile path = do
-    fileSize <- liftIO $ withFile (L.unpack path) ReadMode hFileSize
+    fileSize <- sizeOfFile path
     ctime <- liftIO $ getModificationTime (L.unpack path)
-    pure $ RFile (Just path) Nothing fileSize (TimeStamp ctime) path Nothing
+    pure $ RFile (Just path) Nothing fileSize (TimeStamp ctime) (FileOnDisk path) Nothing
 
 
 defaultUser :: SimpleWrappedUsername

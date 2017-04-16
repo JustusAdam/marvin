@@ -207,7 +207,7 @@ readTextFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, Mo
 readTextFile = A.liftAdapterAction . A.readTextFile
 
 
--- | Return the contents of the file as bytes. If the file is not public, or cannot be interpreted as text returns 'Nothing'.
+-- | Return the contents of the file as bytes. If the file is not public returns 'Nothing'.
 readFileBytes :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
            => RemoteFile a -> m (Maybe ByteString)
 readFileBytes = A.liftAdapterAction . A.readFileBytes
@@ -215,13 +215,13 @@ readFileBytes = A.liftAdapterAction . A.readFileBytes
 
 -- | Create a new 'LocalFile' object for upload with the specified content.
 newLocalFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
-            => FileContent -> m (LocalFile a)
-newLocalFile = A.liftAdapterAction . A.newLocalFile
+            => L.Text -> FileContent -> m (LocalFile a)
+newLocalFile name = A.liftAdapterAction . A.newLocalFile name
 
 
 -- | Share a local file to the supplied list of channels
 shareFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
-            => LocalFile a -> [Channel a] -> m ()
+            => LocalFile a -> [Channel a] -> m (Either L.Text (RemoteFile a))
 shareFile f = A.liftAdapterAction . A.shareFile f
 
 

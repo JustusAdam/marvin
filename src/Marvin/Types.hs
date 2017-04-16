@@ -14,7 +14,7 @@ module Marvin.Types
     , applicationScriptId, IsScript, getScriptId
     , HasConfigAccess, TimeStamp(..)
     , AccessAdapter(AdapterT)
-    , User'(..), Channel'(..), RemoteFile'(..), FileContent
+    , User'(..), Channel'(..), RemoteFile'(..), FileContent(..)
     , Get(getLens)
     , Event(..), RunnerM
     , BotActionState

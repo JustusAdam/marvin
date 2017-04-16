@@ -29,8 +29,8 @@ module Marvin.Prelude
     , when, unless, for, for_, filterM, fromMaybe
     ) where
 
-import           Control.Lens                 (lens, (&), (.~), (^.), at, ix, (^?), (^?!))
-import           Control.Monad                (unless, when, filterM)
+import           Control.Lens                 (at, ix, lens, (&), (.~), (^.), (^?), (^?!))
+import           Control.Monad                (filterM, unless, when)
 import           Control.Monad.IO.Class       (MonadIO, liftIO)
 import           Control.Monad.Logger
 import           Data.Foldable                (for_)

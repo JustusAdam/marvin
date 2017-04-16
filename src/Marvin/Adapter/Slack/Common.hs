@@ -13,6 +13,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson                      hiding (Error)
 import           Data.Aeson.Types                hiding (Error)
+import qualified Data.ByteString.Lazy            as B
 import           Data.Char                       (isSpace)
 import           Data.Foldable                   (asum)
 import qualified Data.HashMap.Strict             as HM
@@ -36,7 +37,7 @@ messageParser = withObject "expected object" $ \o -> do
     (,,\u c -> MessageEvent u c content ts) <$> o .: "user" <*> o .: "channel"
 
 
-eventParser :: Value -> Parser (InternalType a)
+eventParser :: MkSlack a => Value -> Parser (InternalType a)
 eventParser v@(Object o) = isErrParser <|> isOkParser <|> hasTypeParser
   where
     isErrParser = do
@@ -145,13 +146,13 @@ runnerImpl handler = do
     runHandlerLoop messageChan handler
 
 
-execAPIMethod :: MkSlack a => (Object -> Parser v) -> String -> [FormParam] -> AdapterM (SlackAdapter a) (Either String v)
+execAPIMethod :: MkSlack a => (Object -> Parser v) -> String -> [FormParam] -> AdapterM (SlackAdapter a) (Either L.Text v)
 execAPIMethod innerParser method params = do
     token <- requireFromAdapterConfig "token"
     response <- liftIO $ post $(isS "https://slack.com/api/#{method}") (("token" := (token :: T.Text)):params)
     if response^.responseStatus == ok200
-        then return $ eitherDecode (response^.responseBody) >>= join . parseEither (apiResponseParser innerParser)
-        else return $ Left $(isS "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
+        then return $ mapLeft L.pack $ eitherDecode (response^.responseBody) >>= join . parseEither (apiResponseParser innerParser)
+        else return $ Left $(isL "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
 
 
 messageChannelImpl :: SlackChannelId -> L.Text -> AdapterM (SlackAdapter a) ()
@@ -179,17 +180,17 @@ refreshSingleUserInfo user@(SlackUserId user') = do
     adapter <- getAdapter
     usr <- execAPIMethod (\o -> o .: "user" >>= userInfoParser) "users.info" ["user" := user']
     case usr of
-        Left err -> error ("Parse error when getting user data " ++ err)
+        Left err -> error $(isS "Parse error when getting user data: #{err}")
         Right v -> do
             modifyMVar_ (userInfoCache adapter) (return . (infoCache . at user .~ Just v))
             return v
 
 
-refreshChannels :: MkSlack a => AdapterM (SlackAdapter a) (Either String ChannelCache)
+refreshChannels :: MkSlack a => AdapterM (SlackAdapter a) (Either L.Text ChannelCache)
 refreshChannels = do
     chans <- execAPIMethod (\o -> o .: "channels" >>= lciListParser) "channels.list" []
     case chans of
-        Left err -> return $ Left $ "Error when getting channel data " ++ err
+        Left err -> return $ Left $(isL "Error when getting channel data: #{err}")
         Right v -> do
             let cmap = HM.fromList $ map ((^. idValue) &&& id) v
                 nmap = HM.fromList $ map ((^. name) &&& id) v
@@ -201,7 +202,7 @@ refreshSingleChannelInfo :: MkSlack a => SlackChannelId -> AdapterM (SlackAdapte
 refreshSingleChannelInfo chan = do
     res <- execAPIMethod (\o -> o .: "channel" >>= lciParser) "channels.info" []
     case res of
-        Left err -> error $ "Parse error when getting channel data " ++ err
+        Left err -> error $(isS "Parse error when getting channel data: #{err}")
         Right v -> do
             adapter <- getAdapter
             modifyMVar_ (channelCache adapter) (return . (infoCache . at chan .~ Just v))
@@ -222,11 +223,11 @@ resolveChannelImpl name' = do
   where name = L.tail name'
 
 
-refreshUserInfo ::  MkSlack a => AdapterM (SlackAdapter a) (Either String UserCache)
+refreshUserInfo ::  MkSlack a => AdapterM (SlackAdapter a) (Either L.Text UserCache)
 refreshUserInfo = do
     users <- execAPIMethod (\o -> o .: "members" >>= userInfoListParser) "users.list" []
     case users of
-        Left err -> return $ Left $ "Error when getting channel data " ++ err
+        Left err -> return $ Left $(isL "Error when getting channel data: #{err}")
         Right v -> do
             let cmap = HM.fromList $ map ((^. idValue) &&& id) v
                 nmap = HM.fromList $ map ((^. username) &&& id) v
@@ -313,7 +314,7 @@ instance MkSlack a => IsAdapter (SlackAdapter a) where
     resolveUser = resolveUserImpl
 
 
-instance HasFiles (SlackAdapter a) where
+instance MkSlack a => HasFiles (SlackAdapter a) where
     type RemoteFile (SlackAdapter a) = SlackRemoteFile a
     type LocalFile (SlackAdapter a) = SlackLocalFile
 
@@ -333,7 +334,19 @@ instance HasFiles (SlackAdapter a) where
             logWarnN "Reading file contents is only supported for public files"
             when (isJust $ file^.publicPermalink) $ logWarnN "Detected public permalink on private file"
             return Nothing
-    shareFile _ _ =
-        logErrorN "Sharing file is not implemented"
-    newLocalFile = return . SlackLocalFile Nothing Nothing
+    shareFile file channels = do
+        c <- case file^.content of
+                FileOnDisk p       -> liftIO $ B.readFile (L.unpack p)
+                FileInMemory bytes -> pure bytes
+
+
+        execAPIMethod (.: "file") "files.upload" $
+            ["file" := c, "filename" := file^.name]
+            ++ maybe [] (pure . ("filetype":=)) (file^.fileType)
+            ++ maybe [] (pure . ("initial_comment":=)) (file^.comment)
+            ++ maybe [] (pure . ("title":=)) (file^.title)
+            ++ case channels of
+                    [] -> []
+                    a -> ["channels":=T.intercalate "," (map (unwrapSlackChannelId . (^.idValue)) channels)]
+    newLocalFile name = return . SlackLocalFile name Nothing Nothing Nothing
 

@@ -103,17 +103,18 @@ class ( HasName (RemoteFile a) (Maybe L.Text)
       , HasCreationDate (RemoteFile a) (TimeStamp a)
       , HasSize (RemoteFile a) Integer
       , HasContent (LocalFile a) FileContent
-      , HasName (LocalFile a) (Maybe L.Text)
+      , HasName (LocalFile a) L.Text
       , HasFileType (LocalFile a) (Maybe L.Text)
       ) => HasFiles a where
     -- | Concrete type of an uploaded file
     type RemoteFile a
     type LocalFile a
     -- | Resolve the name of the file
-    newLocalFile :: FileContent -> AdapterM a (LocalFile a)
+    newLocalFile :: L.Text -> FileContent -> AdapterM a (LocalFile a)
     readTextFile :: RemoteFile a -> AdapterM a (Maybe L.Text)
     readFileBytes :: RemoteFile a -> AdapterM a (Maybe ByteString)
-    shareFile :: LocalFile a -> [Channel a] -> AdapterM a ()
+    shareFile :: LocalFile a -> [Channel a] -> AdapterM a (Either L.Text (RemoteFile a))
+    -- Add a method for resolving a file
 
 
 -- | Wrapping type for users. Only used to enable 'Get' typeclass instances.
