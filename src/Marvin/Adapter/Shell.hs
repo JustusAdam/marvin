@@ -6,6 +6,8 @@ License     : BSD3
 Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
+
+See http://marvin.readthedocs.io/en/latest/adapters.html#shell for documentation of this adapter.
 -}
 module Marvin.Adapter.Shell (ShellAdapter) where
 

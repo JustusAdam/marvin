@@ -6,6 +6,8 @@ License     : BSD3
 Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
+
+See http://marvin.readthedocs.io/en/latest/adapters.html#events-api for documentation about this adapter.
 -}
 module Marvin.Adapter.Slack.EventsAPI
     ( SlackAdapter, EventsAPI

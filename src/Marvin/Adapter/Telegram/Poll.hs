@@ -7,6 +7,7 @@ Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
 
+See http://marvin.readthedocs.io/en/latest/adapters.html#poll for documentation about this adapter.
 
 === Caveats:
 
