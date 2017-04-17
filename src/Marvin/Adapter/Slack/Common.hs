@@ -313,21 +313,14 @@ instance MkSlack a => HasFiles (SlackAdapter a) where
     type LocalFile (SlackAdapter a) = SlackLocalFile
 
     readTextFile = fmap (fmap L.decodeUtf8) . readFileBytes
-    readFileBytes file
-        | file^.public =
-            case file^.publicPermalink of
-                Just pLink -> do
-                    r <- liftIO $ get (L.unpack pLink)
-                    if r^.responseStatus == ok200
-                        then return $ Just $ r^.responseBody
-                        else do
-                            logErrorN $(isT "Unexpected status from server: #{r^.responseStatus.statusMessage}")
-                            return Nothing
-                _ -> logErrorN "Public file had no permalink_public field" >> return Nothing
-        | otherwise = do
-            logWarnN "Reading file contents is only supported for public files"
-            when (isJust $ file^.publicPermalink) $ logWarnN "Detected public permalink on private file"
-            return Nothing
+    readFileBytes file = do
+        token <- requireFromAdapterConfig "token"
+        r <- liftIO $ getWith (defaults & header "Authorization" .~ ["Bearer " `mappend` B.toStrict (L.encodeUtf8 token)]) (L.unpack $ file^.privateUrl)
+        if r^.responseStatus == ok200
+            then return $ Just $ r^.responseBody
+            else do
+                logErrorN $(isT "Unexpected status from server: #{r^.responseStatus.statusMessage}")
+                return Nothing
     shareFile file channels = do
         c <- case file^.content of
                 FileOnDisk p       -> liftIO $ B.readFile (L.unpack p)
@@ -335,7 +328,7 @@ instance MkSlack a => HasFiles (SlackAdapter a) where
 
 
         execAPIMethod (.: "file") "files.upload" $
-            ["file" := c, "filename" := file^.name]
+            ["content" := c, "filename" := file^.name]
             ++ maybe [] (pure . ("filetype":=)) (file^.fileType)
             ++ maybe [] (pure . ("initial_comment":=)) (file^.comment)
             ++ maybe [] (pure . ("title":=)) (file^.title)

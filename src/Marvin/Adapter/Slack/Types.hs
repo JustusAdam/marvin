@@ -119,6 +119,7 @@ declareFields [d|
         , slackRemoteFilePublic          :: Bool
         , slackRemoteFileUser            :: SlackUserId
         , slackRemoteFileUrl             :: Maybe L.Text
+        , slackRemoteFilePrivateUrl      :: L.Text
         }
     |]
 
@@ -145,6 +146,7 @@ instance FromJSON (SlackRemoteFile a) where
         <*> o .: "is_public"
         <*> o .: "user"
         <*> o .:? "permalink_public"
+        <*> o .: "url_private_download"
 
 -- makeFields ''SlackRemoteFile
 -- makeFields ''SlackLocalFile
