@@ -11,6 +11,7 @@ import           Marvin.Internal.LensClasses
 import           Marvin.Internal.Types
 import           Marvin.Interpolate.Text
 import           Text.Read                   (readMaybe)
+import Data.String (IsString(fromString))
 
 
 notImplemented :: a
@@ -38,7 +39,10 @@ timestampFromNumber _ = fail "Timestamp must be number or string"
 
 
 
-newtype SimpleWrappedUsername = SimpleWrappedUsername { unwrapUser :: L.Text }
+newtype SimpleWrappedUsername = SimpleWrappedUsername { unwrapUser :: L.Text } deriving Eq
+
+instance IsString SimpleWrappedUsername where fromString = SimpleWrappedUsername . fromString
+instance Show SimpleWrappedUsername where show = L.unpack . unwrapUser
 
 instance HasUsername SimpleWrappedUsername L.Text where username = lens unwrapUser (const SimpleWrappedUsername)
 instance HasFirstName SimpleWrappedUsername (Maybe L.Text) where firstName = lens (const Nothing) const
@@ -46,7 +50,10 @@ instance HasLastName SimpleWrappedUsername (Maybe L.Text) where lastName = lens 
 instance HasName SimpleWrappedUsername (Maybe L.Text) where name = lens (const Nothing) const
 
 
-newtype SimpleWrappedChannelName = SimpleWrappedChannelName { unwrapChannelName :: L.Text }
+newtype SimpleWrappedChannelName = SimpleWrappedChannelName { unwrapChannelName :: L.Text } deriving Eq
+
+instance IsString SimpleWrappedChannelName where fromString = SimpleWrappedChannelName . fromString
+instance Show SimpleWrappedChannelName where show = L.unpack . unwrapChannelName
 
 instance HasName SimpleWrappedChannelName L.Text where name = lens unwrapChannelName (const SimpleWrappedChannelName)
 

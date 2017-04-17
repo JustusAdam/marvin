@@ -124,11 +124,11 @@ pathToFile path = do
 
 
 defaultUser :: SimpleWrappedUsername
-defaultUser = SimpleWrappedUsername "shell"
+defaultUser = "shell"
 
 
 defaultChannel :: SimpleWrappedChannelName
-defaultChannel = SimpleWrappedChannelName "shell"
+defaultChannel = "shell"
 
 
 instance IsAdapter ShellAdapter where
