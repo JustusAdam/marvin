@@ -44,7 +44,8 @@ script = defineScript "test" $ do
 
     fileShared $ do
         f <- getRemoteFile
-        send $(isL "A file of name #{f^.name} and type #{f^.fileType}")
+        c <- getChannel
+        send $(isL "A file of name #{f^.name} and type #{f^.fileType} has been shared in #{c^.name}")
         when (f^.fileType == Nothing) $ do
             content <- readTextFile f
             maybe (return ()) send content
@@ -71,5 +72,9 @@ script = defineScript "test" $ do
 
             case res of 
                 Left err -> send $(isL "Failed to share file: #{err}")
-                Right _ -> return ()
+                Right f -> do
+                    res <- saveFileToDir f "downloaded"
+                    send $ case res of 
+                            Left err -> $(isL "Failed to save file: #{err}")
+                            Right path -> $(isL "File saved to path: #{path}")
 

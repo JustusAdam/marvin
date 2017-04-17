@@ -23,6 +23,7 @@ executable marvin-integration
                      , marvin
                      , text
                      , directory
+                     , filepath
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies
@@ -40,6 +41,7 @@ executable marvin-shell
                      , marvin
                      , text
                      , directory
+                     , filepath
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies
