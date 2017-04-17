@@ -207,7 +207,7 @@ refreshSingleChannelInfo chan@(SlackChannelId sid) =
 
 
 resolveChannelImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe LimitedChannelInfo)
-resolveChannelImpl name' = do
+resolveChannelImpl name = do
     adapter <- getAdapter
     modifyMVar (channelCache adapter) $ \cc ->
         case cc ^? nameResolver . ix name of
@@ -217,7 +217,6 @@ resolveChannelImpl name' = do
                     Left err  -> logErrorN $(isT "#{err}") >> return (cc, Nothing)
                     Right ncc -> return (ncc, ncc ^? nameResolver . ix name)
             Just found -> return (cc, Just found)
-  where name = L.tail name'
 
 
 refreshUserInfo ::  MkSlack a => AdapterM (SlackAdapter a) (Either L.Text UserCache)
@@ -248,10 +247,9 @@ getChannelNameImpl :: MkSlack a => SlackChannelId -> AdapterM (SlackAdapter a) L
 getChannelNameImpl channel = do
     adapter <- getAdapter
     cc <- readMVar $ channelCache adapter
-    L.cons '#' <$>
-        case cc ^? infoCache . ix channel of
-            Nothing    -> (^.name) <$> refreshSingleChannelInfo channel
-            Just found -> return $ found ^. name
+    case cc ^? infoCache . ix channel of
+        Nothing    -> (^.name) <$> refreshSingleChannelInfo channel
+        Just found -> return $ found ^. name
 
 
 

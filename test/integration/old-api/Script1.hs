@@ -29,10 +29,10 @@ script = defineScript "test" $ do
         loc <- requireConfigVal "location"
         send $(isL "I am running on #{loc :: L.Text}")
 
-    topicIn "#testing" $ do
+    topicIn "testing" $ do
         t <- getTopic
         messageChannel "#random" $(isL "The new topic in testing is \"#{t}\"")
-    enterIn "#random" $ do
+    enterIn "random" $ do
         u <- getUser
         username <- getUsername user
         send $(isL "#{username} just entered random")

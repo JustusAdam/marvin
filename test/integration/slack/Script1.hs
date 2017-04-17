@@ -33,10 +33,10 @@ script = defineScript "test" $ do
         loc <- requireConfigVal "location"
         send $(isL "I am running on #{loc :: L.Text}")
 
-    topicIn "#testing" $ do
+    topicIn "testing" $ do
         t <- getTopic
         messageChannel "#random" $(isL "The new topic in testing is \"#{t}\"")
-    enterIn "#random" $ do
+    enterIn "random" $ do
         u <- getUser
         send $(isL "#{u^.username} just entered random")
 
@@ -46,13 +46,15 @@ script = defineScript "test" $ do
         n <- getBotName
         send $(isL "My name is #{n}, nice to meet you.")
 
-    fileSharedIn "#testing" $ do
+    fileShared $ logInfoN "A file was shared"
+
+    fileSharedIn "testing" $ do
         f <- getRemoteFile
-        when (f^.fileType == Just "jpg") $ do
-            res <- saveFileToDir f "downloaded"
-            send $ case res of 
-                      Left err -> $(isL "Failed to save file: #{err}")
-                      Right path -> $(isL "File saved to path: #{path}")
+        logInfoN $(isT "A file was shared in testing with type #{f^.fileType}")
+        res <- saveFileToDir f "downloaded"
+        send $ case res of 
+                    Left err -> $(isL "Failed to save file: #{err}")
+                    Right path -> $(isL "File saved to path: #{path}")
 
     respond "^upload (.+)$" $ do
         [_, path'] <- getMatch

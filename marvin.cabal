@@ -3,7 +3,10 @@ version:             0.3
 synopsis:            A framework for modular, portable chat bots.
 description:         A framework for writing portable chat bots. Inspired by hubot. 
                      . 
-                     The best way to get started with this library is with the documentation on readthedocs: <https://marvin.readthedocs.io>
+                     The best way to get started with this library is with the documentation on readthedocs: <https://marvin.readthedocs.io>.
+
+                     .
+                     When upgrading to a new version also be aware of the potential breaking changes, listed here: <https://marvin.readthedocs.io/en/latest/breaking-changes.html>.
 homepage:            https://marvin.readthedocs.io
 bug-reports:         https://github.com/JustusAdam/marvin/issues
 license:             BSD3

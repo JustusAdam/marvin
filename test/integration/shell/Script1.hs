@@ -9,9 +9,10 @@ import qualified Data.Version             as V
 import           Marvin.Prelude
 import qualified Paths_marvin_integration as P
 import System.Directory
+import Marvin.Adapter.Shell
 
 
-script :: (IsAdapter a, HasFiles a) => ScriptInit a
+script :: ScriptInit ShellAdapter
 script = defineScript "test" $ do
     hear (r [CaseInsensitive] "^ping$") $ do
         msg <- getMessage
@@ -29,10 +30,10 @@ script = defineScript "test" $ do
         loc <- requireConfigVal "location"
         send $(isL "I am running on #{loc :: L.Text}")
 
-    topicIn "#testing" $ do
+    topicIn "testing" $ do
         t <- getTopic
         messageChannel "#random" $(isL "The new topic in testing is \"#{t}\"")
-    enterIn "#random" $ do
+    enterIn "random" $ do
         u <- getUser
         send $(isL "#{u^.username} just entered random")
 
@@ -50,7 +51,7 @@ script = defineScript "test" $ do
             content <- readTextFile f
             maybe (return ()) send content
 
-    fileSharedIn "#testing" $ do
+    fileSharedIn "testing" $ do
         f <- getRemoteFile
         when (f^.fileType == Just "jpg") $ do
             res <- saveFileToDir f "downloaded"
