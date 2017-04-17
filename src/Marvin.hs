@@ -21,15 +21,16 @@ module Marvin
     -- ** Getting data
     -- | The type signature for the functions in this section is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
     , getData, getMessage, getMatch, getTopic, getChannel, getUser, getRemoteFile, getTimeStamp, resolveUser, resolveChannel, getUsername, getChannelName
-    -- *** File interactions
-    , readTextFile, readFileBytes, newLocalFile, shareFile
-    , saveFile, saveFileTo, saveFileToDir
     -- ** Sending messages
     , send, reply, messageChannel, messageChannel'
+    -- ** File interactions
+    -- | Special interactions for adapters which support the file api 'HasFiles's
+    , readTextFile, readFileBytes, newLocalFile, shareFile
+    , saveFile, saveFileTo, saveFileToDir
     -- ** Interaction with the config
     , getConfigVal, requireConfigVal, getBotName
-    , BotReacting
     -- ** Handler Types
+    , BotReacting
     , Message, User, Channel, Topic, FileContent(..)
     -- * The Script
     , Script, defineScript, ScriptInit
@@ -37,7 +38,7 @@ module Marvin
     , ScriptDefinition, IsAdapter, HasFiles
     -- * Lenses
     , HasActions(actions), HasUsername(username), HasName(name), HasFirstName(firstName), HasLastName(lastName), HasFileType(fileType), HasUrl(url), HasCreationDate(creationDate), HasSize(size), HasContent(content)
-    -- ** Advanced actions
+    -- * Advanced actions
     , extractAction, extractReaction
     ) where
 

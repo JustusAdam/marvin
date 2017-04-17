@@ -179,7 +179,7 @@ instance Monoid (Handlers a) where
 
 
 
--- | Monad for reacting in the bot. Allows use of functions like 'Marvin.send', 'Marvin.reply' and 'Marvin.messageChannel' as well as any arbitrary 'IO' action using 'liftIO'.
+-- | Context for reacting in the bot. Allows use of functions like 'Marvin.send', 'Marvin.reply' and 'Marvin.messageChannel' as well as any arbitrary 'IO' action using 'liftIO'.
 --
 -- The type parameter @d@ is the accessible data provided by the trigger for this action and can be obtained with 'Marvin.getData' or other custom functions like 'Marvin.getMessage' and 'Marvin.getMatch' which typically depend on a particular type of data in @d@.
 --
@@ -191,11 +191,9 @@ instance Monoid (Handlers a) where
 newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState a d) RunnerM r }
     deriving (Monad, MonadIO, Applicative, Functor, MonadReader (BotActionState a d), MonadLogger, MonadLoggerIO, MonadBase IO)
 
--- | An abstract type describing a marvin script.
+-- | An abstract type describing a marvin script using @a@ as adapter.
 --
 -- This is basically a collection of event handlers.
---
--- Internal structure is exposed for people wanting to extend this.
 declareFields [d|
     data Script a = Script
         { scriptActions   :: Handlers a
