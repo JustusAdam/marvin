@@ -100,9 +100,9 @@ processor inChan handler = do
           where
             ev = fmap (L.fromStrict . T.decodeUtf8) rawEv
             origin = case _source ev of
-                        User nick -> Just (SimpleWrappedUsername nick, Direct nick)
+                        User nick         -> Just (SimpleWrappedUsername nick, Direct nick)
                         Channel chan user -> Just (SimpleWrappedUsername user, RealChannel chan)
-                        Server _ -> Nothing
+                        Server _          -> Nothing
                         -- TODO What do we do if the server sends a message here?
 
 -- If the bot is the target of the message, it's a command. Also we should

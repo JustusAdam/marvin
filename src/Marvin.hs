@@ -15,26 +15,27 @@ For the proper, verbose documentation see <https://marvin.readthedocs.org/en/lat
 {-# LANGUAGE ScopedTypeVariables #-}
 module Marvin
     (
-    -- * The Script
-      Script, defineScript, ScriptInit
-    , ScriptId
-    , ScriptDefinition, IsAdapter, HasFiles
     -- * Reacting
-    , BotReacting
     -- ** Reaction Functions
-    , hear, respond, enter, exit, enterIn, exitFrom, topic, topicIn, fileShared, fileSharedIn, customTrigger
+      hear, respond, enter, exit, enterIn, exitFrom, topic, topicIn, fileShared, fileSharedIn, customTrigger
     -- ** Getting data
     -- | The type signature for the functions in this section is so large to allow this function to be used both in 'BotReacting' and 'ScriptDefinition'.
     , getData, getMessage, getMatch, getTopic, getChannel, getUser, getRemoteFile, getTimeStamp, resolveUser, resolveChannel, getUsername, getChannelName
     -- *** File interactions
     , readTextFile, readFileBytes, newLocalFile, shareFile
+    , saveFile, saveFileTo, saveFileToDir
     -- ** Sending messages
     , send, reply, messageChannel, messageChannel'
     -- ** Interaction with the config
     , getConfigVal, requireConfigVal, getBotName
+    , BotReacting
     -- ** Handler Types
-    , Message, User, Channel, Topic
-    -- ** Lenses
+    , Message, User, Channel, Topic, FileContent(..)
+    -- * The Script
+    , Script, defineScript, ScriptInit
+    , ScriptId
+    , ScriptDefinition, IsAdapter, HasFiles
+    -- * Lenses
     , HasActions(actions), HasUsername(username), HasName(name), HasFirstName(firstName), HasLastName(lastName), HasFileType(fileType), HasUrl(url), HasCreationDate(creationDate), HasSize(size), HasContent(content)
     -- ** Advanced actions
     , extractAction, extractReaction
@@ -47,6 +48,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader        (ask, runReaderT)
 import           Control.Monad.State         (MonadState)
 import           Data.ByteString.Lazy        (ByteString)
+import qualified Data.ByteString.Lazy        as B
 import qualified Data.Configurator           as C
 import qualified Data.Configurator.Types     as C
 import qualified Data.HashMap.Strict         as HM
@@ -54,6 +56,7 @@ import           Data.Maybe                  (fromMaybe)
 import           Data.Monoid                 ((<>))
 import qualified Data.Text                   as T
 import qualified Data.Text.Lazy              as L
+import           Data.Time.Clock
 import qualified Data.Vector                 as V
 import           Marvin.Adapter              (HasFiles(LocalFile, RemoteFile), IsAdapter)
 import qualified Marvin.Adapter              as A
@@ -64,10 +67,11 @@ import           Marvin.Internal.Types       (BotActionState(BotActionState),
                                               ScriptDefinition(ScriptDefinition),
                                               ScriptInit(ScriptInit))
 import           Marvin.Internal.Values      (defaultBotName)
-import           Marvin.Interpolate.String
-import           Marvin.Interpolate.Text
+import           Marvin.Interpolate.All
 import           Marvin.Types
 import           Marvin.Util.Regex           (Match, Regex)
+import           System.Directory
+import           System.FilePath
 
 
 prepareAction :: (MonadState (Script a) m, ShowT t) => Maybe t -> BotReacting a d () -> m (d -> RunnerM ())
@@ -205,6 +209,52 @@ resolveChannel =  A.liftAdapterAction . A.resolveChannel
 readTextFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
            => RemoteFile a -> m (Maybe L.Text)
 readTextFile = A.liftAdapterAction . A.readTextFile
+
+
+-- | Attempt to download the remote file into the current directory.
+--
+-- Uses either the name of the downloaded file as filename or @"unnamed-<current time>"@
+--
+-- When successful returns the path of the saved file otherwise an error message.
+saveFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a, MonadLogger m)
+         => RemoteFile a -> m (Either L.Text FilePath)
+saveFile = (`saveFileToDir` ".")
+
+
+-- | Attempt to download the remote file into the specified directory.
+--
+-- Uses either the name of the downloaded file as filename or @"unnamed-<current time>"@
+--
+-- When successful returns the path of the saved file otherwise an error message.
+saveFileToDir :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a, MonadLogger m)
+              => RemoteFile a -> FilePath -> m (Either L.Text FilePath)
+saveFileToDir file dir = do
+    name <- liftIO $
+        case file^.name of
+            Nothing -> do
+                ts <- getCurrentTime
+                return $(isS "unnamed-#{ts}")
+            Just n -> return $ L.unpack n
+    saveFileTo file (dir </> name)
+
+
+-- | Attempt to download the remote file to the designated path.
+--
+-- Uses either the name of the downloaded file as filename or @"unnamed-<current time>"@
+-- Creates intermediate directories if they are missing.
+--
+-- When successful returns the path of the saved file otherwise an error message.
+saveFileTo :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a, MonadLogger m)
+           => RemoteFile a -> FilePath -> m (Either L.Text FilePath)
+saveFileTo file path =
+    readFileBytes file >>= \case
+        Nothing ->
+            return $ Left $(isL "#{maybe \"unnamed file\" (\"File \" <>) $ file^.name} could not be downloaded")
+        Just text -> do
+            liftIO $ do
+                createDirectoryIfMissing True $ takeDirectory path
+                B.writeFile path text
+            return $ return path
 
 
 -- | Return the contents of the file as bytes. If the file is not public returns 'Nothing'.

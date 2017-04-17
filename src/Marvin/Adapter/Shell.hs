@@ -30,7 +30,9 @@ import           Marvin.Interpolate.Text.Lazy
 import           Marvin.Types
 import           System.Console.Haskeline
 import           System.Directory
+import           System.FilePath
 import           System.IO
+import Control.Arrow (second)
 import           Util
 
 
@@ -117,7 +119,8 @@ pathToFile :: L.Text -> IO RFile
 pathToFile path = do
     fileSize <- sizeOfFile path
     ctime <- liftIO $ getModificationTime (L.unpack path)
-    pure $ RFile (Just path) Nothing fileSize (TimeStamp ctime) (FileOnDisk path) Nothing
+    pure $ RFile (Just path) ftype fileSize (TimeStamp ctime) (FileOnDisk path) Nothing
+  where ftype = case takeExtension (L.unpack path) of "" -> Nothing; (_:a) -> Just $ L.pack a; 
 
 
 defaultUser :: SimpleWrappedUsername

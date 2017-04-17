@@ -35,8 +35,8 @@ type Message = L.Text
 
 -- | A timestamp type. Supplied with most 'Event' types.
 --
--- The type parameter is only a tag. 
--- It is used so you may declare instances for classes such as 'FromJSON' for this type depending on your adapter. 
+-- The type parameter is only a tag.
+-- It is used so you may declare instances for classes such as 'FromJSON' for this type depending on your adapter.
 -- This way different adapters may have different 'FromJSON' instances for the timestamp.
 newtype TimeStamp a = TimeStamp { unwrapTimeStamp :: UTCTime } deriving Show
 
@@ -93,7 +93,7 @@ class ( HasUsername (User a) L.Text
 
 
 -- | Monad in which adapter actions run in
-newtype AdapterM a r = AdapterM { runAdapterAction :: ReaderT (AdapterMEnv a) RunnerM r } 
+newtype AdapterM a r = AdapterM { runAdapterAction :: ReaderT (AdapterMEnv a) RunnerM r }
     deriving (MonadIO, Monad, Applicative, Functor, MonadLogger, MonadLoggerIO, MonadBase IO, MonadReader (AdapterMEnv a))
 
 
@@ -188,7 +188,7 @@ instance Monoid (Handlers a) where
 -- This is also a 'MonadReader' instance, there you can inspect the entire state of this reaction.
 -- This is typically only used in internal or utility functions and not necessary for the user.
 -- To inspect particular pieces of this state refer to the *Lenses* section.
-newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState a d) RunnerM r } 
+newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState a d) RunnerM r }
     deriving (Monad, MonadIO, Applicative, Functor, MonadReader (BotActionState a d), MonadLogger, MonadLoggerIO, MonadBase IO)
 
 -- | An abstract type describing a marvin script.
@@ -207,7 +207,7 @@ declareFields [d|
 
 
 -- | A monad for gradually defining a 'Script' using 'Marvin.respond' and 'Marvin.hear' as well as any 'IO' action.
-newtype ScriptDefinition a r = ScriptDefinition { runScript :: StateT (Script a) RunnerM r } 
+newtype ScriptDefinition a r = ScriptDefinition { runScript :: StateT (Script a) RunnerM r }
     deriving (Monad, MonadIO, Applicative, Functor, MonadLogger, MonadBase IO)
 
 
