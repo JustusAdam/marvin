@@ -170,14 +170,16 @@ getChannelInfo :: MkSlack a => SlackChannelId -> AdapterM (SlackAdapter a) Limit
 getChannelInfo cid = do
     adapter <- getAdapter
     cc <- readMVar $ channelCache adapter
-    return $ cc ^?! infoCache. ix cid
+    case cc ^? infoCache. ix cid of
+        Nothing -> refreshSingleChannelInfo cid
+        Just info -> return info
 
 
 refreshSingleUserInfo :: MkSlack a => SlackUserId -> AdapterM (SlackAdapter a) UserInfo
-refreshSingleUserInfo user@(SlackUserId user') = do
+refreshSingleUserInfo user@(SlackUserId user_) = do
     adapter <- getAdapter
-    execAPIMethod (\o -> o .: "user" >>= userInfoParser) "users.info" ["user" := user'] >>= \case
-        Left err -> error $(isS "Parse error when getting user data: #{err}")
+    execAPIMethod (\o -> o .: "user" >>= userInfoParser) "users.info" ["user" := user_] >>= \case
+        Left err -> error $(isS "Parse error when getting data for user #{user_}: #{err}")
         Right v -> do
             modifyMVar_ (userInfoCache adapter) (return . (infoCache . at user .~ Just v))
             return v
@@ -195,9 +197,9 @@ refreshChannels =
 
 
 refreshSingleChannelInfo :: MkSlack a => SlackChannelId -> AdapterM (SlackAdapter a) LimitedChannelInfo
-refreshSingleChannelInfo chan =
-    execAPIMethod (\o -> o .: "channel" >>= lciParser) "channels.info" [] >>= \case
-        Left err -> error $(isS "Parse error when getting channel data: #{err}")
+refreshSingleChannelInfo chan@(SlackChannelId sid) =
+    execAPIMethod (\o -> o .: "channel" >>= lciParser) "channels.info" ["channel" := sid] >>= \case
+        Left err -> error $(isS "Error when getting channel data: #{err}")
         Right v -> do
             adapter <- getAdapter
             modifyMVar_ (channelCache adapter) (return . (infoCache . at chan .~ Just v))
