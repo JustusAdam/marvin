@@ -27,6 +27,7 @@ module Marvin
     -- | Special interactions for adapters which support the file api 'HasFiles's
     , readTextFile, readFileBytes, newLocalFile, shareFile
     , saveFile, saveFileTo, saveFileToDir
+    , sendFile, sendFileTo, sendFileTo'
     -- ** Interaction with the config
     , getConfigVal, requireConfigVal, getBotName
     -- ** Handler Types
@@ -46,6 +47,7 @@ module Marvin
 import           Control.Lens
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Control.Monad.Logger
+import Control.Monad.Except
 import           Control.Monad.Reader        (ask, runReaderT)
 import           Control.Monad.State         (MonadState)
 import           Data.ByteString.Lazy        (ByteString)
@@ -256,6 +258,30 @@ saveFileTo file path =
                 createDirectoryIfMissing True $ takeDirectory path
                 B.writeFile path text
             return $ return path
+
+
+-- | Share the file with the provided path to the channel retrieved from the state.
+sendFile :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => L.Text -> BotReacting a m (Either L.Text (RemoteFile a))
+sendFile path = do
+    chan <- getChannel
+    sendFileTo' path chan
+
+
+-- | Share the file with the provided path (argument 1) to the channel (argument 2).
+sendFileTo :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => L.Text -> L.Text -> BotReacting a m (Either L.Text (RemoteFile a))
+sendFileTo path chanName = do
+    chan <- resolveChannel chanName
+    maybe (return $ Left "Channel does not exist") (sendFileTo' path) chan
+
+
+-- | Share the file with the provided path to the channel.
+sendFileTo' :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => L.Text -> Channel a -> BotReacting a m (Either L.Text (RemoteFile a))
+sendFileTo' path' chan = runExceptT $ do
+    e <- liftIO $ doesFileExist path
+    when e $ fail "File does not exist"
+    file <- lift $ newLocalFile path' (FileOnDisk path')
+    ExceptT $ shareFile file [chan]
+  where path = L.unpack path'
 
 
 -- | Return the contents of the file as bytes. If the file is not public returns 'Nothing'.

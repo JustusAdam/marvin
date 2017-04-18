@@ -42,7 +42,7 @@ script = defineScript "my-script" $ do
 
         send $(isL "You wrote #{message}")
     
-    respond "what is in file (\\w+)\\??" $ do
+    respond "what is in file ([\\w\\._/-]+)\\??" $ do
         match <- getMatch 
         let file = match !! 1
 
@@ -50,11 +50,21 @@ script = defineScript "my-script" $ do
 
         send contents
     
-    enterIn "#random" $ do
+    respond "upload file ([\\w\\._/-]+)" $ do
+        [_, filepath] <- getMatch
+        chan <- getChannel
+        f <- sendFile filepath
+        case res of
+            Left err -> reporter $(isL "Failed to share file: #{err}")
+            Right _  -> reporter "File successfully uploaded"
+    
+    enterIn "random" $ do
         user <- getUser
-        username <- getUsername user
-
-        send $(isL "Hello #{username} welcome to the random channel!")
+        send $(isL "Hello #{user^.username} welcome to the random channel!")
+    
+    fileSharedIn "announcements" $ do
+        file <- getFile
+        safeFileToDir file "shared-files"
 ```
 
 ## Testing and Talking
