@@ -46,20 +46,22 @@ script = defineScript "test" $ do
         n <- getBotName
         send $(isL "My name is #{n}, nice to meet you.")
 
-    fileShared $ logInfoN "A file was shared"
-
     fileSharedIn "testing" $ do
         f <- getRemoteFile
         logInfoN $(isT "A file was shared in testing with type #{f^.fileType}")
-        res <- saveFileToDir f "downloaded"
-        send $ case res of 
-                    Left err -> $(isL "Failed to save file: #{err}")
-                    Right path -> $(isL "File saved to path: #{path}")
+        botname <- getBotName
+        uploader <- getUser
+        unless (botname == uploader^.username) $ do
+            res <- saveFileToDir f "downloaded"
+            send $ case res of 
+                        Left err -> $(isL "Failed to save file: #{err}")
+                        Right path -> $(isL "File saved to path: #{path}")
 
     respond "^upload (.+)$" $ do
-        [_, path'] <- getMatch
+        [_, rawPath] <- getMatch
 
-        let path = L.unpack path'
+        let path' = L.strip rawPath
+            path = L.unpack path'
 
         if  | isAbsolute path -> send "Please provide a relative path"
             | ".." `elem` splitDirectories path -> send "'..' is not allowed in the upload path"
