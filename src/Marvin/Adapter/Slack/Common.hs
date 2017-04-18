@@ -153,6 +153,15 @@ execAPIMethod innerParser method params = do
         else return $ Left $(isL "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
 
 
+execAPIMethodPart :: MkSlack a => (Object -> Parser v) -> String -> [Part] -> AdapterM (SlackAdapter a) (Either L.Text v)
+execAPIMethodPart innerParser method params = do
+    token <- requireFromAdapterConfig "token"
+    response <- liftIO $ post $(isS "https://slack.com/api/#{method}") (partText "token" token:params)
+    if response^.responseStatus == ok200
+        then return $ mapLeft L.pack $ eitherDecode (response^.responseBody) >>= join . parseEither (apiResponseParser innerParser)
+        else return $ Left $(isL "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
+
+
 messageChannelImpl :: SlackChannelId -> L.Text -> AdapterM (SlackAdapter a) ()
 messageChannelImpl cid msg = do
     SlackAdapter{outChannel} <- getAdapter
@@ -308,6 +317,9 @@ instance MkSlack a => IsAdapter (SlackAdapter a) where
     resolveUser = resolveUserImpl
 
 
+partLText name val = partText name $ L.toStrict val
+
+
 instance MkSlack a => HasFiles (SlackAdapter a) where
     type RemoteFile (SlackAdapter a) = SlackRemoteFile a
     type LocalFile (SlackAdapter a) = SlackLocalFile
@@ -321,19 +333,20 @@ instance MkSlack a => HasFiles (SlackAdapter a) where
             else do
                 logErrorN $(isT "Unexpected status from server: #{r^.responseStatus.statusMessage}")
                 return Nothing
-    shareFile file channels = do
-        c <- case file^.content of
-                FileOnDisk p       -> liftIO $ B.readFile (L.unpack p)
-                FileInMemory bytes -> pure bytes
-
-
-        execAPIMethod (.: "file") "files.upload" $
-            ["content" := c, "filename" := file^.name]
-            ++ maybe [] (pure . ("filetype":=)) (file^.fileType)
-            ++ maybe [] (pure . ("initial_comment":=)) (file^.comment)
-            ++ maybe [] (pure . ("title":=)) (file^.title)
+    shareFile file channels =
+        execAPIMethodPart (.: "file") "files.upload" $
+            [ partLText "filename" $ file^.name
+            , contentpart
+            ]
+            ++ maybe [] (pure . partLText "filetype") (file^.fileType)
+            ++ maybe [] (pure . partLText "initial_comment") (file^.comment)
+            ++ maybe [] (pure . partLText "title") (file^.title)
             ++ case channels of
                     [] -> []
-                    a -> ["channels":=T.intercalate "," (map (unwrapSlackChannelId . (^.idValue)) channels)]
+                    a -> [partText "channels" $ T.intercalate "," $ map (unwrapSlackChannelId . (^.idValue)) channels]
+      where
+        contentpart = case file^.content of
+                FileOnDisk p       -> partFile "file" $ L.unpack p
+                FileInMemory bytes -> partLBS "file" bytes
     newLocalFile name = return . SlackLocalFile name Nothing Nothing Nothing
 
