@@ -42,6 +42,10 @@ downloadFile report directory = do
         logInfoN $ L.toStrict msg
 
 
+-- | Upload a file referenced by a command.
+--
+-- The boolean decides whether to send a message of success or failure to the originating channel.
+-- The @Int@ is the index for the filepath in the regex match.
 uploadFile :: (IsAdapter a, HasFiles a, Get s Match, Get s (Channel' a)) => Bool -> Int -> BotReacting a s ()
 uploadFile report index = do
     match <- getMatch
