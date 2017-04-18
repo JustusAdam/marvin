@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances       #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 module Marvin.Internal.Types where
 
 

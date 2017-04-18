@@ -1,5 +1,4 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 module Marvin.Adapter.Slack.Common where
 
 
@@ -350,7 +349,7 @@ instance MkSlack a => HasFiles (SlackAdapter a) where
                     a -> [partText "channels" $ T.intercalate "," $ map (unwrapSlackChannelId . (^.idValue)) a]
       where
         contentpart = case file^.content of
-                FileOnDisk p       -> partFile "file" p
+                FileOnDisk p       -> partFile "file" $ L.unpack p
                 FileInMemory bytes -> partLBS "file" bytes
     newLocalFile fname = return . SlackLocalFile fname Nothing Nothing Nothing
 
