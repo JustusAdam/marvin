@@ -48,8 +48,8 @@ downloadFile report directory = do
 -- The @Int@ is the index for the filepath in the regex match.
 uploadFile :: (IsAdapter a, HasFiles a, Get s Match, Get s (Channel' a)) => Bool -> Int -> BotReacting a s ()
 uploadFile report index = do
-    match <- getMatch
-    case match^?ix index of
+    match_ <- getMatch
+    case match_^?ix index of
         Nothing -> logErrorN "Could not find expected index in match"
         Just rawPath
             | isAbsolute path -> send "Please provide a relative path"

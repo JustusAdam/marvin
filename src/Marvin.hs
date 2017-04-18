@@ -89,17 +89,17 @@ prepareAction trigger reac = do
 --
 -- Equivalent to "robot.hear" in hubot
 hear :: Regex -> BotReacting a (User' a, Channel' a, Match, Message, TimeStamp a) () -> ScriptDefinition a ()
-hear !re ac = ScriptDefinition $ do
-    pac <- prepareAction (Just re) ac
-    actions . hears %= V.cons (re, pac)
+hear !regex ac = ScriptDefinition $ do
+    pac <- prepareAction (Just regex) ac
+    actions . hears %= V.cons (regex, pac)
 
 -- | Runs the handler only if the bot was directly addressed.
 --
 -- Equivalent to "robot.respond" in hubot
 respond :: Regex -> BotReacting a (User' a, Channel' a, Match, Message, TimeStamp a) () -> ScriptDefinition a ()
-respond !re ac = ScriptDefinition $ do
-    pac <- prepareAction (Just re) ac
-    actions . responds %= V.cons (re, pac)
+respond !regex ac = ScriptDefinition $ do
+    pac <- prepareAction (Just regex) ac
+    actions . responds %= V.cons (regex, pac)
 
 
 -- | This handler runs whenever a user enters __any channel__ (which the bot is subscribed to)
@@ -232,13 +232,13 @@ saveFile = (`saveFileToDir` ".")
 saveFileToDir :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a, MonadLogger m)
               => RemoteFile a -> FilePath -> m (Either L.Text FilePath)
 saveFileToDir file dir = do
-    name <- liftIO $
+    fname <- liftIO $
         case file^.name of
             Nothing -> do
                 ts <- getCurrentTime
                 return $(isS "unnamed-#{ts}")
             Just n -> return $ L.unpack n
-    saveFileTo file (dir </> name)
+    saveFileTo file (dir </> fname)
 
 
 -- | Attempt to download the remote file to the designated path.
@@ -293,7 +293,7 @@ readFileBytes = A.liftAdapterAction . A.readFileBytes
 -- | Create a new 'LocalFile' object for upload with the specified content.
 newLocalFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
             => L.Text -> FileContent -> m (LocalFile a)
-newLocalFile name = A.liftAdapterAction . A.newLocalFile name
+newLocalFile fname = A.liftAdapterAction . A.newLocalFile fname
 
 
 -- | Share a local file to the supplied list of channels
@@ -320,9 +320,9 @@ reply msg = do
 
 -- | Send a message to a Channel (by name)
 messageChannel :: (HasConfigAccess m, AccessAdapter m, IsAdapter (AdapterT m), MonadLoggerIO m) => L.Text -> L.Text -> m ()
-messageChannel name msg = do
-    mchan <- resolveChannel name
-    maybe ($logError $(isT "No channel known with the name #{name}")) (`messageChannel'` msg) mchan
+messageChannel fname msg = do
+    mchan <- resolveChannel fname
+    maybe ($logError $(isT "No channel known with the name #{fname}")) (`messageChannel'` msg) mchan
 
 
 -- | Send a message to a channel (by adapter dependent channel object)
@@ -411,9 +411,9 @@ getRemoteFile = (unwrapFile' :: RemoteFile' a -> RemoteFile a) <$> view (payload
 --
 -- The 'HasConfigAccess' Constraint means this function can be used both during script definition and when a handler is run.
 getConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m (Maybe a)
-getConfigVal name = do
+getConfigVal key = do
     cfg <- getConfig
-    liftIO $ C.lookup cfg name
+    liftIO $ C.lookup cfg key
 
 
 -- | Get a value out of the config and fail with an error if the specified key is not found.
@@ -422,14 +422,14 @@ getConfigVal name = do
 --
 -- The 'HasConfigAccess' Constraint means this function can be used both during script definition and when a handler is run.
 requireConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m a
-requireConfigVal name = do
+requireConfigVal key = do
     cfg <- getConfig
-    l <- liftIO $ C.lookup cfg name
+    l <- liftIO $ C.lookup cfg key
     case l of
         Just v -> return v
         _ -> do
             sid <- getScriptId
-            error $(isS "Could not find required config value \"#{name}\" in script \"#{sid}\"")
+            error $(isS "Could not find required config value \"#{key}\" in script \"#{sid}\"")
 
 
 -- | Get the configured name of the bot.

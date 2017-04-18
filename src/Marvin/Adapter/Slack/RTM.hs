@@ -55,20 +55,13 @@ runConnectionLoop eventChan connectionTracker = forever $ do
     case eitherDecode (r^.responseBody) of
         Left err -> logErrorN $(isT "Error decoding rtm json #{err}")
         Right js -> do
-            let uri = url js
-                authority = fromMaybe (error "URI lacks authority") (uriAuthority uri)
-                host = uriUserInfo authority ++ uriRegName authority
-                path = uriPath uri
-                portOnErr v = do
-                    logErrorN $(isT "Unreadable port #{v}")
-                    return 443
-            port <- case uriPort authority of
-                        v@(':':r) -> maybe (portOnErr v) return $ readMaybe r
+            port <- case uriPort authority_ of
+                        v@(':':rest_) -> maybe (portOnErr v) return $ readMaybe rest_
                         v         -> portOnErr v
             logDebugN $(isT "connecting to socket '#{uri}'")
             logFn <- askLoggerIO
             catch
-                (liftIO $ runSecureClient host port path $ \conn -> flip runLoggingT logFn $ do
+                (liftIO $ runSecureClient host port path_ $ \conn -> flip runLoggingT logFn $ do
                     logInfoN "Connection established"
                     d <- liftIO $ receiveData conn
                     case eitherDecode d >>= parseEither helloParser of
@@ -77,23 +70,31 @@ runConnectionLoop eventChan connectionTracker = forever $ do
                         _ -> error $ "First packet was not hello packet: " ++ BS.unpack d
                     putMVar connectionTracker conn
                     forever $ do
-                        d <- liftIO $ receiveData conn
-                        writeChan messageChan d)
+                        data_ <- liftIO $ receiveData conn
+                        writeChan messageChan data_)
                 $ \e -> do
                     void $ takeMVar connectionTracker
                     logErrorN $(isT "#{e :: ConnectionException}")
+          where
+            uri = url js
+            authority_ = fromMaybe (error "URI lacks authority") (uriAuthority uri)
+            host = uriUserInfo authority_ ++ uriRegName authority_
+            path_ = uriPath uri
+            portOnErr v = do
+                logErrorN $(isT "Unreadable port #{v}")
+                return 443
 
 
 senderLoop :: MVar Connection -> AdapterM (SlackAdapter a) ()
 senderLoop connectionTracker = do
-    SlackAdapter{outChannel} <- getAdapter
+    outChan <- view (adapter.outChannel)
     midTracker <- liftIO $ atomically $ newTMVar (0 :: Int)
     forever $ do
-        (SlackChannelId sid, msg) <- readChan outChannel
+        (SlackChannelId sid, msg) <- readChan outChan
         mid <- liftIO $ atomically $ do
-            id <- takeTMVar midTracker
-            putTMVar midTracker  (id + 1)
-            return id
+            newMid <- takeTMVar midTracker
+            putTMVar midTracker $ succ newMid
+            return newMid
         let encoded = encode $ object
                 [ "id" .= mid
                 , "type" .= ("message" :: T.Text)

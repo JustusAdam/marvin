@@ -9,8 +9,7 @@
     "tasks": [
         {
             "taskName": "build",
-            "args": [
-            ],
+            "args": ["--pedantic"],
             "isBuildCommand": true
         }, {
             "taskName": "test"

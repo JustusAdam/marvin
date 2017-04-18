@@ -27,7 +27,7 @@ instance NFData Regex where
 
 -- Warning: This exposes the underlying representation of a 'Regex' and under no curcumstances should be considered stable.
 unwrapRegex :: Regex -> Re.Regex
-unwrapRegex (Regex r) = r
+unwrapRegex (Regex re) = re
 
 
 instance Show Regex where

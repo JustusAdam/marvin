@@ -18,6 +18,7 @@ import           Marvin.Adapter
 import           Marvin.Types
 import           Network.URI
 import           Util
+import Data.Bool (bool)
 
 
 jsonParseURI :: Value -> Parser URI
@@ -81,6 +82,16 @@ declareFields [d|
         }
     |]
 
+-- | Adapter for interacting with Slack API\'s. Polymorphic over the method for retrieving events.
+declareFields [d|
+    data SlackAdapter a = SlackAdapter
+        { slackAdapterChannelCache  :: MVar ChannelCache
+        , slackAdapterUserInfoCache :: MVar UserCache
+        , slackAdapterOutChannel    :: Chan (SlackChannelId, L.Text)
+        }
+    |]
+
+
 data InternalType a
     = SlackEvent (SlackUserId, SlackChannelId, UserInfo -> LimitedChannelInfo -> Event (SlackAdapter a))
     | Error
@@ -95,14 +106,6 @@ data InternalType a
     | ChannelRename LimitedChannelInfo
     | UserChange UserInfo
     | OkResponseEvent T.Text
-
-
--- | Adapter for interacting with Slack API\'s. Polymorphic over the method for retrieving events.
-data SlackAdapter a = SlackAdapter
-    { channelCache  :: MVar ChannelCache
-    , userInfoCache :: MVar UserCache
-    , outChannel    :: Chan (SlackChannelId, L.Text)
-    }
 
 instance FromJSON (TimeStamp (SlackAdapter a)) where parseJSON = timestampFromNumber
 
@@ -180,11 +183,10 @@ userInfoListParser = withArray "expected array" (fmap toList . mapM userInfoPars
 
 
 apiResponseParser :: (Object -> Parser a) -> Value -> Parser (APIResponse a)
-apiResponseParser f = withObject "expected object" $ \o -> do
-    succ <- o .: "ok"
-    if succ
-        then Right <$> f o
-        else Left <$> o .: "error"
+apiResponseParser f = withObject "expected object" $ \o ->
+    o .: "ok" >>= bool
+        (Left <$> o .: "error")
+        (Right <$> f o)
 
 
 lciParser :: Value -> Parser LimitedChannelInfo

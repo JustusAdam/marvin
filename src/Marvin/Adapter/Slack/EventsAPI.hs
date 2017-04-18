@@ -36,6 +36,7 @@ import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Handler.WarpTLS
 import           Network.Wreq
+import Control.Lens
 
 
 eventAPIeventParser :: Value -> Parser (T.Text, Either L.Text (InternalType EventsAPI))
@@ -67,7 +68,7 @@ runEventReceiver evChan = do
 
     liftIO $ server warpSet $ \req resp -> flip runLoggingT logFn $
         let
-            respond status headers body = liftIO $ resp $ responseLBS status headers body
+            respond status rheaders body = liftIO $ resp $ responseLBS status rheaders body
         in  if requestMethod req == methodPost
                 then do
                     bod <- liftIO $ lazyRequestBody req
@@ -89,9 +90,9 @@ runEventReceiver evChan = do
 
 sendMessageLoop :: AdapterM (SlackAdapter EventsAPI) ()
 sendMessageLoop = do
-    SlackAdapter{outChannel} <- getAdapter
+    outChan <- view (adapter.outChannel)
     forever $ do
-        (SlackChannelId chan, msg) <- readChan outChannel
+        (SlackChannelId chan, msg) <- readChan outChan
         res <- execAPIMethod
             (const $ return ())
             "chat.postMessage"

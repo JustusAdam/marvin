@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances       #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 module Marvin.Internal.Types where
 
 
@@ -24,8 +25,7 @@ import           Data.Time.Clock
 import           Data.Vector                 (Vector)
 import           GHC.Generics
 import           Marvin.Internal.LensClasses
-import           Marvin.Interpolate.String
-import           Marvin.Interpolate.Text
+import           Marvin.Interpolate.All
 import           Marvin.Util.Regex
 
 -- | The topic in a channel
@@ -301,10 +301,10 @@ type LoggingFn = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 
 
 verifyIdString :: String -> (T.Text -> a) -> T.Text -> Either String a
-verifyIdString name _ "" = Left $(isS "#{name} must not be empty")
-verifyIdString name f s
+verifyIdString thingToVerify _ "" = Left $(isS "#{thingToVerify} must not be empty")
+verifyIdString thingToVerify f s
     | isLetter x && T.all (\c -> isAlphaNum c || c == '-' || c == '_' ) xs = Right $ f s
-    | otherwise = Left $(isS "first character of #{name} must be a letter, all other characters can be alphanumeric, '-' or '_'")
+    | otherwise = Left $(isS "first character of #{thingToVerify} must be a letter, all other characters can be alphanumeric, '-' or '_'")
   where Just (x, xs) = T.uncons s
 
 

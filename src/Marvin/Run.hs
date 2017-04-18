@@ -123,11 +123,11 @@ runHandlers handlers eventChan =
         lDispatches <- doIfMatch v
         mapM_ wait lDispatches
       where
-        doIfMatch things  =
-            vcatMaybes <$> for things (\(trigger, action) ->
+        doIfMatch =
+            fmap vcatMaybes . mapM (\(trigger, msgHandler) ->
                 case match trigger msg of
                         Nothing -> return Nothing
-                        Just m  -> Just <$> async (action (User' user, Channel' chan, m, msg, ts)))
+                        Just m  -> Just <$> async (msgHandler (User' user, Channel' chan, m, msg, ts)))
     handleCommand = handleMessageLike respondsV
     handleMessage = handleMessageLike hearsV
 
@@ -135,15 +135,15 @@ runHandlers handlers eventChan =
 
 
 initHandlers :: IsAdapter a => [ScriptInit a] -> C.Config -> a -> RunnerM (Handlers a)
-initHandlers inits config ada = do
+initHandlers inits botConfig ada = do
     logInfoNS logSource "Initializing scripts"
-    !handlers <- force . foldMap (^.actions) . catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada config) (onInitExcept sid)) inits
+    !handlers <- force . foldMap (^.actions) . catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada botConfig) (onInitExcept sid)) inits
     return handlers
   where
     logSource = $(isT "#{applicationScriptId}.init")
     onInitExcept :: ScriptId -> SomeException -> RunnerM (Maybe a')
-    onInitExcept (ScriptId id) e = do
-        err $(isT "Unhandled exception during initialization of script #{id}")
+    onInitExcept (ScriptId sid) e = do
+        err $(isT "Unhandled exception during initialization of script #{sid}")
         err $(isT "#{e}")
         return Nothing
       where err = logErrorNS logSource

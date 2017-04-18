@@ -19,6 +19,7 @@ module Marvin.Adapter
     , lookupFromAppConfig, requireFromAppConfig, getBotname
     , getAdapterConfig, getAppConfig, getAdapter
     , liftAdapterAction
+    , HasAdapter(adapter), HasConfig(config)
     ) where
 
 import           Control.Lens
@@ -29,7 +30,7 @@ import qualified Data.Configurator           as C
 import qualified Data.Configurator.Types     as C
 import           Data.Maybe                  (fromMaybe)
 import qualified Data.Text.Lazy              as L
-import           Marvin.Internal.LensClasses (config)
+import           Marvin.Internal.LensClasses
 import           Marvin.Internal.Types
 import           Marvin.Internal.Values
 import           Marvin.Interpolate.Text

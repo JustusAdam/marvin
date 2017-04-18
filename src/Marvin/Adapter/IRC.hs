@@ -128,10 +128,10 @@ isMention botname target msg
 
 
 setUp :: Chan MarvinIRCMsg -> L.Text -> [L.Text] -> IO ()
-setUp chan username channels = do
-    writeChan chan (Nick username)
-    writeChan chan (RawMsg $ "User " <> username <> " 0 * :" <> username)
-    writeList2Chan chan $ map Join channels
+setUp chan uname channels =
+    writeList2Chan chan $ 
+        [Nick uname, RawMsg $(isL "User #{uname} 0 * :#{uname}")]
+        ++ map Join channels
 
 instance IsAdapter IRCAdapter where
     -- | Stores the username

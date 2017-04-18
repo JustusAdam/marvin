@@ -45,9 +45,9 @@ import           Network.Wreq
 pushEventGetter :: Chan (TelegramUpdate Push) -> AdapterM (TelegramAdapter Push) ()
 pushEventGetter evChan = do
     void $ async $ do
-        url <- requireFromAdapterConfig "url"
+        url_ <- requireFromAdapterConfig "url"
         r <- execAPIMethod parseJSON "setWebhook"
-            [ "url" := (url :: T.Text)
+            [ "url" := (url_ :: T.Text)
             , "allowed_updates" := show telegramSupportedUpdates
             ]
         case r of

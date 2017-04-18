@@ -62,10 +62,10 @@ declareFields [d|
 instance HasName TelegramUser (Maybe L.Text) where
     name = lens
         (\u -> (mappend <$> u^.firstName <*> (mappend " " <$> u^.lastName)) <|> u^.firstName <|> u^.lastName)
-        (flip set)
+        (flip set_)
       where
-        set Nothing = (firstName .~ Nothing) . (lastName .~ Nothing)
-        set (Just n) = (firstName .~ Just first) . (lastName .~ if L.null rest then Nothing else Just rest)
+        set_ Nothing = (firstName .~ Nothing) . (lastName .~ Nothing)
+        set_ (Just n) = (firstName .~ Just first) . (lastName .~ if L.null rest then Nothing else Just rest)
           where
             (first, rest') = L.break (== ' ') n
             rest = L.tail rest'
@@ -163,9 +163,9 @@ execAPIMethodWith :: MkTelegram b
                   -> String
                   -> [FormParam]
                   -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
-execAPIMethodWith opts innerParser methodName params = do
+execAPIMethodWith opts innerParser methodName fparams = do
     token <- requireFromAdapterConfig "token"
-    res <- retry (3 :: Int) (liftIO (postWith opts $(isS "https://api.telegram.org/bot#{token :: String}/#{methodName}") params))
+    res <- retry (3 :: Int) (liftIO (postWith opts $(isS "https://api.telegram.org/bot#{token :: String}/#{methodName}") fparams))
     return $ res >>= eitherDecode . (^. responseBody) >>= parseEither (apiResponseParser innerParser)
   where
     retry n a = (Right <$> a) `catch` \e -> if n <= 0

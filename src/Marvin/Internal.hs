@@ -39,12 +39,10 @@ runBotAction scriptId config adapter trigger data_ action = do
 
 
 onScriptExcept :: ShowT t => ScriptId -> Maybe t -> SomeException -> RunnerM ()
-onScriptExcept id trigger e = do
-    case trigger of
-        Just t ->
-            err $(isT "Unhandled exception during execution of script \"#{id}\" with trigger \"#{t}\"")
-        Nothing ->
-            err $(isT "Unhandled exception during execution of script \"#{id}\"")
+onScriptExcept sid trigger e = do
+    err $ case trigger of
+        Just t -> $(isT "Unhandled exception during execution of script \"#{sid}\" with trigger \"#{t}\"")
+        Nothing -> $(isT "Unhandled exception during execution of script \"#{sid}\"")
     err $(isT "#{e}")
   where
     err = logErrorNS $(isT "#{applicationScriptId}.dispatch")

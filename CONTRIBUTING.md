@@ -20,6 +20,8 @@ When contributing a new feature please make sure you code satisfies the followin
 
 3. Style
 
+    I recommend compiling with `--pedantic`, which makes all warnings errors and excluding individual warnings which are unavoidable with `{-# OPTIONS_GHC ... #-}`.
+
     This is a minor point but try to follow the general code style of the repository, including running `stylish-haskell` on any newly submitted code.
 
 4. Tests

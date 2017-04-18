@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 module Marvin.Adapter.Slack.Common where
 
 
@@ -17,7 +18,6 @@ import qualified Data.ByteString.Lazy            as B
 import           Data.Char                       (isSpace)
 import           Data.Foldable                   (asum)
 import qualified Data.HashMap.Strict             as HM
-import           Data.Maybe                      (isJust)
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import qualified Data.Text.Lazy.Encoding         as L
@@ -32,9 +32,17 @@ import           Util
 
 messageParser :: Value -> Parser (SlackUserId, SlackChannelId, UserInfo -> LimitedChannelInfo -> Event (SlackAdapter a))
 messageParser = withObject "expected object" $ \o -> do
-    content <- o .: "text"
+    messageContent <- o .: "text"
     ts <- o .: "ts" >>= timestampFromNumber
-    (,,\u c -> MessageEvent u c content ts) <$> o .: "user" <*> o .: "channel"
+    (,,\u c -> MessageEvent u c messageContent ts) <$> o .: "user" <*> o .: "channel"
+
+
+flip2_2 :: (a -> b -> c -> d -> e) -> c -> d -> a -> b -> e
+flip2_2 f c d a b = f a b c d
+
+
+flip2_1 :: (a -> b -> c -> d) -> c -> a -> b -> d
+flip2_1 f c a b = f a b c
 
 
 eventParser :: MkSlack a => Value -> Parser (InternalType a)
@@ -77,20 +85,19 @@ eventParser v@(Object o) = isErrParser <|> isOkParser <|> hasTypeParser
                     "channel_leave" -> cLeave
                     "group_leave" -> cLeave
                     "channel_topic" ->
-                        wrapEv $ (\topic ts u c -> TopicChangeEvent u c topic ts) <$> o .: "topic" <*> ts
+                        wrapEv $ flip2_2 TopicChangeEvent <$> o .: "topic" <*> ts
                     "file_share" ->
-                        wrapEv $ (\topic ts u c -> FileSharedEvent u c topic ts) <$> o .: "file" <*> ts
+                        wrapEv $ flip2_2 FileSharedEvent <$> o .: "file" <*> ts
                     _ -> msgEv
 
             _ -> msgEv
       where
-        user = o .: "user"
         channel = o .: "channel"
         ts = o .: "ts" >>= timestampFromNumber
         msgEv = messageParser v
-        wrapEv f = (,,) <$> user <*> channel <*> f
-        cJoin = wrapEv $ (\t u c -> ChannelJoinEvent u c t) <$> ts
-        cLeave = wrapEv $ (\t u c -> ChannelLeaveEvent u c t) <$> ts
+        wrapEv f = (,,) <$> o .: "user" <*> channel <*> f
+        cJoin = wrapEv $ flip2_1 ChannelJoinEvent <$> ts
+        cLeave = wrapEv $ flip2_1 ChannelLeaveEvent <$> ts
 eventParser _ = fail "expected object"
 
 
@@ -145,18 +152,18 @@ runnerImpl handler = do
 
 
 execAPIMethod :: MkSlack a => (Object -> Parser v) -> String -> [FormParam] -> AdapterM (SlackAdapter a) (Either L.Text v)
-execAPIMethod innerParser method params = do
+execAPIMethod innerParser method fparams = do
     token <- requireFromAdapterConfig "token"
-    response <- liftIO $ post $(isS "https://slack.com/api/#{method}") (("token" := (token :: T.Text)):params)
+    response <- liftIO $ post $(isS "https://slack.com/api/#{method}") (("token" := (token :: T.Text)):fparams)
     if response^.responseStatus == ok200
         then return $ mapLeft L.pack $ eitherDecode (response^.responseBody) >>= join . parseEither (apiResponseParser innerParser)
         else return $ Left $(isL "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
 
 
 execAPIMethodPart :: MkSlack a => (Object -> Parser v) -> String -> [Part] -> AdapterM (SlackAdapter a) (Either L.Text v)
-execAPIMethodPart innerParser method params = do
+execAPIMethodPart innerParser method formParts = do
     token <- requireFromAdapterConfig "token"
-    response <- liftIO $ post $(isS "https://slack.com/api/#{method}") (partText "token" token:params)
+    response <- liftIO $ post $(isS "https://slack.com/api/#{method}") (partText "token" token:formParts)
     if response^.responseStatus == ok200
         then return $ mapLeft L.pack $ eitherDecode (response^.responseBody) >>= join . parseEither (apiResponseParser innerParser)
         else return $ Left $(isL "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
@@ -164,33 +171,33 @@ execAPIMethodPart innerParser method params = do
 
 messageChannelImpl :: SlackChannelId -> L.Text -> AdapterM (SlackAdapter a) ()
 messageChannelImpl cid msg = do
-    SlackAdapter{outChannel} <- getAdapter
-    writeChan outChannel (cid, msg)
+    chan <- view $ adapter.outChannel
+    writeChan chan (cid, msg)
 
 
 getUserInfo :: MkSlack a => SlackUserId -> AdapterM (SlackAdapter a) UserInfo
-getUserInfo user = do
-    adapter <- getAdapter
-    uc <- readMVar $ userInfoCache adapter
-    maybe (refreshSingleUserInfo user) return $ uc ^? infoCache. ix user
+getUserInfo userid = do
+    cache <- view $ adapter.userInfoCache
+    uc <- readMVar cache
+    maybe (refreshSingleUserInfo userid) return $ uc ^? infoCache. ix userid
 
 
 getChannelInfo :: MkSlack a => SlackChannelId -> AdapterM (SlackAdapter a) LimitedChannelInfo
 getChannelInfo cid = do
-    adapter <- getAdapter
-    cc <- readMVar $ channelCache adapter
+    cacheVar <- view $ adapter.channelCache
+    cc <- readMVar cacheVar
     case cc ^? infoCache. ix cid of
         Nothing   -> refreshSingleChannelInfo cid
         Just info -> return info
 
 
 refreshSingleUserInfo :: MkSlack a => SlackUserId -> AdapterM (SlackAdapter a) UserInfo
-refreshSingleUserInfo user@(SlackUserId user_) = do
-    adapter <- getAdapter
+refreshSingleUserInfo userid@(SlackUserId user_) = do
+    uc <- view $ adapter.userInfoCache
     execAPIMethod (\o -> o .: "user" >>= userInfoParser) "users.info" ["user" := user_] >>= \case
         Left err -> error $(isS "Parse error when getting data for user #{user_}: #{err}")
         Right v -> do
-            modifyMVar_ (userInfoCache adapter) (return . (infoCache . at user .~ Just v))
+            modifyMVar_ uc (return . (infoCache . at userid .~ Just v))
             return v
 
 
@@ -210,21 +217,19 @@ refreshSingleChannelInfo chan@(SlackChannelId sid) =
     execAPIMethod (\o -> o .: "channel" >>= lciParser) "channels.info" ["channel" := sid] >>= \case
         Left err -> error $(isS "Error when getting channel data: #{err}")
         Right v -> do
-            adapter <- getAdapter
-            modifyMVar_ (channelCache adapter) (return . (infoCache . at chan .~ Just v))
+            cache <- view $ adapter . channelCache
+            modifyMVar_ cache (return . (infoCache . at chan .~ Just v))
             return v
 
 
 resolveChannelImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe LimitedChannelInfo)
-resolveChannelImpl name = do
-    adapter <- getAdapter
-    modifyMVar (channelCache adapter) $ \cc ->
-        case cc ^? nameResolver . ix name of
-            Nothing -> do
-                refreshed <- refreshChannels
-                case refreshed of
-                    Left err  -> logErrorN $(isT "#{err}") >> return (cc, Nothing)
-                    Right ncc -> return (ncc, ncc ^? nameResolver . ix name)
+resolveChannelImpl chanName = view (adapter.channelCache) >>= flip modifyMVar modifier
+  where 
+    modifier cc =
+        case cc ^? nameResolver . ix chanName of
+            Nothing -> refreshChannels >>= \case
+                Left err  -> logErrorN $(isT "#{err}") >> return (cc, Nothing)
+                Right ncc -> return (ncc, ncc ^? nameResolver . ix chanName)
             Just found -> return (cc, Just found)
 
 
@@ -240,61 +245,59 @@ refreshUserInfo =
 
 
 resolveUserImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe UserInfo)
-resolveUserImpl name = do
-    adapter <- getAdapter
-    modifyMVar (userInfoCache adapter) $ \cc ->
-        case cc ^? nameResolver . ix name of
-            Nothing -> do
-                refreshed <- refreshUserInfo
-                case refreshed of
-                    Left err  -> logErrorN $(isT "#{err}") >> return (cc, Nothing)
-                    Right ncc -> return (ncc, ncc ^? nameResolver . ix name)
-            Just found -> return (cc, Just found)
+resolveUserImpl uname = view (adapter.userInfoCache) >>= flip modifyMVar modifier
+  where
+    modifier uc =
+        case uc ^? nameResolver . ix uname of
+            Nothing -> refreshUserInfo >>= \case
+                Left err  -> logErrorN $(isT "#{err}") >> return (uc, Nothing)
+                Right newUc -> return (newUc, newUc ^? nameResolver . ix uname)
+            Just found -> return (uc, Just found)
 
 
 getChannelNameImpl :: MkSlack a => SlackChannelId -> AdapterM (SlackAdapter a) L.Text
-getChannelNameImpl channel = do
-    adapter <- getAdapter
-    cc <- readMVar $ channelCache adapter
-    case cc ^? infoCache . ix channel of
-        Nothing    -> (^.name) <$> refreshSingleChannelInfo channel
-        Just found -> return $ found ^. name
+getChannelNameImpl channel = view (adapter.channelCache) >>= readMVar >>= modifier
+  where
+    modifier cc =
+        case cc ^? infoCache . ix channel of
+            Nothing    -> (^.name) <$> refreshSingleChannelInfo channel
+            Just found -> return $ found ^. name
 
 
 
 putChannel :: LimitedChannelInfo -> AdapterM (SlackAdapter a) ()
-putChannel  channelInfo@(LimitedChannelInfo id name _) = do
-    SlackAdapter{channelCache} <- getAdapter
-    modifyMVar_ channelCache $ \cache ->
-        return $ cache
-            & infoCache . at id .~ Just channelInfo
-            & nameResolver . at name .~ Just channelInfo
+putChannel  channelInfo@(LimitedChannelInfo chanId chanName _) = 
+    view (adapter.channelCache) >>= flip modifyMVar_ (pure . modifier)
+  where
+    modifier =
+        (infoCache . at chanId .~ Just channelInfo)
+        . (nameResolver . at chanName .~ Just channelInfo)
 
 
 deleteChannel :: SlackChannelId -> AdapterM (SlackAdapter a) ()
-deleteChannel channel = do
-    SlackAdapter{channelCache} <- getAdapter
-    modifyMVar_ channelCache $ \cache ->
-        return $ case cache ^? infoCache . ix channel of
+deleteChannel channel = view (adapter.channelCache) >>= flip modifyMVar_ (pure . modifier)
+  where
+    modifier cache =
+        case cache ^? infoCache . ix channel of
             Nothing -> cache
-            Just (LimitedChannelInfo _ name _) ->
+            Just (LimitedChannelInfo _ chanName _) ->
                 cache
                     & infoCache . at channel .~ Nothing
-                    & nameResolver . at name .~ Nothing
+                    & nameResolver . at chanName .~ Nothing
 
 
 renameChannel :: LimitedChannelInfo -> AdapterM (SlackAdapter a) ()
-renameChannel channelInfo@(LimitedChannelInfo id name _) = do
-    SlackAdapter{channelCache} <- getAdapter
-    modifyMVar_ channelCache $ \cache ->
-        return $
-            let inserted = cache
-                                & infoCache . at id .~ Just channelInfo
-                                & nameResolver . at name .~ Just channelInfo
-            in case cache ^? infoCache . ix id of
-                Just (LimitedChannelInfo _ oldName _) | oldName /= name ->
-                    inserted & nameResolver . at oldName .~ Nothing
-                _ -> inserted
+renameChannel channelInfo@(LimitedChannelInfo cid chanName _) = 
+    view (adapter.channelCache) >>= flip modifyMVar_ (pure . modifier)
+  where
+    modifier cache = case cache ^? infoCache . ix cid of
+        Just (LimitedChannelInfo _ oldName _) | oldName /= chanName ->
+            inserted & nameResolver . at oldName .~ Nothing
+        _ -> inserted
+      where
+        inserted = cache
+                    & infoCache . at cid .~ Just channelInfo
+                    & nameResolver . at chanName .~ Just channelInfo
 
 
 -- | Class to enable polymorphism for 'SlackAdapter' over the method used for retrieving updates. ('RTM' or 'EventsAPI')
@@ -317,7 +320,8 @@ instance MkSlack a => IsAdapter (SlackAdapter a) where
     resolveUser = resolveUserImpl
 
 
-partLText name val = partText name $ L.toStrict val
+partLText :: T.Text -> L.Text -> Part
+partLText pName = partText pName . L.toStrict
 
 
 instance MkSlack a => HasFiles (SlackAdapter a) where
@@ -343,10 +347,10 @@ instance MkSlack a => HasFiles (SlackAdapter a) where
             ++ maybe [] (pure . partLText "title") (file^.title)
             ++ case channels of
                     [] -> []
-                    a -> [partText "channels" $ T.intercalate "," $ map (unwrapSlackChannelId . (^.idValue)) channels]
+                    a -> [partText "channels" $ T.intercalate "," $ map (unwrapSlackChannelId . (^.idValue)) a]
       where
         contentpart = case file^.content of
                 FileOnDisk p       -> partFile "file" $ L.unpack p
                 FileInMemory bytes -> partLBS "file" bytes
-    newLocalFile name = return . SlackLocalFile name Nothing Nothing Nothing
+    newLocalFile fname = return . SlackLocalFile fname Nothing Nothing Nothing
 

@@ -12,7 +12,6 @@ See http://marvin.readthedocs.io/en/latest/adapters.html#shell for documentation
 module Marvin.Adapter.Shell (ShellAdapter) where
 
 
-import           Control.Arrow                   (second)
 import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
 import           Control.Lens
@@ -79,16 +78,16 @@ declareFields [d|
 
 
 rFileFromLFile :: LFile -> AdapterM ShellAdapter RFile
-rFileFromLFile (LFile name type_ date content) = do
-    (size, url) <- case content of
+rFileFromLFile (LFile fname type_ date fcontent) = do
+    (fsize, furl) <- case fcontent of
                FileOnDisk path -> (,path) <$> sizeOfFile path
                FileInMemory bytes -> -- do
                 --    fileCache <- view $ adapter . files
-                --    atomicModifyIORef' fileCache $ at url .~ Just bytes
-                   pure (fromIntegral $ B.length bytes, url)
-                 where url = $(isL "memory://#{name}")
+                --    atomicModifyIORef' fileCache $ at memurl .~ Just bytes
+                   pure (fromIntegral $ B.length bytes, memurl)
+                 where memurl = $(isL "memory://#{fname}")
 
-    return $ RFile (Just name) type_ size date content (Just url)
+    return $ RFile (Just fname) type_ fsize date fcontent (Just furl)
 
 
 sizeOfFile :: MonadIO m => L.Text -> m Integer
@@ -98,11 +97,11 @@ sizeOfFile path = liftIO $ withFile (L.unpack path) ReadMode hFileSize
 instance HasFiles ShellAdapter where
     type RemoteFile ShellAdapter = RFile
     type LocalFile ShellAdapter = LFile
-    newLocalFile name content = do
-        t <- liftIO $ TimeStamp <$> case content of
+    newLocalFile fname fcontent = do
+        t <- liftIO $ TimeStamp <$> case fcontent of
                 FileOnDisk path -> getModificationTime (L.unpack path)
                 FileInMemory _  -> getCurrentTime
-        return $ LFile name Nothing t content
+        return $ LFile fname Nothing t fcontent
     readTextFile f =
         case f^.content of
             FileOnDisk path    -> Just <$> liftIO (L.readFile (L.unpack path))
