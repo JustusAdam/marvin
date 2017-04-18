@@ -49,4 +49,4 @@ script = defineScript "test" $ do
 
     fileSharedIn "testing" $ downloadFile True "downloaded"
 
-    respond "^upload (.+)$" $ uploadFile True
+    respond "^upload (.+)$" $ uploadFile True 1

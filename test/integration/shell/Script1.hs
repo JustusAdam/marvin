@@ -52,5 +52,5 @@ script = defineScript "test" $ do
             content <- readTextFile f
             maybe (return ()) send content
 
-    respond "^upload (.+)$" $ uploadFile True
+    respond "^upload (.+)$" $ uploadFile True 1
 
