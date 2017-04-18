@@ -33,6 +33,8 @@ module Marvin
     -- ** Handler Types
     , BotReacting
     , Message, User, Channel, Topic, FileContent(..)
+    -- * Utility functions
+    , textToPath, pathToText
     -- * The Script
     , Script, defineScript, ScriptInit
     , ScriptId
@@ -261,27 +263,27 @@ saveFileTo file path =
 
 
 -- | Share the file with the provided path to the channel we are currently responding to.
-sendFile :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => L.Text -> BotReacting a m (Either L.Text (RemoteFile a))
+sendFile :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => FilePath -> BotReacting a m (Either L.Text (RemoteFile a))
 sendFile path = do
     chan <- getChannel
     sendFileTo' path chan
 
 
--- | Share the file with the provided path (argument 1) to the channel with the specified name (argument 2).
-sendFileTo :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => L.Text -> L.Text -> BotReacting a m (Either L.Text (RemoteFile a))
+-- | Share the file with the provided path to the channel with the specified name.
+sendFileTo :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => FilePath -> L.Text -> BotReacting a m (Either L.Text (RemoteFile a))
 sendFileTo path chanName = do
     chan <- resolveChannel chanName
     maybe (return $ Left "Channel does not exist") (sendFileTo' path) chan
 
 
 -- | Share the file with the provided path to the channel.
-sendFileTo' :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => L.Text -> Channel a -> BotReacting a m (Either L.Text (RemoteFile a))
-sendFileTo' path' chan = runExceptT $ do
+sendFileTo' :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => FilePath -> Channel a -> BotReacting a m (Either L.Text (RemoteFile a))
+sendFileTo' path chan = runExceptT $ do
     e <- liftIO $ doesFileExist path
     when e $ fail "File does not exist"
-    file <- lift $ newLocalFile path' (FileOnDisk path')
+    file <- lift $ newLocalFile path' (FileOnDisk path)
     ExceptT $ shareFile file [chan]
-  where path = L.unpack path'
+  where path' = L.pack path
 
 
 -- | Return the contents of the file as bytes. If the file is not public returns 'Nothing'.
@@ -457,3 +459,10 @@ extractAction ac = do
         fmap (flip runLoggingT logger . runReaderT (runReaction ac)) $
             BotActionState <$> use scriptId <*> use config <*> use adapter <*> pure ()
 
+
+textToPath :: L.Text -> FilePath
+textToPath = L.unpack
+
+
+pathToText :: FilePath -> L.Text
+pathToText = L.pack

@@ -22,10 +22,10 @@ import           System.FilePath
 echoVersion :: (IsAdapter a, Get d (Channel' a)) => BotReacting a d ()
 echoVersion = do
     botname <- getBotName
-    send $(isL "I am #{botname} a bot built with the marvin library version #{V.showVersion P.version}")
+    send $(isL "I am #{botname}, a bot built with the marvin library version #{V.showVersion P.version}.")
 
 
--- | Download any shared file which was not shared by the bot itself @(uploader.username == botname)@
+-- | Download any shared file which was not shared by the bot itself (@uploader^.username /= botname@)
 --
 -- The boolean decides whether to send a message of success or failure to the originating channel.
 downloadFile :: (IsAdapter a, HasFiles a, Get s (RemoteFile' a), Get s (User' a), Get s (Channel' a)) => Bool -> FilePath -> BotReacting a s ()
@@ -60,7 +60,7 @@ uploadFile report index = do
                 if e
                     then do
                         chan <- getChannel
-                        f <- newLocalFile path' (FileOnDisk path')
+                        f <- newLocalFile path' (FileOnDisk path)
                         res <- shareFile f [chan]
                         case res of
                             Left err -> reporter $(isL "Failed to share file: #{err}")

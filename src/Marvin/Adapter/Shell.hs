@@ -80,7 +80,7 @@ declareFields [d|
 rFileFromLFile :: LFile -> AdapterM ShellAdapter RFile
 rFileFromLFile (LFile fname type_ date fcontent) = do
     (fsize, furl) <- case fcontent of
-               FileOnDisk path -> (,path) <$> sizeOfFile path
+               FileOnDisk path -> (,L.pack path) <$> sizeOfFile path
                FileInMemory bytes -> -- do
                 --    fileCache <- view $ adapter . files
                 --    atomicModifyIORef' fileCache $ at memurl .~ Just bytes
@@ -90,8 +90,8 @@ rFileFromLFile (LFile fname type_ date fcontent) = do
     return $ RFile (Just fname) type_ fsize date fcontent (Just furl)
 
 
-sizeOfFile :: MonadIO m => L.Text -> m Integer
-sizeOfFile path = liftIO $ withFile (L.unpack path) ReadMode hFileSize
+sizeOfFile :: MonadIO m => FilePath -> m Integer
+sizeOfFile path = liftIO $ withFile path ReadMode hFileSize
 
 
 instance HasFiles ShellAdapter where
@@ -99,27 +99,27 @@ instance HasFiles ShellAdapter where
     type LocalFile ShellAdapter = LFile
     newLocalFile fname fcontent = do
         t <- liftIO $ TimeStamp <$> case fcontent of
-                FileOnDisk path -> getModificationTime (L.unpack path)
+                FileOnDisk path -> getModificationTime path
                 FileInMemory _  -> getCurrentTime
         return $ LFile fname Nothing t fcontent
     readTextFile f =
         case f^.content of
-            FileOnDisk path    -> Just <$> liftIO (L.readFile (L.unpack path))
+            FileOnDisk path    -> Just <$> liftIO (L.readFile path)
             FileInMemory bytes -> pure $ Just $ L.decodeUtf8 bytes
     readFileBytes f =
         case f^.content of
-            FileOnDisk path    -> Just <$> liftIO (B.readFile (L.unpack path))
+            FileOnDisk path    -> Just <$> liftIO (B.readFile path)
             FileInMemory bytes -> pure $ Just bytes
     shareFile file chans =
         mapM_ (`messageChannel` $(isL "The bot has shared a file #{file^.name} in this channel")) chans >> Right <$> rFileFromLFile file
 
 
-pathToFile :: L.Text -> IO RFile
+pathToFile :: FilePath -> IO RFile
 pathToFile path = do
     fileSize <- sizeOfFile path
-    ctime <- liftIO $ getModificationTime (L.unpack path)
-    pure $ RFile (Just path) ftype fileSize (TimeStamp ctime) (FileOnDisk path) Nothing
-  where ftype = case takeExtension (L.unpack path) of "" -> Nothing; (_:a) -> Just $ L.pack a;
+    ctime <- liftIO $ getModificationTime path
+    pure $ RFile (Just $ L.pack path) ftype fileSize (TimeStamp ctime) (FileOnDisk path) Nothing
+  where ftype = case takeExtension path of "" -> Nothing; (_:a) -> Just $ L.pack a;
 
 
 defaultUser :: SimpleWrappedUsername
@@ -175,13 +175,13 @@ instance IsAdapter ShellAdapter where
                                 [":leave", user, chan] -> writeChan inChan $ ChannelLeaveEvent (SimpleWrappedUsername user) (SimpleWrappedChannelName chan) ts
                                 (":topic":_) -> writeChan inChan $ TopicChangeEvent defaultUser defaultChannel (L.stripStart $ fromJust $ L.stripPrefix ":topic" mtext) ts
                                 [":file", chan, path] -> do
-                                    f <- pathToFile path
+                                    f <- pathToFile $ L.unpack path
                                     writeChan inChan $ FileSharedEvent defaultUser (SimpleWrappedChannelName chan) f ts
                                 [":file", path] -> do
-                                    f <- pathToFile path
+                                    f <- pathToFile $ L.unpack path
                                     writeChan inChan $ FileSharedEvent defaultUser defaultChannel f ts
                                 [":file", user, chan, path] -> do
-                                    f <- pathToFile path
+                                    f <- pathToFile $ L.unpack path
                                     writeChan inChan $ FileSharedEvent (SimpleWrappedUsername user) (SimpleWrappedChannelName chan) f ts
                                 (x:_) | ":" `L.isPrefixOf` x ->
                                     writeChan out $(isL "Unknown command #{x} or unexpected arguments")

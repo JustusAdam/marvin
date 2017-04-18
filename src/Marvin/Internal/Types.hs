@@ -97,7 +97,7 @@ newtype AdapterM a r = AdapterM { runAdapterAction :: ReaderT (AdapterMEnv a) Ru
     deriving (MonadIO, Monad, Applicative, Functor, MonadLogger, MonadLoggerIO, MonadBase IO, MonadReader (AdapterMEnv a))
 
 
-data FileContent = FileOnDisk L.Text | FileInMemory ByteString
+data FileContent = FileOnDisk FilePath | FileInMemory ByteString
 
 
 class ( HasName (RemoteFile a) (Maybe L.Text)
