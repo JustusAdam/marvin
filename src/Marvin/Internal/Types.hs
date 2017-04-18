@@ -251,44 +251,6 @@ instance Get (a, b, c, d, e) b where getLens = _2
 instance Get (a, b, c, d, e) c where getLens = _3
 instance Get (a, b, c, d, e) d where getLens = _4
 
--- instance Get (User' a, b, c) (User' a) where
---     getLens = _1
-
--- instance Get (User' a, b, c, d) (User' a) where
---     getLens = _1
-
--- instance Get (User' a, b, c, d, e) (User' a) where
---     getLens = _1
-
--- instance Get (a, Channel' b, c) (Channel' b) where
---     getLens = _2
-
--- instance Get (a, Channel' b, c, d) (Channel' b) where
---     getLens = _2
-
--- instance Get (a, Channel' b, c, d, e) (Channel' b) where
---     getLens = _2
-
--- instance Get (a, b, TimeStamp c) (TimeStamp c) where
---     getLens = _3
-
--- instance Get (a, b, c, TimeStamp d) (TimeStamp d) where
---     getLens = _4
-
--- instance Get (a, b, c, d, TimeStamp e) (TimeStamp e) where
---     getLens = _5
-
--- instance Get (a, b, Match, d, e) Match where
---     getLens = _3
-
--- instance Get (a, b, c, Message, e) Message where
---     getLens = _4
-
--- instance Get (a, b, Topic, d) Topic where
---     getLens = _3
-
--- instance Get (a, b, RemoteFile' c, d) (RemoteFile' c) where
---     getLens = _3
 
 instance HasConfigAccess (ScriptDefinition a) where
     getConfigInternal = ScriptDefinition $ use config
