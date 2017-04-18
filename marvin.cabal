@@ -32,6 +32,7 @@ library
                      , Marvin.Prelude
                      , Marvin.Types
                      , Marvin.Run
+                     , Marvin.Handler
                     --  , Marvin.Util.Mutable
                      , Marvin.Util.Regex
                      , Marvin.Util.Random
@@ -52,6 +53,7 @@ library
                      , Marvin.Adapter.Slack.Types
                      , Marvin.Adapter.Slack.Common
                      , Marvin.Adapter.Telegram.Common
+                     , Paths_marvin
   build-depends:       base >= 4.7 && < 5
                      , wreq >= 0.4 && < 0.6
                      , aeson >= 0.11 && < 1.3
