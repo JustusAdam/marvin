@@ -206,7 +206,7 @@ declareFields [d|
 
 -- | A monad for gradually defining a 'Script' using 'Marvin.respond' and 'Marvin.hear' as well as any 'IO' action.
 newtype ScriptDefinition a r = ScriptDefinition { runScript :: StateT (Script a) RunnerM r }
-    deriving (Monad, MonadIO, Applicative, Functor, MonadLogger, MonadBase IO)
+    deriving (Monad, MonadIO, Applicative, Functor, MonadLogger, MonadLoggerIO, MonadBase IO)
 
 
 -- | Initializer for a script. This gets run by the server during startup and creates a 'Script'

@@ -216,7 +216,7 @@ readTextFile = A.liftAdapterAction . A.readTextFile
 
 -- | Attempt to download the remote file into the current directory.
 --
--- Uses either the name of the downloaded file as filename or @"unnamed-<current time>"@
+-- Uses either the name of the downloaded file as filename or @"unnamed-\<current time\>"@
 --
 -- When successful returns the path of the saved file otherwise an error message.
 saveFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a, MonadLogger m)
@@ -226,7 +226,7 @@ saveFile = (`saveFileToDir` ".")
 
 -- | Attempt to download the remote file into the specified directory.
 --
--- Uses either the name of the downloaded file as filename or @"unnamed-<current time>"@
+-- Uses either the name of the downloaded file as filename or @"unnamed-\<current time\>"@
 --
 -- When successful returns the path of the saved file otherwise an error message.
 saveFileToDir :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a, MonadLogger m)
@@ -243,7 +243,7 @@ saveFileToDir file dir = do
 
 -- | Attempt to download the remote file to the designated path.
 --
--- Uses either the name of the downloaded file as filename or @"unnamed-<current time>"@
+-- Uses either the name of the downloaded file as filename or @"unnamed-\<current time\>"@
 -- Creates intermediate directories if they are missing.
 --
 -- When successful returns the path of the saved file otherwise an error message.
@@ -260,14 +260,14 @@ saveFileTo file path =
             return $ return path
 
 
--- | Share the file with the provided path to the channel retrieved from the state.
+-- | Share the file with the provided path to the channel we are currently responding to.
 sendFile :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => L.Text -> BotReacting a m (Either L.Text (RemoteFile a))
 sendFile path = do
     chan <- getChannel
     sendFileTo' path chan
 
 
--- | Share the file with the provided path (argument 1) to the channel (argument 2).
+-- | Share the file with the provided path (argument 1) to the channel with the specified name (argument 2).
 sendFileTo :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => L.Text -> L.Text -> BotReacting a m (Either L.Text (RemoteFile a))
 sendFileTo path chanName = do
     chan <- resolveChannel chanName
@@ -441,15 +441,19 @@ getBotName = fromMaybe defaultBotName <$> getAppConfigVal "name"
 -- Useful for creating actions which can be scheduled to execute a certain time or asynchronous.
 -- The idea is that one can conveniently send messages from inside a schedulable action.
 extractReaction :: BotReacting a s o -> BotReacting a s (IO o)
-extractReaction reac = BotReacting $
-    runStderrLoggingT . runReaderT (runReaction reac) <$> ask
+extractReaction reac = do 
+    logger <- askLoggerIO
+    BotReacting $
+        flip runLoggingT logger . runReaderT (runReaction reac) <$> ask
 
 
 -- | Take an action and produce an IO action with the same effect.
 -- Useful for creating actions which can be scheduled to execute a certain time or asynchronous.
 -- The idea is that one can conveniently send messages from inside a schedulable action.
 extractAction :: BotReacting a () o -> ScriptDefinition a (IO o)
-extractAction ac = ScriptDefinition $
-    fmap (runStderrLoggingT . runReaderT (runReaction ac)) $
-        BotActionState <$> use scriptId <*> use config <*> use adapter <*> pure ()
+extractAction ac = do 
+    logger <- askLoggerIO
+    ScriptDefinition $
+        fmap (flip runLoggingT logger . runReaderT (runReaction ac)) $
+            BotActionState <$> use scriptId <*> use config <*> use adapter <*> pure ()
 
