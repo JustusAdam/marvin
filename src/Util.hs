@@ -4,6 +4,7 @@ module Util where
 import           Control.Lens
 import           Control.Monad
 import           Data.Aeson.Types
+import           Data.String                 (IsString(fromString))
 import qualified Data.Text                   as T
 import qualified Data.Text.Lazy              as L
 import           Data.Time.Clock.POSIX
@@ -11,7 +12,6 @@ import           Marvin.Internal.LensClasses
 import           Marvin.Internal.Types
 import           Marvin.Interpolate.Text
 import           Text.Read                   (readMaybe)
-import Data.String (IsString(fromString))
 
 
 notImplemented :: a

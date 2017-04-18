@@ -6,6 +6,7 @@ module Script1 (
 
 import qualified Data.Text.Lazy           as L
 import qualified Data.Version             as V
+import           Marvin.Handler
 import           Marvin.Prelude
 import qualified Paths_marvin_integration as P
 
@@ -37,7 +38,7 @@ script = defineScript "test" $ do
         username <- getUsername user
         send $(isL "#{username} just entered random")
 
-    respond "^version\\??$" $ send $(isL "marvins integration test, version #{V.showVersion P.version}")
+    respond "^version\\??$" echoVersion
 
     hear "^bot name\\??$" $ do
         n <- getBotName

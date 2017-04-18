@@ -1,5 +1,5 @@
+{-# LANGUAGE MultiWayIf      #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE MultiWayIf #-}
 module Script1 (
     script
     ) where
@@ -7,11 +7,12 @@ module Script1 (
 
 import qualified Data.Text.Lazy           as L
 import qualified Data.Version             as V
+import           Marvin.Adapter.Slack.RTM
+import           Marvin.Handler
 import           Marvin.Prelude
 import qualified Paths_marvin_integration as P
-import System.Directory
-import System.FilePath
-import Marvin.Adapter.Slack.RTM
+import           System.Directory
+import           System.FilePath
 
 -- Add a test that the HasFiles functionality is available as is to be expected
 
@@ -40,44 +41,12 @@ script = defineScript "test" $ do
         u <- getUser
         send $(isL "#{u^.username} just entered random")
 
-    respond "^version\\??$" $ send $(isL "marvins integration test, version #{V.showVersion P.version}")
+    respond "^version\\??$" echoVersion
 
     hear "^bot name\\??$" $ do
         n <- getBotName
         send $(isL "My name is #{n}, nice to meet you.")
 
-    fileSharedIn "testing" $ do
-        f <- getRemoteFile
-        logInfoN $(isT "A file was shared in testing with type #{f^.fileType}")
-        botname <- getBotName
-        uploader <- getUser
-        unless (botname == uploader^.username) $ do
-            res <- saveFileToDir f "downloaded"
-            send $ case res of 
-                        Left err -> $(isL "Failed to save file: #{err}")
-                        Right path -> $(isL "File saved to path: #{path}")
+    fileSharedIn "testing" $ downloadFile True "downloaded"
 
-    respond "^upload (.+)$" $ do
-        [_, rawPath] <- getMatch
-
-        let path' = L.strip rawPath
-            path = L.unpack path'
-
-        if  | isAbsolute path -> send "Please provide a relative path"
-            | ".." `elem` splitDirectories path -> send "'..' is not allowed in the upload path"
-            | otherwise -> do
-                e <- liftIO $ doesFileExist path
-
-                if e 
-                    then do
-                        chan <- getChannel
-
-                        f <- newLocalFile path' (FileOnDisk path')
-
-                        res <- shareFile f [chan]
-
-                        case res of 
-                            Left err -> send $(isL "Failed to share file: #{err}")
-                            Right _ -> send "File successfully uploaded"
-                    else send $(isL "Sorry, but there is no file with the path #{path} here.")
-        
+    respond "^upload (.+)$" $ uploadFile True

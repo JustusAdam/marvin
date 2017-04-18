@@ -180,7 +180,7 @@ getChannelInfo cid = do
     adapter <- getAdapter
     cc <- readMVar $ channelCache adapter
     case cc ^? infoCache. ix cid of
-        Nothing -> refreshSingleChannelInfo cid
+        Nothing   -> refreshSingleChannelInfo cid
         Just info -> return info
 
 

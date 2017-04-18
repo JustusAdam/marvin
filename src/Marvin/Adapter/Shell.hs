@@ -12,6 +12,7 @@ See http://marvin.readthedocs.io/en/latest/adapters.html#shell for documentation
 module Marvin.Adapter.Shell (ShellAdapter) where
 
 
+import           Control.Arrow                   (second)
 import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
 import           Control.Lens
@@ -32,7 +33,6 @@ import           System.Console.Haskeline
 import           System.Directory
 import           System.FilePath
 import           System.IO
-import Control.Arrow (second)
 import           Util
 
 
@@ -120,7 +120,7 @@ pathToFile path = do
     fileSize <- sizeOfFile path
     ctime <- liftIO $ getModificationTime (L.unpack path)
     pure $ RFile (Just path) ftype fileSize (TimeStamp ctime) (FileOnDisk path) Nothing
-  where ftype = case takeExtension (L.unpack path) of "" -> Nothing; (_:a) -> Just $ L.pack a; 
+  where ftype = case takeExtension (L.unpack path) of "" -> Nothing; (_:a) -> Just $ L.pack a;
 
 
 defaultUser :: SimpleWrappedUsername
