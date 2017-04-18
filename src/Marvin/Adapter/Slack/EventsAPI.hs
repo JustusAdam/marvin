@@ -18,6 +18,7 @@ module Marvin.Adapter.Slack.EventsAPI
 
 import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
+import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -36,7 +37,6 @@ import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Network.Wai.Handler.WarpTLS
 import           Network.Wreq
-import Control.Lens
 
 
 eventAPIeventParser :: Value -> Parser (T.Text, Either L.Text (InternalType EventsAPI))

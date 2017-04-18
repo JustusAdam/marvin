@@ -224,7 +224,7 @@ refreshSingleChannelInfo chan@(SlackChannelId sid) =
 
 resolveChannelImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe LimitedChannelInfo)
 resolveChannelImpl chanName = view (adapter.channelCache) >>= flip modifyMVar modifier
-  where 
+  where
     modifier cc =
         case cc ^? nameResolver . ix chanName of
             Nothing -> refreshChannels >>= \case
@@ -266,7 +266,7 @@ getChannelNameImpl channel = view (adapter.channelCache) >>= readMVar >>= modifi
 
 
 putChannel :: LimitedChannelInfo -> AdapterM (SlackAdapter a) ()
-putChannel  channelInfo@(LimitedChannelInfo chanId chanName _) = 
+putChannel  channelInfo@(LimitedChannelInfo chanId chanName _) =
     view (adapter.channelCache) >>= flip modifyMVar_ (pure . modifier)
   where
     modifier =
@@ -287,7 +287,7 @@ deleteChannel channel = view (adapter.channelCache) >>= flip modifyMVar_ (pure .
 
 
 renameChannel :: LimitedChannelInfo -> AdapterM (SlackAdapter a) ()
-renameChannel channelInfo@(LimitedChannelInfo cid chanName _) = 
+renameChannel channelInfo@(LimitedChannelInfo cid chanName _) =
     view (adapter.channelCache) >>= flip modifyMVar_ (pure . modifier)
   where
     modifier cache = case cache ^? infoCache . ix cid of

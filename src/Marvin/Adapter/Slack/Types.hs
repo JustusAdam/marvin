@@ -7,6 +7,7 @@ import           Control.Lens                   hiding ((.=))
 import           Data.Aeson                     hiding (Error)
 import           Data.Aeson.TH
 import           Data.Aeson.Types               hiding (Error)
+import           Data.Bool                      (bool)
 import qualified Data.ByteString.Lazy.Char8     as BS
 import           Data.Foldable                  (toList)
 import           Data.Hashable
@@ -18,7 +19,6 @@ import           Marvin.Adapter
 import           Marvin.Types
 import           Network.URI
 import           Util
-import Data.Bool (bool)
 
 
 jsonParseURI :: Value -> Parser URI

@@ -57,7 +57,7 @@ runConnectionLoop eventChan connectionTracker = forever $ do
         Right js -> do
             port <- case uriPort authority_ of
                         v@(':':rest_) -> maybe (portOnErr v) return $ readMaybe rest_
-                        v         -> portOnErr v
+                        v             -> portOnErr v
             logDebugN $(isT "connecting to socket '#{uri}'")
             logFn <- askLoggerIO
             catch

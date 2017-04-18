@@ -129,7 +129,7 @@ isMention botname target msg
 
 setUp :: Chan MarvinIRCMsg -> L.Text -> [L.Text] -> IO ()
 setUp chan uname channels =
-    writeList2Chan chan $ 
+    writeList2Chan chan $
         [Nick uname, RawMsg $(isL "User #{uname} 0 * :#{uname}")]
         ++ map Join channels
 

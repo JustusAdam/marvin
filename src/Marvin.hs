@@ -45,9 +45,9 @@ module Marvin
 
 
 import           Control.Lens
+import           Control.Monad.Except
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Control.Monad.Logger
-import Control.Monad.Except
 import           Control.Monad.Reader        (ask, runReaderT)
 import           Control.Monad.State         (MonadState)
 import           Data.ByteString.Lazy        (ByteString)
@@ -441,7 +441,7 @@ getBotName = fromMaybe defaultBotName <$> getAppConfigVal "name"
 -- Useful for creating actions which can be scheduled to execute a certain time or asynchronous.
 -- The idea is that one can conveniently send messages from inside a schedulable action.
 extractReaction :: BotReacting a s o -> BotReacting a s (IO o)
-extractReaction reac = do 
+extractReaction reac = do
     logger <- askLoggerIO
     BotReacting $
         flip runLoggingT logger . runReaderT (runReaction reac) <$> ask
@@ -451,7 +451,7 @@ extractReaction reac = do
 -- Useful for creating actions which can be scheduled to execute a certain time or asynchronous.
 -- The idea is that one can conveniently send messages from inside a schedulable action.
 extractAction :: BotReacting a () o -> ScriptDefinition a (IO o)
-extractAction ac = do 
+extractAction ac = do
     logger <- askLoggerIO
     ScriptDefinition $
         fmap (flip runLoggingT logger . runReaderT (runReaction ac)) $
