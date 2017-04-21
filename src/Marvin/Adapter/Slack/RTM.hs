@@ -48,7 +48,12 @@ runConnectionLoop eventChan connectionTracker = forever $ do
     void $ async $ forever $ do
         msg <- readChan messageChan
         case eitherDecode msg >>= parseEither eventParser of
-            Left e  -> logErrorN $(isT "Error parsing json: #{e} original data: #{rawBS msg}")
+            Left e  -> 
+                -- changed it do logDebug for now as we still have events that we do not handle
+                -- all those will show up as errors and I want to avoid polluting the log
+                -- once we are sure that all events are handled in some way we can make this as error again 
+                -- (which it should be)
+                logDebugN $(isT "Error parsing json: #{e} original data: #{rawBS msg}")
             Right v -> writeChan eventChan v
     logDebugN "initializing socket"
     r <- liftIO $ post "https://slack.com/api/rtm.start" [ "token" := (token :: T.Text) ]

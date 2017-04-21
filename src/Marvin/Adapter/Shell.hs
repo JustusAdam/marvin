@@ -110,8 +110,9 @@ instance HasFiles ShellAdapter where
         case f^.content of
             FileOnDisk path    -> Just <$> liftIO (B.readFile path)
             FileInMemory bytes -> pure $ Just bytes
-    shareFile file chans =
-        mapM_ (`messageChannel` $(isL "The bot has shared a file #{file^.name} in this channel")) chans >> Right <$> rFileFromLFile file
+    shareFile file chans = do
+        mapM_ (`messageChannel` $(isL "The bot has shared a file #{file^.name} in this channel")) chans
+        Right <$> rFileFromLFile file
 
 
 pathToFile :: FilePath -> IO RFile
