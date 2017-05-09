@@ -8,6 +8,7 @@ import           Data.List             (intercalate, isPrefixOf)
 import           Data.Maybe            (fromMaybe)
 import           Data.Monoid           ((<>))
 import qualified Data.Text.IO          as T
+import qualified Data.Vector           as V
 import           Marvin.Run            (defaultConfigName, lookupFromAppConfig)
 import           Options.Applicative
 import           Prelude
@@ -25,6 +26,24 @@ data Opts = Opts
     , externalScripts :: FilePath
     , configLocation  :: Maybe FilePath
     }
+
+
+data ExternalScript
+    = ModuleOnly String
+    | ModuleAndScripts String [String]
+
+
+instance FromJSON ExternalScript where
+    parseJSON v = (ModuleOnly <$> parseJSON v) <|> (parseJSON v >>= fromArr) <|> (parseJSON v >>= fromObj)
+      where
+        fromArr (x:xs) = pure $ ModuleAndScripts x xs -- ENHANCEMENT verification for module names?
+        fromArr _      = fail "Array form for external script needs at least one element"
+
+        fromObj o = do
+            module_ <- o .: "module"
+            ModuleAndScripts module_
+                <$> (return <$> o .: "script")
+                <|> o .: "scripts"
 
 
 slackRtmData :: (String, String)
