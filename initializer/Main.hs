@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf      #-}
 {-# LANGUAGE RecordWildCards #-}
 module Main where
 
@@ -74,11 +75,12 @@ main = do
 
     for_ wantFiles $ \(source, target) -> do
         let targetName = T.unpack $ substituteValue target subsData
-        if ".mustache" == takeExtension source
-            then do
+        targetExists <- doesFileExist targetName
+        if  | targetExists -> putStrLn $ "Skipping " ++ targetName ++ ". File already exists!"
+            | ".mustache" == takeExtension source -> do
                 tpl <- fromEither <$> automaticCompile [d] source
                 T.writeFile targetName $ substituteValue tpl subsData
-            else copyFile source targetName
+            | otherwise -> copyFile source targetName
 
     return ()
   where

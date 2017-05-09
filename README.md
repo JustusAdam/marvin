@@ -55,8 +55,8 @@ script = defineScript "my-script" $ do
         chan <- getChannel
         f <- sendFile filepath
         case res of
-            Left err -> reporter $(isL "Failed to share file: #{err}")
-            Right _  -> reporter "File successfully uploaded"
+            Left err -> send $(isL "Failed to share file: #{err}")
+            Right _  -> send "File successfully uploaded"
     
     enterIn "random" $ do
         user <- getUser
