@@ -9,6 +9,9 @@
 - Changed Util API
     - Marvin.Util.HTTP has been removed (was empty) until an API has been found
     - Marvin.Util.Mutable has been removed as BotReacting now has a `MonadBase` and `MonadBaseControl` instance meaning the functions from `lifted-base` can be used without modification.
+- Initializer no longer overwrites files
+- Preprocessor now uses the new external-scripts.json spec from issue #8
+- Added some generic handlers for file down/upload and version
 
 # 0.2.3 - 05.03.2017
 
