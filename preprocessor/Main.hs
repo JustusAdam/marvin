@@ -33,6 +33,16 @@ data ExternalScript
     | ModuleAndScripts String [String]
 
 
+getModule :: ExternalScript -> String
+getModule (ModuleOnly m) = m
+getModule (ModuleAndScripts m _) = m
+
+
+getScripts :: ExternalScript -> [String]
+getScripts (ModuleOnly m) = [m <> ".script"]
+getScripts (ModuleAndScripts m xs) = [m <> "." <> s | s <- xs]
+
+
 instance FromJSON ExternalScript where
     parseJSON v = (ModuleOnly <$> parseJSON v) <|> (parseJSON v >>= fromArr) <|> (parseJSON v >>= fromObj)
       where
@@ -89,10 +99,10 @@ main = do
                 f <- B.readFile externalScripts
                 either error return $ eitherDecode f
             else return mempty
-    let hsFiles = map dropExtensions $ filter (/= takeFileName sourceName) $ filter ((`elem` [".hs", ".lhs"]) . takeExtension) files
-        scripts = hsFiles <> externals
-        processed = substitute tpl (object [ "scripts" ~> intercalate ", " (map (<> ".script") scripts)
-                                            , "imports" ~> scripts
+    let scriptsFromFiles = map (ModuleOnly . dropExtensions) $ filter (/= takeFileName sourceName) $ filter ((`elem` [".hs", ".lhs"]) . takeExtension) files
+        scripts = scriptsFromFiles <> externals
+        processed = substitute tpl (object [ "scripts" ~> intercalate ", " (concatMap getScripts scripts)
+                                            , "imports" ~> map getModule scripts
                                             , "adapter-import" ~> adapterImport
                                             , "adapter-type" ~> adapterType
                                             ])
