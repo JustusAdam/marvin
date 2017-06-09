@@ -60,6 +60,9 @@ matrix:
 
   allow_failures:
   - env: BUILD=cabal GHCVER=head  CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
+  # Travis builds on OSX are not cached right now
+  # As a result they frequently take longer than the allowed buid tie and fail
+  # Therefore we have to mark all osx builds as failures until caching is enabled
   - os: osx
 
 before_install:
