@@ -1,12 +1,13 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedLists    #-}
+{-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE StandaloneDeriving #-}
 import           Data.Aeson
+import           Data.Foldable   (fold)
+import           Data.List       (intersperse)
+import           Data.Monoid     ((<>))
 import           ExternalScripts
 import           Marvin.Prelude
 import           Test.Hspec
-import Data.List (intersperse)
-import Data.Monoid ((<>))
-import Data.Foldable (fold)
 
 -- TODO add tests. I'm not really sure what to test unfortunately.
 -- A lot of the code in this repo is just about interacting with external API's
@@ -17,7 +18,7 @@ deriving instance Show ExternalScript
 
 testRandom :: Spec
 testRandom =
-    describe "randomFrom" $
+    describe "randomFrom" $ do
         it "returns the first element in a one element list" $
             randomFrom [4] `shouldReturn` (4 :: Int)
 
