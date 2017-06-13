@@ -270,23 +270,23 @@ saveFileTo file path =
 sendFile :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => FilePath -> BotReacting a m (Either L.Text (RemoteFile a))
 sendFile path = do
     chan <- getChannel
-    sendFileTo' path chan
+    sendFileTo' path [chan]
 
 
 -- | Share the file with the provided path to the channel with the specified name.
-sendFileTo :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => FilePath -> L.Text -> BotReacting a m (Either L.Text (RemoteFile a))
+sendFileTo :: (MonadAdapter m, AdapterT m ~ a, HasFiles a, MonadIO m) => FilePath -> L.Text -> m (Either L.Text (RemoteFile a))
 sendFileTo path chanName = do
     chan <- resolveChannel chanName
-    maybe (return $ Left "Channel does not exist") (sendFileTo' path) chan
+    maybe (return $ Left "Channel does not exist") (sendFileTo' path . return) chan
 
 
 -- | Share the file with the provided path to the channel.
-sendFileTo' :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => FilePath -> Channel a -> BotReacting a m (Either L.Text (RemoteFile a))
-sendFileTo' path chan = runExceptT $ do
+sendFileTo' :: (MonadAdapter m, HasFiles a, MonadIO m, AdapterT m ~ a) => FilePath -> [Channel a] -> m (Either L.Text (RemoteFile a))
+sendFileTo' path chans = runExceptT $ do
     e <- liftIO $ doesFileExist path
     when e $ fail "File does not exist"
     file <- lift $ newLocalFile path' (FileOnDisk path)
-    ExceptT $ shareFile file [chan]
+    ExceptT $ shareFile file chans
   where path' = L.pack path
 
 
