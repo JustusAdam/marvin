@@ -83,7 +83,6 @@ library:
   - hashable >=1.0
   - text >=1.0
   - unordered-containers >=0.2
-  - stm >=2.0
   - marvin-interpolate >=1.0
   - lifted-base >=0.2
   - lifted-async >=0.8

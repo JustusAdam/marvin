@@ -19,7 +19,6 @@ module Marvin.Adapter.Slack.RTM
 import           Control.Concurrent.Async.Lifted (async, link)
 import           Control.Concurrent.Chan.Lifted
 import           Control.Concurrent.MVar.Lifted
-import           Control.Concurrent.STM          (atomically, newTMVar, putTMVar, takeTMVar)
 import           Control.Exception.Lifted
 import           Control.Lens                    hiding ((.=))
 import           Control.Monad
@@ -39,6 +38,7 @@ import           Network.WebSockets
 import           Network.Wreq
 import           Text.Read                       (readMaybe)
 import           Wuss
+import Data.IORef.Lifted
 
 
 runConnectionLoop :: Chan (InternalType RTM) -> MVar Connection -> AdapterM (SlackAdapter RTM) ()
@@ -48,12 +48,11 @@ runConnectionLoop eventChan connectionTracker = forever $ do
     void $ async $ forever $ do
         msg <- readChan messageChan
         case eitherDecode msg >>= parseEither eventParser of
-            Left e  -> 
-                -- changed it do logDebug for now as we still have events that we do not handle
-                -- all those will show up as errors and I want to avoid polluting the log
-                -- once we are sure that all events are handled in some way we can make this as error again 
-                -- (which it should be)
-                logDebugN $(isT "Error parsing json: #{e} original data: #{rawBS msg}")
+            -- changed it do logDebug for now as we still have events that we do not handle
+            -- all those will show up as errors and I want to avoid polluting the log
+            -- once we are sure that all events are handled in some way we can make this as error again
+            -- (which it should be)
+            Left e  -> logDebugN $(isT "Error parsing json: #{e} original data: #{rawBS msg}")
             Right v -> writeChan eventChan v
     logDebugN "initializing socket"
     r <- liftIO $ post "https://slack.com/api/rtm.start" [ "token" := (token :: T.Text) ]
@@ -93,13 +92,10 @@ runConnectionLoop eventChan connectionTracker = forever $ do
 senderLoop :: MVar Connection -> AdapterM (SlackAdapter a) ()
 senderLoop connectionTracker = do
     outChan <- view (adapter.outChannel)
-    midTracker <- liftIO $ atomically $ newTMVar (0 :: Int)
+    midTracker <- newIORef (0 :: Int)
     forever $ do
         (SlackChannelId sid, msg) <- readChan outChan
-        mid <- liftIO $ atomically $ do
-            newMid <- takeTMVar midTracker
-            putTMVar midTracker $ succ newMid
-            return newMid
+        mid <- atomicModifyIORef' midTracker (\i -> (i+1, i))
         let encoded = encode $ object
                 [ "id" .= mid
                 , "type" .= ("message" :: T.Text)

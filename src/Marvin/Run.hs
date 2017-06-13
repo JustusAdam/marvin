@@ -69,7 +69,8 @@ requireFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO a
 requireFromAppConfig = C.require . C.subconfig (unwrapScriptId applicationScriptId)
 
 
--- | Retrieve a value from the application config, given the whole config structure. Returns 'Nothing' if value not parseable as @a@ or not present.
+-- | Retrieve a value from the application config, given the whole config structure.
+-- Returns 'Nothing' if value not parseable as @a@ or not present.
 lookupFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO (Maybe a)
 lookupFromAppConfig = C.lookup . C.subconfig (unwrapScriptId applicationScriptId)
 
@@ -82,13 +83,10 @@ runHandlers :: forall a. IsAdapter a => Handlers a -> Chan (Event a) -> RunnerM 
 runHandlers handlers eventChan =
     forever $ readChan eventChan >>= genericHandler
   where
-    genericHandler ev = do
-        generics <- async $ do
-            let applicables = vcatMaybes $ fmap ($ ev) customsV
-            asyncs <- for applicables async
-            for_ asyncs wait
+    genericHandler ev = void $ async $ do
+        generics <- mapM async $ vcatMaybes $ fmap ($ ev) customsV
         handler ev
-        wait generics
+        mapM_ wait generics
     handler (MessageEvent user chan msg ts) = handleMessage user chan msg ts
     handler (CommandEvent user chan msg ts) = handleCommand user chan msg ts
     -- TODO implement other handlers
