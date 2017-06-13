@@ -31,12 +31,11 @@ randomValFromRange = liftIO . randomRIO
 -- | Get a random value out of a list of values.
 -- This uses 'length' and therefore does not terminate for infinite lists.
 --
--- The list must be non empty (hence the 'NE.NonEmpty' type)
--- however using the @-XOverloadedLists@ extension you can write
--- normal list literals for this using the @[elem1, elem2]@ syntax
+-- The list must be non empty, otherwise the function will throw an error.
 --
 -- Uses the global random number generator.
 --
 -- Usable in all IO capable monads, such as 'BotReacting' and 'ScriptDefinition'.
-randomFrom :: MonadIO m => NE.NonEmpty e -> m e
+randomFrom :: MonadIO m => [e] -> m e
+randomFrom [] = error "List of random elements may not be empty!"
 randomFrom list = (list NE.!!) <$> randomValFromRange (0, pred $ NE.length list)

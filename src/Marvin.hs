@@ -24,7 +24,7 @@ module Marvin
     -- ** Sending messages
     , send, reply, messageChannel, messageChannel'
     -- ** File interactions
-    -- | Special interactions for adapters which support the file api 'HasFiles's
+    -- | Special interactions for adapters which support the file api 'HasFiles'
     , readTextFile, readFileBytes, newLocalFile, shareFile
     , saveFile, saveFileTo, saveFileToDir
     , sendFile, sendFileTo, sendFileTo'
