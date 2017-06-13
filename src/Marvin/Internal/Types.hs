@@ -36,7 +36,7 @@ type Message = L.Text
 -- The type parameter is only a tag.
 -- It is used so you may declare instances for classes such as 'FromJSON' for this type depending on your adapter.
 -- This way different adapters may have different 'FromJSON' instances for the timestamp.
-newtype TimeStamp a = TimeStamp { unwrapTimeStamp :: UTCTime } deriving Show
+newtype TimeStamp a = TimeStamp { toUTCTime :: UTCTime } deriving (Show, Eq, Ord)
 
 
 declareFields [d|
@@ -177,7 +177,7 @@ instance Monoid (Handlers a) where
 
 
 
--- | Context for reacting in the bot. Allows use of functions like 'Marvin.send', 'Marvin.reply' and 'Marvin.messageChannel' as well as any arbitrary 'IO' action using 'liftIO'.
+-- | Context for reacting in the bot. Allows use of functions like 'Marvin.send', 'Marvin.reply' and 'Marvin.messageChannel', arbitrary 'IO' actions using 'liftIO' and logging via the 'MonadLogger' typeclass.
 --
 -- The type parameter @d@ is the accessible data provided by the trigger for this action and can be obtained with 'Marvin.getData' or other custom functions like 'Marvin.getMessage' and 'Marvin.getMatch' which typically depend on a particular type of data in @d@.
 --
@@ -250,12 +250,6 @@ instance Get (a, b, c, d, e) c where getLens = _3
 instance Get (a, b, c, d, e) d where getLens = _4
 
 
-instance HasConfigAccess (ScriptDefinition a) where
-    getConfigInternal = ScriptDefinition $ use config
-
-instance HasConfigAccess (BotReacting a b) where
-    getConfigInternal = view config
-
 -- | Similar to 'AccessAdapter', this class says there is a 'ScriptId' reachable from the type (usually a monad) @m@.
 class IsScript m where
     -- | Retrieve the script id out of @m@, ususally a monad.
@@ -267,28 +261,48 @@ instance IsScript (ScriptDefinition a) where
 instance IsScript (BotReacting a b) where
     getScriptId = view scriptId
 
-
--- | Similar to 'IsScript', this class says that there is an adapter 'AdapterT' available from this type (usually a monad) @m@.
+-- | Lifting class for adapter actions.
 --
--- The type of adapter depends on the monad itself.
--- This class can be thought of as 'MonadReader' specified to 'AdapterT'.
-class AccessAdapter m where
-    -- | The concrete type of adapter accessible from @m@.
+-- The 'IsAdapter' and 'Monad' constraint is just for convenience
+class (IsAdapter (AdapterT m), Monad m) => MonadAdapter m where
     type AdapterT m
-    getAdapter :: m (AdapterT m)
+    liftAdapterM :: AdapterM (AdapterT m) r -> m r
 
-instance AccessAdapter (ScriptDefinition a) where
+instance IsAdapter a => MonadAdapter (ScriptDefinition a) where
     type AdapterT (ScriptDefinition a) = a
-    getAdapter = ScriptDefinition $ use adapter
+    liftAdapterM (AdapterM ac) = do
+        a <- ScriptDefinition $ use adapter
+        c <- ScriptDefinition $ use config
+        logger <- askLoggerIO
+        liftIO $ flip runLoggingT logger $ runReaderT ac (AdapterMEnv c a)
 
-instance AccessAdapter (BotReacting a b) where
+instance IsAdapter a => MonadAdapter (BotReacting a b) where
     type AdapterT (BotReacting a b) = a
-    getAdapter = view adapter
+    liftAdapterM (AdapterM ac) = do
+        a <- view adapter
+        c <- view config
+        logger <- askLoggerIO
+        liftIO $ flip runLoggingT logger $ runReaderT ac (AdapterMEnv c a)
 
-
-instance AccessAdapter (AdapterM a) where
+instance IsAdapter a => MonadAdapter (AdapterM a) where
     type AdapterT (AdapterM a) = a
-    getAdapter = view adapter
+    liftAdapterM = id
+
+-- | Denotes a place from which we may access the configuration.
+--
+-- During script definition or when handling a request we can obtain the config with 'getConfigVal' or 'requireConfigVal'.
+class (IsScript m, MonadIO m) => HasConfigAccess m where
+    -- | INTERNAL USE WITH CARE
+    --
+    -- Obtain the entire config structure
+    getConfigInternal :: m C.Config
+
+instance HasConfigAccess (ScriptDefinition a) where
+    getConfigInternal = ScriptDefinition $ use config
+
+instance HasConfigAccess (BotReacting a b) where
+    getConfigInternal = view config
+
 
 instance ShowT ScriptId where showT = unwrapScriptId
 
@@ -322,17 +336,6 @@ mkScriptId = verifyIdString "script id" ScriptId
 -- | Attempt to create an adapter id from 'Text'
 mkAdapterId :: T.Text -> Either String (AdapterId a)
 mkAdapterId = verifyIdString "adapter id" AdapterId
-
-
--- | Denotes a place from which we may access the configuration.
---
--- During script definition or when handling a request we can obtain the config with 'getConfigVal' or 'requireConfigVal'.
-class (IsScript m, MonadIO m) => HasConfigAccess m where
-    -- | INTERNAL USE WITH CARE
-    --
-    -- Obtain the entire config structure
-    getConfigInternal :: m C.Config
-
 
 instance C.Configured LogLevel where
     convert (C.String s) =

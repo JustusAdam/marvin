@@ -32,15 +32,15 @@ module Marvin
     , getConfigVal, requireConfigVal, getBotName
     -- ** Handler Types
     , BotReacting
-    , Message, User, Channel, Topic, FileContent(..)
+    , Message, Topic, FileContent(..)
     -- * Utility functions
     , textToPath, pathToText
     -- * The Script
     , Script, defineScript, ScriptInit
     , ScriptId
-    , ScriptDefinition, IsAdapter, HasFiles
+    , ScriptDefinition, IsAdapter(User, Channel), HasFiles(LocalFile, RemoteFile)
     -- * Lenses
-    , HasActions(actions), HasUsername(username), HasName(name), HasFirstName(firstName), HasLastName(lastName), HasFileType(fileType), HasUrl(url), HasCreationDate(creationDate), HasSize(size), HasContent(content)
+    , HasUsername(username), HasName(name), HasFirstName(firstName), HasLastName(lastName), HasFileType(fileType), HasUrl(url), HasCreationDate(creationDate), HasSize(size), HasContent(content)
     -- * Advanced actions
     , extractAction, extractReaction
     ) where
@@ -70,7 +70,9 @@ import           Marvin.Internal.LensClasses
 import           Marvin.Internal.Types       (BotActionState(BotActionState),
                                               BotReacting(BotReacting, runReaction),
                                               ScriptDefinition(ScriptDefinition),
-                                              ScriptInit(ScriptInit))
+                                              ScriptInit(ScriptInit),
+                                              HasConfigAccess,
+                                              MonadAdapter(AdapterT))
 import           Marvin.Internal.Values      (defaultBotName)
 import           Marvin.Interpolate.All
 import           Marvin.Types
@@ -205,15 +207,15 @@ send msg = do
 
 
 -- | Try to get the channel with a particular human readable name.
-resolveChannel :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
-               => L.Text -> m (Maybe (Channel a))
-resolveChannel =  A.liftAdapterAction . A.resolveChannel
+resolveChannel :: MonadAdapter m
+               => L.Text -> m (Maybe (Channel (AdapterT m)))
+resolveChannel =  liftAdapterM . A.resolveChannel
 
 
 -- | Return the contents of the file as text. If the file is not public, or cannot be interpreted as text returns 'Nothing'.
-readTextFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
-           => RemoteFile a -> m (Maybe L.Text)
-readTextFile = A.liftAdapterAction . A.readTextFile
+readTextFile :: (MonadAdapter m, HasFiles (AdapterT m))
+           => RemoteFile (AdapterT m) -> m (Maybe L.Text)
+readTextFile = liftAdapterM . A.readTextFile
 
 
 -- | Attempt to download the remote file into the current directory.
@@ -221,8 +223,8 @@ readTextFile = A.liftAdapterAction . A.readTextFile
 -- Uses either the name of the downloaded file as filename or @"unnamed-\<current time\>"@
 --
 -- When successful returns the path of the saved file otherwise an error message.
-saveFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a, MonadLogger m)
-         => RemoteFile a -> m (Either L.Text FilePath)
+saveFile :: (MonadAdapter m, MonadIO m, HasFiles (AdapterT m))
+         => RemoteFile (AdapterT m) -> m (Either L.Text FilePath)
 saveFile = (`saveFileToDir` ".")
 
 
@@ -231,8 +233,8 @@ saveFile = (`saveFileToDir` ".")
 -- Uses either the name of the downloaded file as filename or @"unnamed-\<current time\>"@
 --
 -- When successful returns the path of the saved file otherwise an error message.
-saveFileToDir :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a, MonadLogger m)
-              => RemoteFile a -> FilePath -> m (Either L.Text FilePath)
+saveFileToDir :: (MonadAdapter m, MonadIO m, HasFiles (AdapterT m))
+              => RemoteFile (AdapterT m) -> FilePath -> m (Either L.Text FilePath)
 saveFileToDir file dir = do
     fname <- liftIO $
         case file^.name of
@@ -249,8 +251,8 @@ saveFileToDir file dir = do
 -- Creates intermediate directories if they are missing.
 --
 -- When successful returns the path of the saved file otherwise an error message.
-saveFileTo :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a, MonadLogger m)
-           => RemoteFile a -> FilePath -> m (Either L.Text FilePath)
+saveFileTo :: (MonadAdapter m, MonadIO m, HasFiles (AdapterT m))
+           => RemoteFile (AdapterT m) -> FilePath -> m (Either L.Text FilePath)
 saveFileTo file path =
     readFileBytes file >>= \case
         Nothing ->
@@ -287,27 +289,27 @@ sendFileTo' path chan = runExceptT $ do
 
 
 -- | Return the contents of the file as bytes. If the file is not public returns 'Nothing'.
-readFileBytes :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
-           => RemoteFile a -> m (Maybe ByteString)
-readFileBytes = A.liftAdapterAction . A.readFileBytes
+readFileBytes :: (MonadAdapter m, HasFiles (AdapterT m))
+           => RemoteFile (AdapterT m) -> m (Maybe ByteString)
+readFileBytes = liftAdapterM . A.readFileBytes
 
 
 -- | Create a new 'LocalFile' object for upload with the specified content.
-newLocalFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
-            => L.Text -> FileContent -> m (LocalFile a)
-newLocalFile fname = A.liftAdapterAction . A.newLocalFile fname
+newLocalFile :: (MonadAdapter m, HasFiles (AdapterT m))
+            => L.Text -> FileContent -> m (LocalFile (AdapterT m))
+newLocalFile fname = liftAdapterM . A.newLocalFile fname
 
 
 -- | Share a local file to the supplied list of channels
-shareFile :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, HasFiles a, MonadIO m, AdapterT m ~ a)
+shareFile :: (MonadAdapter m, HasFiles a, AdapterT m ~ a)
             => LocalFile a -> [Channel a] -> m (Either L.Text (RemoteFile a))
-shareFile f = A.liftAdapterAction . A.shareFile f
+shareFile f = liftAdapterM . A.shareFile f
 
 
 -- | Try to get the user with a particular username.
-resolveUser :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
-            => L.Text -> m (Maybe (User a))
-resolveUser = A.liftAdapterAction . A.resolveUser
+resolveUser :: MonadAdapter m
+            => L.Text -> m (Maybe (User (AdapterT m)))
+resolveUser = liftAdapterM . A.resolveUser
 
 
 -- | Send a message to the channel the original message came from and address the user that sent the original message.
@@ -321,15 +323,15 @@ reply msg = do
 
 
 -- | Send a message to a Channel (by name)
-messageChannel :: (HasConfigAccess m, AccessAdapter m, IsAdapter (AdapterT m), MonadLoggerIO m) => L.Text -> L.Text -> m ()
+messageChannel :: (MonadAdapter m, MonadLogger m) => L.Text -> L.Text -> m ()
 messageChannel fname msg = do
     mchan <- resolveChannel fname
     maybe ($logError $(isT "No channel known with the name #{fname}")) (`messageChannel'` msg) mchan
 
 
 -- | Send a message to a channel (by adapter dependent channel object)
-messageChannel' :: (HasConfigAccess m, AccessAdapter m, IsAdapter (AdapterT m), MonadIO m) => Channel (AdapterT m) -> L.Text -> m ()
-messageChannel' chan = A.liftAdapterAction . A.messageChannel chan
+messageChannel' :: MonadAdapter m => Channel (AdapterT m) -> L.Text -> m ()
+messageChannel' chan = liftAdapterM . A.messageChannel chan
 
 
 
@@ -347,7 +349,7 @@ defineScript sid definitions =
 -- | Obtain the event reaction data.
 --
 -- The type of this data depends on the reaction function used.
--- For instance 'hear' and 'respond' will contain 'MessageReactionData'.
+-- Generally this will be a tuple of various information about the current event.
 -- The actual contents comes from the event itself and was put together by the trigger.
 getData :: BotReacting a d d
 getData = view payload
@@ -387,8 +389,8 @@ getTimeStamp = view (payload . getLens)
 -- | Get the username of a registered user.
 --
 -- This function is deprecated as of version 0.3 and will be removed in version 1.0 use the lens 'username' instead.
-getUsername :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
-            => User a
+getUsername :: MonadAdapter m
+            => User (AdapterT m)
             -> m L.Text
 getUsername u = pure $ u^.username
 {-# DEPRECATED getUsername "Will be remove in version 1.0, use the lens 'username' instead." #-}
@@ -397,8 +399,8 @@ getUsername u = pure $ u^.username
 -- | Get the human readable name of a channel.
 --
 -- This function is deprecated as of Version 0.3 and will be removed in version 1.0 use the lens 'name' instead.
-getChannelName :: (HasConfigAccess m, AccessAdapter m, IsAdapter a, MonadIO m, AdapterT m ~ a)
-               => Channel a -> m L.Text
+getChannelName :: MonadAdapter m
+               => Channel (AdapterT m) -> m L.Text
 getChannelName c = pure $ c^.name
 {-# DEPRECATED getChannelName "Will be remove in version 1.0, use the lens 'name' instead." #-}
 

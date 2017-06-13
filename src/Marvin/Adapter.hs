@@ -18,7 +18,6 @@ module Marvin.Adapter
     , lookupFromAdapterConfig, requireFromAdapterConfig
     , lookupFromAppConfig, requireFromAppConfig, getBotname
     , getAdapterConfig, getAppConfig, getAdapter
-    , liftAdapterAction
     , HasAdapter(adapter), HasConfig(config)
     ) where
 
@@ -34,13 +33,6 @@ import           Marvin.Internal.LensClasses
 import           Marvin.Internal.Types
 import           Marvin.Internal.Values
 import           Marvin.Interpolate.Text
-
-
-liftAdapterAction :: (MonadIO m, HasConfigAccess m, AccessAdapter m, IsAdapter a, a ~ AdapterT m) => AdapterM a r -> m r
-liftAdapterAction (AdapterM ac) = do
-    a <- getAdapter
-    c <- getConfigInternal
-    liftIO $ runStderrLoggingT $ runReaderT ac (AdapterMEnv c a)
 
 
 getAppConfig :: AdapterM a C.Config
@@ -71,3 +63,7 @@ lookupFromAdapterConfig n = getAdapterConfig >>= liftIO . flip C.lookup n
 
 requireFromAdapterConfig :: (IsAdapter a, C.Configured v) => C.Name -> AdapterM a v
 requireFromAdapterConfig n = getAdapterConfig >>= liftIO . flip C.require n
+
+
+getAdapter :: AdapterM a a
+getAdapter = AdapterM $ view adapter
