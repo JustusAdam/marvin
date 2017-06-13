@@ -106,6 +106,7 @@ library
       Marvin.Internal.Types
       Marvin.Internal.Values
       Util
+      Paths_marvin
   default-language: Haskell2010
 
 executable marvin-init

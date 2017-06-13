@@ -17,7 +17,7 @@ module Marvin.Run
     ) where
 
 
-import           Control.Concurrent.Async.Lifted (async, link, wait)
+import           Control.Concurrent.Async.Lifted (async, link, wait, mapConcurrently_)
 import           Control.Concurrent.Chan.Lifted
 import           Control.DeepSeq
 import           Control.Exception.Lifted
@@ -66,12 +66,12 @@ defaultLoggingLevel = LevelWarn
 
 -- | Retrieve a value from the application config, given the whole config structure. Fails if value not parseable as @a@ or not present.
 requireFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO a
-requireFromAppConfig cfg = C.require (C.subconfig (unwrapScriptId applicationScriptId) cfg)
+requireFromAppConfig = C.require . C.subconfig (unwrapScriptId applicationScriptId)
 
 
 -- | Retrieve a value from the application config, given the whole config structure. Returns 'Nothing' if value not parseable as @a@ or not present.
 lookupFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO (Maybe a)
-lookupFromAppConfig cfg = C.lookup (C.subconfig (unwrapScriptId applicationScriptId) cfg)
+lookupFromAppConfig = C.lookup . C.subconfig (unwrapScriptId applicationScriptId)
 
 
 runWAda :: a -> C.Config -> AdapterM a r -> RunnerM r
@@ -102,15 +102,9 @@ runHandlers handlers eventChan =
                         -> (Channel' a -> d)
                         -> Channel a
                         -> RunnerM ()
-    changeHandlerHelper wildcards specifics other chan = do
-        let applicables = fromMaybe mempty $ specifics^?ix (chan ^.name)
-
-        wildcardsRunning <- for wildcards (async . ($ other (Channel' chan)))
-
-        applicablesRunning <- for applicables (async . ($ other (Channel' chan)))
-
-        mapM_ wait wildcardsRunning
-        mapM_ wait applicablesRunning
+    changeHandlerHelper wildcards specifics other chan =
+        mapConcurrently_ ($ other (Channel' chan)) $ wildcards <> applicables
+      where applicables = fromMaybe mempty $ specifics^?ix (chan ^.name)
 
 
     handleMessageLike :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
@@ -119,15 +113,10 @@ runHandlers handlers eventChan =
                       -> Message
                       -> TimeStamp a
                       -> RunnerM ()
-    handleMessageLike v user chan msg ts = do
-        lDispatches <- doIfMatch v
-        mapM_ wait lDispatches
+    handleMessageLike v user chan msg ts = mapConcurrently_ id $ doIfMatch v
       where
-        doIfMatch =
-            fmap vcatMaybes . mapM (\(trigger, msgHandler) ->
-                case match trigger msg of
-                        Nothing -> return Nothing
-                        Just m  -> Just <$> async (msgHandler (User' user, Channel' chan, m, msg, ts)))
+        doIfMatch = vcatMaybes . fmap select
+        select (trigger, msgHandler) = (\m -> msgHandler (User' user, Channel' chan, m, msg, ts)) <$> match trigger msg
     handleCommand = handleMessageLike respondsV
     handleMessage = handleMessageLike hearsV
 

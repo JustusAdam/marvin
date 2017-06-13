@@ -33,10 +33,10 @@ echoVersion = do
 -- The boolean decides whether to send a message of success or failure to the originating channel.
 downloadFile :: (IsAdapter a, HasFiles a, Get s (RemoteFile' a), Get s (User' a), Get s (Channel' a)) => Bool -> FilePath -> BotReacting a s ()
 downloadFile report directory = do
-    f <- getRemoteFile
     botname <- getBotName
     uploader <- getUser
     unless (botname == uploader^.username) $ do
+        f <- getRemoteFile
         res <- saveFileToDir f directory
         let msg = case res of
                     Left err   -> $(isL "Failed to save file: #{err}")
@@ -50,27 +50,26 @@ downloadFile report directory = do
 -- The boolean decides whether to send a message of success or failure to the originating channel.
 -- The @Int@ is the index for the filepath in the regex match.
 uploadFile :: (IsAdapter a, HasFiles a, Get s Match, Get s (Channel' a)) => Bool -> Int -> BotReacting a s ()
-uploadFile report index = do
-    match_ <- getMatch
-    case match_^?ix index of
-        Nothing -> logErrorN "Could not find expected index in match"
-        Just rawPath
-            | isAbsolute path -> send "Please provide a relative path"
-            | ".." `elem` splitDirectories path -> send "'..' is not allowed in the upload path"
-            | otherwise -> do
-                e <- liftIO $ doesFileExist path
+uploadFile report index = (^?ix index) <$> getMatch >>= \case
+    Nothing -> logErrorN "Could not find expected index in match"
+    Just rawPath
+        | isAbsolute path -> send "Please provide a relative path"
+        | ".." `elem` splitDirectories path -> send "'..' is not allowed in the upload path"
+        | otherwise -> do
+            e <- liftIO $ doesFileExist path
 
-                if e
-                    then do
-                        chan <- getChannel
-                        f <- newLocalFile path' (FileOnDisk path)
-                        res <- shareFile f [chan]
-                        case res of
-                            Left err -> reporter $(isL "Failed to share file: #{err}")
-                            Right _  -> reporter "File successfully uploaded"
-                    else send $(isL "Sorry, but there is no file with the path #{path} here.")
-          where
-            path' = L.strip rawPath
-            path = L.unpack path'
+            if e
+                then do
+                    chan <- getChannel
+                    f <- newLocalFile path' (FileOnDisk path)
+                    res <- shareFile f [chan]
+                    case res of
+                        Left err -> reporter $(isL "Failed to share file: #{err}")
+                        Right _  -> reporter "File successfully uploaded"
+                else send $(isL "Sorry, but there is no file with the path #{path} here.")
+      where
+        path' = L.strip rawPath
+        path = L.unpack path'
   where
-    reporter = if report then send else logInfoN . L.toStrict
+    reporter | report    = send
+             | otherwise = logInfoN . L.toStrict

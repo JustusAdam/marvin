@@ -66,6 +66,7 @@ library:
   - Marvin.Internal.Types
   - Marvin.Internal.Values
   - Util
+  - Paths_marvin
   dependencies:
   - wreq >=0.4 && <0.6
   - mtl >=2.2 && <3
