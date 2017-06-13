@@ -38,7 +38,9 @@ module Marvin
     -- * The Script
     , Script, defineScript, ScriptInit
     , ScriptId
-    , ScriptDefinition, IsAdapter(User, Channel), HasFiles(LocalFile, RemoteFile)
+    , ScriptDefinition
+    -- * The adapter
+    , IsAdapter(User, Channel), HasFiles(LocalFile, RemoteFile), MonadAdapter(AdapterT, liftAdapterM)
     -- * Lenses
     , HasUsername(username), HasName(name), HasFirstName(firstName), HasLastName(lastName), HasFileType(fileType), HasUrl(url), HasCreationDate(creationDate), HasSize(size), HasContent(content)
     -- * Advanced actions

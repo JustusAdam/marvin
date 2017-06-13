@@ -12,7 +12,7 @@ module Marvin.Types
     ( User, Channel, Message, Topic, Script
     , ScriptId, mkScriptId, unwrapScriptId
     , applicationScriptId, IsScript, getScriptId
-    , MonadAdapter(liftAdapterM), TimeStamp(..)
+    , MonadAdapter(AdapterT, liftAdapterM), HasConfigAccess, TimeStamp(..)
     , User'(..), Channel'(..), RemoteFile'(..), FileContent(..)
     , Get(getLens)
     , Event(..), RunnerM

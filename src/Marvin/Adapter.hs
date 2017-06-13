@@ -14,6 +14,7 @@ module Marvin.Adapter
     , IsAdapter(..), AdapterId, mkAdapterId, unwrapAdapterId
     , AdapterM
     , HasFiles(..)
+    , MonadAdapter(..)
     , Event(..)
     , lookupFromAdapterConfig, requireFromAdapterConfig
     , lookupFromAppConfig, requireFromAppConfig, getBotname

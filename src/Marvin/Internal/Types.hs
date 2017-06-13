@@ -266,6 +266,7 @@ instance IsScript (BotReacting a b) where
 -- The 'IsAdapter' and 'Monad' constraint is just for convenience
 class (IsAdapter (AdapterT m), Monad m) => MonadAdapter m where
     type AdapterT m
+    -- | Lift an action from the adapter context into the Monad @m@.
     liftAdapterM :: AdapterM (AdapterT m) r -> m r
 
 instance IsAdapter a => MonadAdapter (ScriptDefinition a) where
