@@ -6,6 +6,9 @@ License     : BSD3
 Maintainer  : dev@justus.science
 Stability   : experimental
 Portability : POSIX
+
+Generic handlers for marvin scripts.
+You can use them directly or have a look at the source as an example of how to use marvins features.
 -}
 module Marvin.Handler where
 

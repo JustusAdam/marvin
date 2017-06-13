@@ -71,10 +71,9 @@ import           Marvin.Internal
 import           Marvin.Internal.LensClasses
 import           Marvin.Internal.Types       (BotActionState(BotActionState),
                                               BotReacting(BotReacting, runReaction),
+                                              HasConfigAccess, MonadAdapter(AdapterT),
                                               ScriptDefinition(ScriptDefinition),
-                                              ScriptInit(ScriptInit),
-                                              HasConfigAccess,
-                                              MonadAdapter(AdapterT))
+                                              ScriptInit(ScriptInit))
 import           Marvin.Internal.Values      (defaultBotName)
 import           Marvin.Interpolate.All
 import           Marvin.Types
@@ -85,10 +84,8 @@ import           System.FilePath
 
 prepareAction :: (MonadState (Script a) m, ShowT t) => Maybe t -> BotReacting a d () -> m (d -> RunnerM ())
 prepareAction trigger reac = do
-    ada <- use adapter
-    cfg <- use config
-    sid <- use scriptId
-    return $ \d -> runBotAction sid cfg ada trigger d reac
+    f <- runBotAction <$> use scriptId <*> use config <*> use adapter
+    return $ \d -> f trigger d reac
 
 
 -- | Whenever any message matches the provided regex this handler gets run.
@@ -203,9 +200,7 @@ customTrigger tr ac = ScriptDefinition $ do
 --
 -- Equivalent to "robot.send" in hubot
 send :: (IsAdapter a, Get d (Channel' a)) => L.Text -> BotReacting a d ()
-send msg = do
-    o <- getChannel
-    messageChannel' o msg
+send msg = flip messageChannel' msg =<< getChannel
 
 
 -- | Try to get the channel with a particular human readable name.
@@ -255,29 +250,24 @@ saveFileToDir file dir = do
 -- When successful returns the path of the saved file otherwise an error message.
 saveFileTo :: (MonadAdapter m, MonadIO m, HasFiles (AdapterT m))
            => RemoteFile (AdapterT m) -> FilePath -> m (Either L.Text FilePath)
-saveFileTo file path =
-    readFileBytes file >>= \case
-        Nothing ->
-            return $ Left $(isL "#{maybe \"unnamed file\" (\"File \" <>) $ file^.name} could not be downloaded")
-        Just text -> do
-            liftIO $ do
-                createDirectoryIfMissing True $ takeDirectory path
-                B.writeFile path text
-            return $ return path
+saveFileTo file path = readFileBytes file >>= \case
+    Nothing ->
+        return $ Left $(isL "#{maybe \"unnamed file\" (\"File \" <>) $ file^.name} could not be downloaded")
+    Just text -> do
+        liftIO $ do
+            createDirectoryIfMissing True $ takeDirectory path
+            B.writeFile path text
+        return $ return path
 
 
 -- | Share the file with the provided path to the channel we are currently responding to.
 sendFile :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => FilePath -> BotReacting a m (Either L.Text (RemoteFile a))
-sendFile path = do
-    chan <- getChannel
-    sendFileTo' path [chan]
+sendFile path = sendFileTo' path . return =<< getChannel
 
 
 -- | Share the file with the provided path to the channel with the specified name.
 sendFileTo :: (MonadAdapter m, AdapterT m ~ a, HasFiles a, MonadIO m) => FilePath -> L.Text -> m (Either L.Text (RemoteFile a))
-sendFileTo path chanName = do
-    chan <- resolveChannel chanName
-    maybe (return $ Left "Channel does not exist") (sendFileTo' path . return) chan
+sendFileTo path chanName = maybe (return $ Left "Channel does not exist") (sendFileTo' path . return) =<< resolveChannel chanName
 
 
 -- | Share the file with the provided path to the channel.
@@ -326,9 +316,7 @@ reply msg = do
 
 -- | Send a message to a Channel (by name)
 messageChannel :: (MonadAdapter m, MonadLogger m) => L.Text -> L.Text -> m ()
-messageChannel fname msg = do
-    mchan <- resolveChannel fname
-    maybe ($logError $(isT "No channel known with the name #{fname}")) (`messageChannel'` msg) mchan
+messageChannel fname msg = maybe ($logError $(isT "No channel known with the name #{fname}")) (`messageChannel'` msg) =<< resolveChannel fname
 
 
 -- | Send a message to a channel (by adapter dependent channel object)
@@ -344,8 +332,7 @@ messageChannel' chan = liftAdapterM . A.messageChannel chan
 --
 -- Roughly equivalent to "module.exports" in hubot.
 defineScript :: ScriptId -> ScriptDefinition a () -> ScriptInit a
-defineScript sid definitions =
-    ScriptInit (sid, runDefinitions sid definitions)
+defineScript sid definitions = ScriptInit (sid, runDefinitions sid definitions)
 
 
 -- | Obtain the event reaction data.
@@ -430,8 +417,7 @@ getConfigVal key = do
 requireConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m a
 requireConfigVal key = do
     cfg <- getConfig
-    l <- liftIO $ C.lookup cfg key
-    case l of
+    liftIO (C.lookup cfg key) >>= \case
         Just v -> return v
         _ -> do
             sid <- getScriptId
@@ -449,8 +435,7 @@ getBotName = fromMaybe defaultBotName <$> getAppConfigVal "name"
 extractReaction :: BotReacting a s o -> BotReacting a s (IO o)
 extractReaction reac = do
     logger <- askLoggerIO
-    BotReacting $
-        flip runLoggingT logger . runReaderT (runReaction reac) <$> ask
+    BotReacting $ flip runLoggingT logger . runReaderT (runReaction reac) <$> ask
 
 
 -- | Take an action and produce an IO action with the same effect.
