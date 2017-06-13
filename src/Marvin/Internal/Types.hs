@@ -269,21 +269,18 @@ class (IsAdapter (AdapterT m), Monad m) => MonadAdapter m where
     -- | Lift an action from the adapter context into the Monad @m@.
     liftAdapterM :: AdapterM (AdapterT m) r -> m r
 
+genericLiftAdapterM :: (MonadLoggerIO m, HasConfigAccess m) => m (AdapterT m) -> AdapterM (AdapterT m) r -> m r
+genericLiftAdapterM getAdapter (AdapterM ac) = do
+    logger <- askLoggerIO
+    liftIO . flip runLoggingT logger . runReaderT ac =<< AdapterMEnv <$> getConfigInternal <*> getAdapter
+
 instance IsAdapter a => MonadAdapter (ScriptDefinition a) where
     type AdapterT (ScriptDefinition a) = a
-    liftAdapterM (AdapterM ac) = do
-        a <- ScriptDefinition $ use adapter
-        c <- ScriptDefinition $ use config
-        logger <- askLoggerIO
-        liftIO $ flip runLoggingT logger $ runReaderT ac (AdapterMEnv c a)
+    liftAdapterM = genericLiftAdapterM (ScriptDefinition $ use adapter)
 
 instance IsAdapter a => MonadAdapter (BotReacting a b) where
     type AdapterT (BotReacting a b) = a
-    liftAdapterM (AdapterM ac) = do
-        a <- view adapter
-        c <- view config
-        logger <- askLoggerIO
-        liftIO $ flip runLoggingT logger $ runReaderT ac (AdapterMEnv c a)
+    liftAdapterM = genericLiftAdapterM (view adapter)
 
 instance IsAdapter a => MonadAdapter (AdapterM a) where
     type AdapterT (AdapterM a) = a
