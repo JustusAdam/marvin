@@ -9,11 +9,14 @@ Portability : POSIX
 -}
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Run
     ( runMarvin, ScriptInit, IsAdapter
     , requireFromAppConfig, lookupFromAppConfig, defaultConfigName
+    -- * Rolling your own
+    , runMarvinWithConfig, parseMarvinCmdArgs, marvinCmdArgsParser, setLoggingLevelIn, runStderrLoggingT
     ) where
 
 
@@ -142,40 +145,15 @@ setLoggingLevelIn lvl = filterLogger f
     where f _ lvl2 = lvl2 >= lvl
 
 
--- | Runs the marvin bot using whatever method the adapter uses.
-runMarvin :: forall a. IsAdapter a => [ScriptInit a] -> IO ()
-runMarvin s' = runStderrLoggingT $ do
-    -- prepareLogger
-    args <- liftIO $ execParser infoParser
+parseMarvinCmdArgs :: MonadIO m => m CmdOptions
+parseMarvinCmdArgs = liftIO $ execParser marvinCmdArgsParser
 
-    cfgLoc <- maybe
-                    (logInfoNS $(isT "#{applicationScriptId}") $(isT "Using default config: #{defaultConfigName}") >> return defaultConfigName)
-                    return
-                    (configPath args)
-    (cfgRaw, _) <- liftIO $ Cfg.autoReload Cfg.autoConfig [Cfg.Required cfgLoc]
-    let cfg = Config cfgRaw
-    loggingLevelFromCfg <- liftIO $ fmap unwrapLogLevel' <$> C.lookup cfg $(isT "#{applicationScriptId}.logging")
 
-    let !loggingLevel
-            | debug args = LevelDebug
-            | verbose args = LevelInfo
-            | otherwise = fromMaybe defaultLoggingLevel loggingLevelFromCfg
-
-    setLoggingLevelIn loggingLevel $ do
-        oldLogFn <- askLoggerIO
-        let runAdaLogging = liftIO . flip runLoggingT (loggingAddSourcePrefix adapterPrefix oldLogFn)
-        ada <- runAdaLogging initAdapter
-        handlers <- initHandlers s' cfg ada
-        eventChan <- newChan
-        a <- async $ runWAda ada cfg $ runAdapter (writeChan eventChan)
-        link a
-        runHandlers handlers eventChan
-
+marvinCmdArgsParser :: ParserInfo CmdOptions
+marvinCmdArgsParser = info
+    (helper <*> optsParser)
+    (fullDesc <> header "Instance of marvin, the modular bot.")
   where
-    adapterPrefix = $(isT "adapter.#{adapterId :: AdapterId a}")
-    infoParser = info
-        (helper <*> optsParser)
-        (fullDesc <> header "Instance of marvin, the modular bot.")
     optsParser = CmdOptions
         <$> optional
             ( strOption
@@ -195,4 +173,44 @@ runMarvin s' = runStderrLoggingT $ do
             (  long "debug"
             <> help "enable debug logging (overrides config and verbose flag)"
             )
+
+
+getLoggingLevel :: MonadIO m => Config -> CmdOptions -> m LogLevel
+getLoggingLevel cfg args = do
+    loggingLevelFromCfg <- liftIO $ fmap unwrapLogLevel' <$> C.lookup cfg $(isT "#{applicationScriptId}.logging")
+
+    pure $ if | debug args -> LevelDebug
+              | verbose args -> LevelInfo
+              | otherwise -> fromMaybe defaultLoggingLevel loggingLevelFromCfg
+
+
+runMarvin :: forall a. IsAdapter a => [ScriptInit a] -> IO ()
+runMarvin s' = runStderrLoggingT $ do
+    args <- parseMarvinCmdArgs
+
+    cfgLoc <- maybe
+                    (logInfoNS $(isT "#{applicationScriptId}") $(isT "Using default config: #{defaultConfigName}") >> return defaultConfigName)
+                    return
+                    (configPath args)
+    (cfgRaw, _) <- liftIO $ Cfg.autoReload Cfg.autoConfig [Cfg.Required cfgLoc]
+    let cfg = Config cfgRaw
+    !loggingLevel <- getLoggingLevel cfg args
+    setLoggingLevelIn loggingLevel $ runMarvinWithConfig cfg args s'
+
+
+-- | Runs the marvin bot using whatever method the adapter uses.
+runMarvinWithConfig :: forall a. IsAdapter a => Config -> CmdOptions -> [ScriptInit a] -> RunnerM ()
+runMarvinWithConfig cfg args s' = do
+    oldLogFn <- askLoggerIO
+    let runAdaLogging = liftIO . flip runLoggingT (loggingAddSourcePrefix adapterPrefix oldLogFn)
+    ada <- runAdaLogging initAdapter
+    handlers <- initHandlers s' cfg ada
+    eventChan <- newChan
+    a <- async $ runWAda ada cfg $ runAdapter (writeChan eventChan)
+    link a
+    runHandlers handlers eventChan
+
+  where
+    adapterPrefix = $(isT "adapter.#{adapterId :: AdapterId a}")
+
 
