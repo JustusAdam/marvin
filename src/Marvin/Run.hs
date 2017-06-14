@@ -17,7 +17,7 @@ module Marvin.Run
     ) where
 
 
-import           Control.Concurrent.Async.Lifted (async, link, wait, mapConcurrently_)
+import           Control.Concurrent.Async.Lifted (async, link, mapConcurrently_, wait)
 import           Control.Concurrent.Chan.Lifted
 import           Control.DeepSeq
 import           Control.Exception.Lifted
@@ -80,8 +80,7 @@ runWAda ada cfg ac = runReaderT (runAdapterAction ac) (AdapterMEnv cfg ada)
 
 -- TODO add timeouts for handlers
 runHandlers :: forall a. IsAdapter a => Handlers a -> Chan (Event a) -> RunnerM ()
-runHandlers handlers eventChan =
-    forever $ readChan eventChan >>= genericHandler
+runHandlers handlers eventChan = forever $ readChan eventChan >>= genericHandler
   where
     genericHandler ev = void $ async $ do
         generics <- mapM async $ vcatMaybes $ fmap ($ ev) customsV

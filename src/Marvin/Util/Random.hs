@@ -36,5 +36,5 @@ randomValFromRange = liftIO . randomRIO
 --
 -- Usable in all IO capable monads, such as 'BotReacting' and 'ScriptDefinition'.
 randomFrom :: MonadIO m => [e] -> m e
-randomFrom [] = error "List of random elements may not be empty!"
+randomFrom []   = error "List of random elements may not be empty!"
 randomFrom list = (list !!) <$> randomValFromRange (0, pred $ length list)

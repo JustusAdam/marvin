@@ -27,6 +27,7 @@ import           Control.Monad.Logger
 import           Data.Aeson                      hiding (Error)
 import           Data.Aeson.Types                hiding (Error)
 import qualified Data.ByteString.Lazy.Char8      as BS
+import           Data.IORef.Lifted
 import           Data.Maybe                      (fromMaybe)
 import qualified Data.Text                       as T
 import           Marvin.Adapter
@@ -38,7 +39,6 @@ import           Network.WebSockets
 import           Network.Wreq
 import           Text.Read                       (readMaybe)
 import           Wuss
-import Data.IORef.Lifted
 
 
 runConnectionLoop :: Chan (InternalType RTM) -> MVar Connection -> AdapterM (SlackAdapter RTM) ()
