@@ -11,6 +11,7 @@ import qualified Data.Text.IO          as T
 import qualified Data.Vector           as V
 import           ExternalScripts
 import           Marvin.Run            (defaultConfigName, lookupFromAppConfig)
+import           Marvin.Util.Config    (Config(Config))
 import           Options.Applicative
 import           Prelude
 import           System.Directory
@@ -55,7 +56,7 @@ main = do
     adapter' <- maybe
         (do
             (cfg, _) <- C.autoReload C.autoConfig $ maybe [] (return . C.Optional) configLocation
-            lookupFromAppConfig cfg "adapter"
+            lookupFromAppConfig (Config cfg) "adapter"
         )
         (return . return)
         adapter

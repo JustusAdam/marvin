@@ -26,19 +26,18 @@ import           Control.Lens
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
-import qualified Data.Configurator           as C
-import qualified Data.Configurator.Types     as C
 import           Data.Maybe                  (fromMaybe)
 import qualified Data.Text.Lazy              as L
 import           Marvin.Internal.LensClasses
 import           Marvin.Internal.Types
 import           Marvin.Internal.Values
 import           Marvin.Interpolate.Text
+import qualified Marvin.Util.Config          as C
 
 
 getAppConfig :: AdapterM a C.Config
 getAppConfig = AdapterM $
-    C.subconfig $(isT "#{applicationScriptId}") <$> view config
+    C.subconfig $(isT "#{applicationScriptId}") =<< view config
 
 
 lookupFromAppConfig :: C.Configured v => C.Name -> AdapterM a (Maybe v)
@@ -55,7 +54,7 @@ getBotname = fromMaybe defaultBotName <$> lookupFromAppConfig "name"
 
 getAdapterConfig :: forall a. IsAdapter a => AdapterM a C.Config
 getAdapterConfig = AdapterM $
-    C.subconfig $(isT "#{adapterConfigKey}.#{adapterId :: AdapterId a}") <$> view config
+    C.subconfig $(isT "#{adapterConfigKey}.#{adapterId :: AdapterId a}") =<< view config
 
 
 lookupFromAdapterConfig :: (IsAdapter a, C.Configured v) => C.Name -> AdapterM a (Maybe v)

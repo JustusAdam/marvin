@@ -89,6 +89,7 @@ library
       Marvin.Util.Regex
       Marvin.Util.Random
       Marvin.Util.JSON
+      Marvin.Util.Config
       Marvin.Adapter
       Marvin.Adapter.Shell
       Marvin.Adapter.IRC

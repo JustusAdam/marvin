@@ -56,8 +56,6 @@ import           Control.Monad.Reader        (ask, runReaderT)
 import           Control.Monad.State         (MonadState)
 import           Data.ByteString.Lazy        (ByteString)
 import qualified Data.ByteString.Lazy        as B
-import qualified Data.Configurator           as C
-import qualified Data.Configurator.Types     as C
 import qualified Data.HashMap.Strict         as HM
 import           Data.Maybe                  (fromMaybe)
 import           Data.Monoid                 ((<>))
@@ -77,6 +75,7 @@ import           Marvin.Internal.Types       (BotActionState(BotActionState),
 import           Marvin.Internal.Values      (defaultBotName)
 import           Marvin.Interpolate.All
 import           Marvin.Types
+import qualified Marvin.Util.Config          as C
 import           Marvin.Util.Regex           (Match, Regex)
 import           System.Directory
 import           System.FilePath
@@ -406,7 +405,7 @@ getRemoteFile = (unwrapFile' :: RemoteFile' a -> RemoteFile a) <$> view (payload
 getConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m (Maybe a)
 getConfigVal key = do
     cfg <- getConfig
-    liftIO $ C.lookup cfg key
+    C.lookup cfg key
 
 
 -- | Get a value out of the config and fail with an error if the specified key is not found.
@@ -417,7 +416,7 @@ getConfigVal key = do
 requireConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m a
 requireConfigVal key = do
     cfg <- getConfig
-    liftIO (C.lookup cfg key) >>= \case
+    C.lookup cfg key >>= \case
         Just v -> return v
         _ -> do
             sid <- getScriptId

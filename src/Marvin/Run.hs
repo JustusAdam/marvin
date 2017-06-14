@@ -24,8 +24,8 @@ import           Control.Exception.Lifted
 import           Control.Lens                    hiding (cons)
 import           Control.Monad.Logger
 import           Control.Monad.Reader
-import qualified Data.Configurator               as C
-import qualified Data.Configurator.Types         as C
+import qualified Data.Configurator               as Cfg
+import qualified Data.Configurator.Types         as Cfg
 import           Data.Foldable                   (for_)
 import qualified Data.HashMap.Strict             as HM
 import           Data.Maybe                      (catMaybes, fromJust, fromMaybe, isJust)
@@ -38,6 +38,7 @@ import           Marvin.Internal.LensClasses
 import           Marvin.Internal.Types
 import           Marvin.Internal.Values
 import           Marvin.Interpolate.Text
+import           Marvin.Util.Config              as C
 import           Marvin.Util.Regex
 import           Options.Applicative
 import           Prelude                         hiding (dropWhile, splitAt)
@@ -65,14 +66,18 @@ defaultLoggingLevel = LevelWarn
 
 
 -- | Retrieve a value from the application config, given the whole config structure. Fails if value not parseable as @a@ or not present.
-requireFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO a
-requireFromAppConfig = C.require . C.subconfig (unwrapScriptId applicationScriptId)
+requireFromAppConfig :: (Configured a, MonadIO m) => Config -> Name -> m a
+requireFromAppConfig cfg name = do
+    subconf <- subconfig (unwrapScriptId applicationScriptId) cfg
+    require subconf name
 
 
 -- | Retrieve a value from the application config, given the whole config structure.
 -- Returns 'Nothing' if value not parseable as @a@ or not present.
-lookupFromAppConfig :: C.Configured a => C.Config -> C.Name -> IO (Maybe a)
-lookupFromAppConfig = C.lookup . C.subconfig (unwrapScriptId applicationScriptId)
+lookupFromAppConfig :: (C.Configured a, MonadIO m) => C.Config -> C.Name -> m (Maybe a)
+lookupFromAppConfig config name = do
+    subconf <- C.subconfig (unwrapScriptId applicationScriptId) config
+    C.lookup subconf name
 
 
 runWAda :: a -> C.Config -> AdapterM a r -> RunnerM r
@@ -120,7 +125,7 @@ runHandlers handlers eventChan = forever $ readChan eventChan >>= genericHandler
     Handlers respondsV hearsV customsV joinsV leavesV topicsV fileSharesV joinsInV leavesFromV topicsInV fileSharesInV = handlers
 
 
-initHandlers :: IsAdapter a => [ScriptInit a] -> C.Config -> a -> RunnerM (Handlers a)
+initHandlers :: IsAdapter a => [ScriptInit a] -> Config -> a -> RunnerM (Handlers a)
 initHandlers inits botConfig ada = do
     logInfoNS logSource "Initializing scripts"
     !handlers <- force . foldMap (^.actions) . catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada botConfig) (onInitExcept sid)) inits
@@ -150,7 +155,8 @@ runMarvin s' = runStderrLoggingT $ do
                     (logInfoNS $(isT "#{applicationScriptId}") $(isT "Using default config: #{defaultConfigName}") >> return defaultConfigName)
                     return
                     (configPath args)
-    (cfg, _) <- liftIO $ C.autoReload C.autoConfig [C.Required cfgLoc]
+    (cfgRaw, _) <- liftIO $ Cfg.autoReload Cfg.autoConfig [Cfg.Required cfgLoc]
+    let cfg = Config cfgRaw
     loggingLevelFromCfg <- liftIO $ C.lookup cfg $(isT "#{applicationScriptId}.logging")
 
     let !loggingLevel

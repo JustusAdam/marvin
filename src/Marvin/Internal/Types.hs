@@ -13,7 +13,6 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Control
 import           Data.ByteString.Lazy        (ByteString)
 import           Data.Char                   (isAlphaNum, isLetter)
-import qualified Data.Configurator.Types     as C
 import qualified Data.HashMap.Strict         as HM
 import           Data.Monoid
 import           Data.String
@@ -24,6 +23,7 @@ import           Data.Vector                 (Vector)
 import           GHC.Generics
 import           Marvin.Internal.LensClasses
 import           Marvin.Interpolate.All
+import qualified Marvin.Util.Config          as C
 import           Marvin.Util.Regex
 
 -- | The topic in a channel

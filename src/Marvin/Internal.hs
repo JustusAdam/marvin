@@ -10,16 +10,15 @@ import           Control.Exception.Lifted
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.State
-import qualified Data.Configurator        as C
-import qualified Data.Configurator.Types  as C
 import           Marvin.Internal.Types
 import           Marvin.Internal.Values
 import           Marvin.Interpolate.Text
+import qualified Marvin.Util.Config       as C
 import           Util
 
 
-getSubConfFor :: HasConfigAccess m => ScriptId -> m C.Config
-getSubConfFor (ScriptId name) = C.subconfig $(isT "#{scriptConfigKey}.#{name}") <$> getConfigInternal
+getSubConfFor :: (HasConfigAccess m, MonadIO m) => ScriptId -> m C.Config
+getSubConfFor (ScriptId name) = C.subconfig $(isT "#{scriptConfigKey}.#{name}") =<< getConfigInternal
 
 
 -- | Get the config part for the currect script
