@@ -335,13 +335,16 @@ mkScriptId = verifyIdString "script id" ScriptId
 mkAdapterId :: T.Text -> Either String (AdapterId a)
 mkAdapterId = verifyIdString "adapter id" AdapterId
 
-instance C.Configured LogLevel where
+newtype LogLevel' = LogLevel' { unwrapLogLevel' :: LogLevel }
+
+instance C.Configured LogLevel' where
     convert (C.String s) =
         case T.strip $ T.toLower s of
-            "debug"   -> Just LevelDebug
-            "warning" -> Just LevelWarn
-            "error"   -> Just LevelError
-            "info"    -> Just LevelInfo
+            "debug"   -> ll LevelDebug
+            "warning" -> ll LevelWarn
+            "error"   -> ll LevelError
+            "info"    -> ll LevelInfo
             _         -> Nothing
+      where ll = return . LogLevel'
     convert _            = Nothing
 

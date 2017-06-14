@@ -24,8 +24,6 @@ module Marvin.Adapter
 
 import           Control.Lens
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
-import           Control.Monad.Reader
 import           Data.Maybe                  (fromMaybe)
 import qualified Data.Text.Lazy              as L
 import           Marvin.Internal.LensClasses

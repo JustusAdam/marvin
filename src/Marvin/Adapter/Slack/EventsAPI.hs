@@ -93,15 +93,13 @@ sendMessageLoop = do
     outChan <- view (adapter.outChannel)
     forever $ do
         (SlackChannelId chan, msg) <- readChan outChan
-        res <- execAPIMethod
-            (const $ return ())
-            "chat.postMessage"
-            [ "channel" := chan
-            , "text" := msg
-            ]
-        case res of
-            Left err -> logErrorN $(isT "Sending message failed: #{err}")
-            Right () -> return ()
+        either (\err -> logErrorN $(isT "Sending message failed: #{err}")) (const $ return ()) =<<
+            execAPIMethod
+                (const $ return ())
+                "chat.postMessage"
+                [ "channel" := chan
+                , "text" := msg
+                ]
 
 
 -- | Recieve events as a server via HTTP webhook

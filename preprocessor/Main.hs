@@ -8,7 +8,6 @@ import           Data.List             (intercalate, isPrefixOf)
 import           Data.Maybe            (fromMaybe)
 import           Data.Monoid           ((<>))
 import qualified Data.Text.IO          as T
-import qualified Data.Vector           as V
 import           ExternalScripts
 import           Marvin.Run            (defaultConfigName, lookupFromAppConfig)
 import           Marvin.Util.Config    (Config(Config))

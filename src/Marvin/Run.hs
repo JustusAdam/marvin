@@ -25,13 +25,10 @@ import           Control.Lens                    hiding (cons)
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import qualified Data.Configurator               as Cfg
-import qualified Data.Configurator.Types         as Cfg
-import           Data.Foldable                   (for_)
 import qualified Data.HashMap.Strict             as HM
 import           Data.Maybe                      (catMaybes, fromJust, fromMaybe, isJust)
 import           Data.Monoid                     ((<>))
 import qualified Data.Text.Lazy                  as L
-import           Data.Traversable                (for)
 import           Data.Vector                     (Vector)
 import qualified Data.Vector                     as V
 import           Marvin.Internal.LensClasses
@@ -67,17 +64,17 @@ defaultLoggingLevel = LevelWarn
 
 -- | Retrieve a value from the application config, given the whole config structure. Fails if value not parseable as @a@ or not present.
 requireFromAppConfig :: (Configured a, MonadIO m) => Config -> Name -> m a
-requireFromAppConfig cfg name = do
+requireFromAppConfig cfg n = do
     subconf <- subconfig (unwrapScriptId applicationScriptId) cfg
-    require subconf name
+    require subconf n
 
 
 -- | Retrieve a value from the application config, given the whole config structure.
 -- Returns 'Nothing' if value not parseable as @a@ or not present.
 lookupFromAppConfig :: (C.Configured a, MonadIO m) => C.Config -> C.Name -> m (Maybe a)
-lookupFromAppConfig config name = do
-    subconf <- C.subconfig (unwrapScriptId applicationScriptId) config
-    C.lookup subconf name
+lookupFromAppConfig cfg n = do
+    subconf <- C.subconfig (unwrapScriptId applicationScriptId) cfg
+    C.lookup subconf n
 
 
 runWAda :: a -> C.Config -> AdapterM a r -> RunnerM r
@@ -157,7 +154,7 @@ runMarvin s' = runStderrLoggingT $ do
                     (configPath args)
     (cfgRaw, _) <- liftIO $ Cfg.autoReload Cfg.autoConfig [Cfg.Required cfgLoc]
     let cfg = Config cfgRaw
-    loggingLevelFromCfg <- liftIO $ C.lookup cfg $(isT "#{applicationScriptId}.logging")
+    loggingLevelFromCfg <- liftIO $ fmap unwrapLogLevel' <$> C.lookup cfg $(isT "#{applicationScriptId}.logging")
 
     let !loggingLevel
             | debug args = LevelDebug

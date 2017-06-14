@@ -22,6 +22,7 @@ import           Control.Concurrent.MVar.Lifted
 import           Control.Exception.Lifted
 import           Control.Lens                    hiding ((.=))
 import           Control.Monad
+import           Control.Monad.Except
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson                      hiding (Error)
@@ -42,8 +43,7 @@ import           Wuss
 
 
 runConnectionLoop :: Chan (InternalType RTM) -> MVar Connection -> AdapterM (SlackAdapter RTM) ()
-runConnectionLoop eventChan connectionTracker = forever $ do
-    token <- requireFromAdapterConfig "token"
+runConnectionLoop eventChan connectionTracker = do
     messageChan <- newChan
     void $ async $ forever $ do
         msg <- readChan messageChan
@@ -54,17 +54,19 @@ runConnectionLoop eventChan connectionTracker = forever $ do
             -- (which it should be)
             Left e  -> logDebugN $(isT "Error parsing json: #{e} original data: #{rawBS msg}")
             Right v -> writeChan eventChan v
-    logDebugN "initializing socket"
-    r <- liftIO $ post "https://slack.com/api/rtm.start" [ "token" := (token :: T.Text) ]
-    case eitherDecode (r^.responseBody) of
-        Left err -> logErrorN $(isT "Error decoding rtm json #{err}")
-        Right js -> do
-            port <- case uriPort authority_ of
-                        v@(':':rest_) -> maybe (portOnErr v) return $ readMaybe rest_
-                        v             -> portOnErr v
-            logDebugN $(isT "connecting to socket '#{uri}'")
-            logFn <- askLoggerIO
-            catch
+    forever $ do
+        token <- requireFromAdapterConfig "token"
+        logDebugN "initializing socket"
+        r <- liftIO $ post "https://slack.com/api/rtm.start" [ "token" := (token :: T.Text) ]
+        case eitherDecode (r^.responseBody) of
+            Left err -> logErrorN $(isT "Error decoding rtm json #{err}")
+            Right js -> do
+                port <- case uriPort authority_ of
+                            v@(':':rest_) -> maybe (portOnErr v) return $ readMaybe rest_
+                            v             -> portOnErr v
+                logDebugN $(isT "connecting to socket '#{uri}'")
+                logFn <- askLoggerIO
+
                 (liftIO $ runSecureClient host port path_ $ \conn -> flip runLoggingT logFn $ do
                     logInfoN "Connection established"
                     d <- liftIO $ receiveData conn
@@ -76,17 +78,17 @@ runConnectionLoop eventChan connectionTracker = forever $ do
                     forever $ do
                         data_ <- liftIO $ receiveData conn
                         writeChan messageChan data_)
-                $ \e -> do
+                `catch` \e -> do
                     void $ takeMVar connectionTracker
                     logErrorN $(isT "#{e :: ConnectionException}")
-          where
-            uri = url js
-            authority_ = fromMaybe (error "URI lacks authority") (uriAuthority uri)
-            host = uriUserInfo authority_ ++ uriRegName authority_
-            path_ = uriPath uri
-            portOnErr v = do
-                logErrorN $(isT "Unreadable port #{v}")
-                return 443
+              where
+                uri = url js
+                authority_ = fromMaybe (error "URI lacks authority") (uriAuthority uri)
+                host = uriUserInfo authority_ ++ uriRegName authority_
+                path_ = uriPath uri
+                portOnErr v = do
+                    logErrorN $(isT "Unreadable port #{v}")
+                    return 443
 
 
 senderLoop :: MVar Connection -> AdapterM (SlackAdapter a) ()
@@ -103,16 +105,13 @@ senderLoop connectionTracker = do
                 , "text" .= msg
                 ]
 
-            go 0 = logErrorN "Connection error, quitting retry."
-            go n =
-                catch
-                    (do
-                        conn <- readMVar connectionTracker
-                        liftIO $ sendTextData conn encoded)
-                    $ \e -> do
-                        logErrorN $(isT "#{e :: ConnectionException}")
-                        go (n-1)
-        go (3 :: Int)
+            try =
+                withMVar connectionTracker (liftIO . flip sendTextData encoded)
+                `catch` \e -> do
+                    logErrorN $(isT "#{e :: ConnectionException}")
+                    throwError ()
+
+        either (const $ logErrorN "Connection error, quitting retry.") return =<< runExceptT (msum (replicate 3 try))
 
 
 -- | Recieve events by opening a websocket to the Real Time Messaging API
