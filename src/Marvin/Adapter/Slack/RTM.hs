@@ -87,7 +87,7 @@ runConnectionLoop eventChan connectionTracker = do
                 host = uriUserInfo authority_ ++ uriRegName authority_
                 path_ = uriPath uri
                 portOnErr v = do
-                    logErrorN $(isT "Unreadable port #{v}")
+                    logWarnN $(isT "Port unreadable \"#{v}\", trying standard port 443")
                     return 443
 
 

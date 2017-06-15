@@ -16,7 +16,8 @@ module Marvin.Run
     ( runMarvin, ScriptInit, IsAdapter
     , requireFromAppConfig, lookupFromAppConfig, defaultConfigName
     -- * Rolling your own
-    , runMarvinWithConfig, parseMarvinCmdArgs, marvinCmdArgsParser, setLoggingLevelIn, runStderrLoggingT
+    , runMarvinWithConfig, parseMarvinCmdArgs, marvinCmdArgsParser
+    , setLoggingLevelIn, runStderrLoggingT, getLoggingLevel, CmdOptions, configPath, verbose, debug
     ) where
 
 
@@ -49,6 +50,7 @@ vcatMaybes :: Vector (Maybe b) -> Vector b
 vcatMaybes = V.map fromJust . V.filter isJust
 
 
+-- | Command line options for marvin.
 data CmdOptions = CmdOptions
     { configPath :: Maybe FilePath
     , verbose    :: Bool
@@ -85,9 +87,9 @@ runWAda ada cfg ac = runReaderT (runAdapterAction ac) (AdapterMEnv cfg ada)
 
 -- TODO add timeouts for handlers
 runHandlers :: forall a. IsAdapter a => Handlers a -> Chan (Event a) -> RunnerM ()
-runHandlers handlers eventChan = forever $ readChan eventChan >>= genericHandler
+runHandlers handlers eventChan = forever $ readChan eventChan >>= void . async . genericHandler
   where
-    genericHandler ev = void $ async $ do
+    genericHandler ev = do
         generics <- mapM async $ vcatMaybes $ fmap ($ ev) customsV
         handler ev
         mapM_ wait generics
@@ -140,15 +142,18 @@ initHandlers inits botConfig ada = do
       where err = logErrorNS logSource
 
 
+-- | Sets the logging level for the nested logger monad
 setLoggingLevelIn :: LogLevel -> RunnerM a -> RunnerM a
 setLoggingLevelIn lvl = filterLogger f
     where f _ lvl2 = lvl2 >= lvl
 
 
+-- | Parse the standard marvin command line args from the environment
 parseMarvinCmdArgs :: MonadIO m => m CmdOptions
 parseMarvinCmdArgs = liftIO $ execParser marvinCmdArgsParser
 
 
+-- | The parser for the standard command line arguments
 marvinCmdArgsParser :: ParserInfo CmdOptions
 marvinCmdArgsParser = info
     (helper <*> optsParser)
@@ -184,23 +189,26 @@ getLoggingLevel cfg args = do
               | otherwise -> fromMaybe defaultLoggingLevel loggingLevelFromCfg
 
 
-runMarvin :: forall a. IsAdapter a => [ScriptInit a] -> IO ()
+-- | Runs the marvin bot using whatever method the adapter uses.
+runMarvin :: IsAdapter a => [ScriptInit a] -> IO ()
 runMarvin s' = runStderrLoggingT $ do
     args <- parseMarvinCmdArgs
 
     cfgLoc <- maybe
-                    (logInfoNS $(isT "#{applicationScriptId}") $(isT "Using default config: #{defaultConfigName}") >> return defaultConfigName)
+                    (logInfoNS $(isT "#{applicationScriptId}") $(isT "Using default config: #{defaultConfigName}")
+                        >> return defaultConfigName)
                     return
                     (configPath args)
     (cfgRaw, _) <- liftIO $ Cfg.autoReload Cfg.autoConfig [Cfg.Required cfgLoc]
     let cfg = Config cfgRaw
     !loggingLevel <- getLoggingLevel cfg args
-    setLoggingLevelIn loggingLevel $ runMarvinWithConfig cfg args s'
+    setLoggingLevelIn loggingLevel $ runMarvinWithConfig cfg s'
 
 
--- | Runs the marvin bot using whatever method the adapter uses.
-runMarvinWithConfig :: forall a. IsAdapter a => Config -> CmdOptions -> [ScriptInit a] -> RunnerM ()
-runMarvinWithConfig cfg args s' = do
+-- | Run marvin on a custom implementation of config and on a custom logger
+-- This function does not change the logger in any way, meaning things such as logging level have to be set before.
+runMarvinWithConfig :: forall a. IsAdapter a => Config -> [ScriptInit a] -> RunnerM ()
+runMarvinWithConfig cfg s' = do
     oldLogFn <- askLoggerIO
     let runAdaLogging = liftIO . flip runLoggingT (loggingAddSourcePrefix adapterPrefix oldLogFn)
     ada <- runAdaLogging initAdapter

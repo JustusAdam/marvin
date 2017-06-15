@@ -1,3 +1,7 @@
+-- This file has been generated from package.yaml by hpack version 0.17.0.
+--
+-- see: https://github.com/sol/hpack
+
 name:                marvin-integration
 version:             0.1.0.0
 synopsis:            Initial project template from stack
@@ -7,44 +11,49 @@ license:             BSD3
 license-file:        LICENSE
 author:              JustusAdam
 maintainer:          dev@justus.science
-copyright:           Copyright: (c) 2016 Justus Adam
+copyright:           Copyright: (c) 2016, 2017 Justus Adam
 category:            Development
 build-type:          Simple
--- extra-source-files:
-cabal-version:       >=1.10
+cabal-version:       >= 1.10
 
 executable marvin-integration
-  hs-source-dirs:      slack
-  main-is:             Main.hs
-  other-modules:       Script1
-                     , Paths_marvin_integration
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  build-depends:       base
-                     , marvin
-                     , text
-                     , directory
-                     , filepath
-  default-language:    Haskell2010
-  default-extensions:  OverloadedStrings
-                     , TypeFamilies
-                     , MultiParamTypeClasses
-                     , TupleSections
-                     , GADTs
+  hs-source-dirs:
+      slack
+  main-is: Main.hs
+  other-modules:
+      Script1
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -with-rtsopts=-K1K
+  build-depends:
+      base
+    , marvin
+    , text
+    , directory
+    , filepath
+    , base
+    , marvin
+    , text
+    , directory
+    , filepath
+  default-language: Haskell2010
+  default-extensions: OverloadedStrings TypeFamilies MultiParamTypeClasses TupleSections GADTs OverloadedStrings TypeFamilies MultiParamTypeClasses TupleSections GADTs
 
 executable marvin-shell
-  hs-source-dirs:      shell
-  main-is:             Main.hs
-  other-modules:       Script1
-                     , Paths_marvin_integration
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  build-depends:       base
-                     , marvin
-                     , text
-                     , directory
-                     , filepath
-  default-language:    Haskell2010
-  default-extensions:  OverloadedStrings
-                     , TypeFamilies
-                     , MultiParamTypeClasses
-                     , TupleSections
-                     , GADTs
+  hs-source-dirs:
+      shell
+  main-is: Main.hs
+  other-modules:
+      Script1
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -with-rtsopts=-K1K
+  build-depends:
+      base
+    , marvin
+    , text
+    , directory
+    , filepath
+    , base
+    , marvin
+    , text
+    , directory
+    , filepath
+  default-language: Haskell2010
+  default-extensions: OverloadedStrings TypeFamilies MultiParamTypeClasses TupleSections GADTs OverloadedStrings TypeFamilies MultiParamTypeClasses TupleSections GADTs
