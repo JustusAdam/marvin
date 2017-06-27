@@ -41,7 +41,7 @@ wantFiles = map (second $ fromEither . compileTemplate "")
     [ ("Main.hs.mustache", "bot/Main.hs")
     , ("MyScript.hs.mustache", "bot/MyScript.hs")
     , ("config.cfg.mustache", "config.cfg")
-    , ("bot.cabal.mustache", "{{name}}.cabal")
+    , ("package.yaml.mustache", "package.yaml")
     ]
 
 
@@ -59,7 +59,7 @@ adType =
 main :: IO ()
 main = do
     Opts{..} <- execParser infoParser
-    d <- (</> "initializer") <$> getDataDir
+    d <- (</> "resources/initializer") <$> getDataDir
     unless (isJust $ lookup adapter adType) $ hPutStrLn stderr "Unrecognized adapter"
 
     let (adModule, adSig) = maybe ("IsAdapter a => ScriptInit a", "") (("import " <>) *** ("ScriptInit " <>)) (lookup adapter adType)
