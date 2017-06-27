@@ -163,9 +163,11 @@ helloParser = withObject "expected object" $ \o -> do
 
 
 userInfoParser :: Value -> Parser UserInfo
-userInfoParser = withObject "expected object" $ \o' -> do
-    o2 <- o' .: "profile"
-    UserInfo <$> o' .: "name" <*> o' .: "id"
+userInfoParser = withObject "expected object" $ \o -> do
+    o2 <- o .: "profile"
+    UserInfo 
+        <$> o .: "name" 
+        <*> o .: "id"
         <*> o2 .:? "real_name"
         <*> o2 .:? "first_name"
         <*> o2 .:? "last_name"

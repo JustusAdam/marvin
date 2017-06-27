@@ -58,7 +58,8 @@ getResolver = fromMaybe "lts" <$> lookupEnv "STACK_RESOLVER"
 prepareBuilder :: FilePath -> IO (String -> [String] -> IO (), IO ())
 prepareBuilder dir =
     lookupEnv "BUILD" >>= \case
-        Just "cabal" ->
+        Just "cabal" -> do
+            callProcess "hpack" []
             return
                 ( callProcess
                 , callProcess "cabal" ["build"])
@@ -85,7 +86,7 @@ compileIntegration :: IO ()
 compileIntegration =
     withTempDirectory "." ".test" $ \dir -> do
         copyDirectory "test/integration" dir
-        (_, builder) <- prepareBuilder dir
+        (executor, builder) <- prepareBuilder dir
         getAndModifyStackYaml (dir </> "stack.yaml")
         withCurrentDirectory dir builder
 

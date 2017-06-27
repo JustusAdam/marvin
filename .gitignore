@@ -5,4 +5,3 @@ dist/
 .DS_Store
 /test/integration/config.cfg
 /marvin.cabal
-/test/integration/marvin-integration.cabal

@@ -42,6 +42,7 @@ wantFiles = map (second $ fromEither . compileTemplate "")
     , ("MyScript.hs.mustache", "bot/MyScript.hs")
     , ("config.cfg.mustache", "config.cfg")
     , ("package.yaml.mustache", "package.yaml")
+    , ("bot.cabal.mustache", "{{ name }}.cabal")
     ]
 
 

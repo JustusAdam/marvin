@@ -44,7 +44,7 @@ import           Network.Wreq
 
 pushEventGetter :: Chan (TelegramUpdate Push) -> AdapterM (TelegramAdapter Push) ()
 pushEventGetter evChan = do
-    void $ async $ do
+    a <- async $ do
         url_ <- requireFromAdapterConfig "url"
         r <- execAPIMethod parseJSON "setWebhook"
             [ "url" := (url_ :: T.Text)
@@ -55,6 +55,7 @@ pushEventGetter evChan = do
             Right Success{ result = False } -> error $(isS "Setting webhok failed. Review your settings and try again.")
             Left err -> error $(isS "Parsing result from setting webhook failed #{err}")
             Right Error{errDescription} -> error $(isS "Setting the webhook failed: #{errDescription}")
+    link a
     useTLS <- fromMaybe True <$> lookupFromAdapterConfig "use-tls"
     port <- requireFromAdapterConfig "port"
 

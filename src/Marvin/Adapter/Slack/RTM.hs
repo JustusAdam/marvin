@@ -45,7 +45,7 @@ import           Wuss
 runConnectionLoop :: Chan (InternalType RTM) -> MVar Connection -> AdapterM (SlackAdapter RTM) ()
 runConnectionLoop eventChan connectionTracker = do
     messageChan <- newChan
-    void $ async $ forever $ do
+    a <- async $ forever $ do
         msg <- readChan messageChan
         case eitherDecode msg >>= parseEither eventParser of
             -- changed it do logDebug for now as we still have events that we do not handle
@@ -54,6 +54,7 @@ runConnectionLoop eventChan connectionTracker = do
             -- (which it should be)
             Left e  -> logDebugN $(isT "Error parsing json: #{e} original data: #{rawBS msg}")
             Right v -> writeChan eventChan v
+    link a
     forever $ do
         token <- requireFromAdapterConfig "token"
         logDebugN "initializing socket"
