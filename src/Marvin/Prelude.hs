@@ -24,18 +24,18 @@ module Marvin.Prelude
     -- ** Arbitrary IO in scripts
     , MonadIO, liftIO
     -- ** Lenses
-    , module Control.Lens
+    , module Lens.Micro.Platform
     -- ** Useful functions not in the normal Prelude
     , when, unless, for, for_, filterM, fromMaybe
     ) where
 
-import           Control.Lens                 (at, ix, lens, (&), (.~), (^.), (^?), (^?!))
 import           Control.Monad                (filterM, unless, when)
 import           Control.Monad.IO.Class       (MonadIO, liftIO)
 import           Control.Monad.Logger
 import           Data.Foldable                (for_)
 import           Data.Maybe                   (fromMaybe)
 import           Data.Traversable             (for)
+import           Lens.Micro.Platform          (at, ix, lens, (&), (.~), (^.), (^?), (^?!))
 import           Marvin
 import           Marvin.Interpolate.String    (isS)
 import           Marvin.Interpolate.Text      (isT)

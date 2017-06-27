@@ -3,7 +3,6 @@ module Marvin.Adapter.Slack.Types where
 
 import           Control.Concurrent.Chan.Lifted (Chan)
 import           Control.Concurrent.MVar.Lifted (MVar)
-import           Control.Lens                   hiding ((.=))
 import           Data.Aeson                     hiding (Error)
 import           Data.Aeson.TH
 import           Data.Aeson.Types               hiding (Error)
@@ -15,6 +14,7 @@ import           Data.HashMap.Strict            (HashMap)
 import           Data.String                    (IsString(..))
 import qualified Data.Text                      as T
 import qualified Data.Text.Lazy                 as L
+import           Lens.Micro.Platform            hiding ((.=))
 import           Marvin.Adapter
 import           Marvin.Types
 import           Network.URI
@@ -48,48 +48,36 @@ class HasNameResolver s a | s -> a where nameResolver :: Lens' s a
 class HasInfoCache s a | s -> a where infoCache :: Lens' s a
 class HasCreated s a | s -> a where created :: Lens' s a
 
-declareFields [d|
-    data LimitedChannelInfo = LimitedChannelInfo
-        { limitedChannelInfoIdValue :: SlackChannelId
-        , limitedChannelInfoName    :: L.Text
-        , limitedChannelInfoTopic   :: L.Text
-        } deriving Show
-    |]
+data LimitedChannelInfo = LimitedChannelInfo
+    { limitedChannelInfoIdValue :: SlackChannelId
+    , limitedChannelInfoName    :: L.Text
+    , limitedChannelInfoTopic   :: L.Text
+    } deriving Show
 
-declareFields [d|
-    data UserInfo = UserInfo
-        { userInfoUsername  :: L.Text
-        , userInfoIdValue   :: SlackUserId
-        , userInfoName      :: Maybe L.Text
-        , userInfoFirstName :: Maybe L.Text
-        , userInfoLastName  :: Maybe L.Text
-        }
-    |]
+data UserInfo = UserInfo
+    { userInfoUsername  :: L.Text
+    , userInfoIdValue   :: SlackUserId
+    , userInfoName      :: Maybe L.Text
+    , userInfoFirstName :: Maybe L.Text
+    , userInfoLastName  :: Maybe L.Text
+    }
 
+data ChannelCache = ChannelCache
+    { channelCacheInfoCache    :: HashMap SlackChannelId LimitedChannelInfo
+    , channelCacheNameResolver :: HashMap L.Text LimitedChannelInfo
+    }
 
-declareFields [d|
-    data ChannelCache = ChannelCache
-        { channelCacheInfoCache    :: HashMap SlackChannelId LimitedChannelInfo
-        , channelCacheNameResolver :: HashMap L.Text LimitedChannelInfo
-        }
-    |]
-
-
-declareFields [d|
-    data UserCache = UserCache
-        { userCacheInfoCache    :: HashMap SlackUserId UserInfo
-        , userCacheNameResolver :: HashMap L.Text UserInfo
-        }
-    |]
+data UserCache = UserCache
+    { userCacheInfoCache    :: HashMap SlackUserId UserInfo
+    , userCacheNameResolver :: HashMap L.Text UserInfo
+    }
 
 -- | Adapter for interacting with Slack API\'s. Polymorphic over the method for retrieving events.
-declareFields [d|
-    data SlackAdapter a = SlackAdapter
-        { slackAdapterChannelCache  :: MVar ChannelCache
-        , slackAdapterUserInfoCache :: MVar UserCache
-        , slackAdapterOutChannel    :: Chan (SlackChannelId, L.Text)
-        }
-    |]
+data SlackAdapter a = SlackAdapter
+    { slackAdapterChannelCache  :: MVar ChannelCache
+    , slackAdapterUserInfoCache :: MVar UserCache
+    , slackAdapterOutChannel    :: Chan (SlackChannelId, L.Text)
+    }
 
 
 data InternalType a
@@ -107,34 +95,39 @@ data InternalType a
     | UserChange UserInfo
     | OkResponseEvent T.Text
 
+
+data SlackRemoteFile a = SlackRemoteFile
+    { slackRemoteFileIdValue         :: L.Text
+    , slackRemoteFileCreationDate    :: TimeStamp (SlackAdapter a)
+    , slackRemoteFileName            :: Maybe L.Text
+    , slackRemoteFileTitle           :: Maybe L.Text
+    , slackRemoteFileFileType        :: Maybe L.Text
+    , slackRemoteFilePublicPermalink :: Maybe L.Text
+    , slackRemoteFileSize            :: Integer
+    , slackRemoteFileEditable        :: Bool
+    , slackRemoteFilePublic          :: Bool
+    , slackRemoteFileUser            :: SlackUserId
+    , slackRemoteFileUrl             :: Maybe L.Text
+    , slackRemoteFilePrivateUrl      :: L.Text
+    }
+
+data SlackLocalFile = SlackLocalFile
+    { slackLocalFileName     :: L.Text
+    , slackLocalFileFileType :: Maybe L.Text
+    , slackLocalFileTitle    :: Maybe L.Text
+    , slackLocalFileComment  :: Maybe L.Text
+    , slackLocalFileContent  :: FileContent
+    }
+
+makeFields ''LimitedChannelInfo
+makeFields ''UserInfo
+makeFields ''ChannelCache
+makeFields ''UserCache
+makeFields ''SlackAdapter
+makeFields ''SlackRemoteFile
+makeFields ''SlackLocalFile
+
 instance FromJSON (TimeStamp (SlackAdapter a)) where parseJSON = timestampFromNumber
-
-declareFields [d|
-    data SlackRemoteFile a = SlackRemoteFile
-        { slackRemoteFileIdValue         :: L.Text
-        , slackRemoteFileCreationDate    :: TimeStamp (SlackAdapter a)
-        , slackRemoteFileName            :: Maybe L.Text
-        , slackRemoteFileTitle           :: Maybe L.Text
-        , slackRemoteFileFileType        :: Maybe L.Text
-        , slackRemoteFilePublicPermalink :: Maybe L.Text
-        , slackRemoteFileSize            :: Integer
-        , slackRemoteFileEditable        :: Bool
-        , slackRemoteFilePublic          :: Bool
-        , slackRemoteFileUser            :: SlackUserId
-        , slackRemoteFileUrl             :: Maybe L.Text
-        , slackRemoteFilePrivateUrl      :: L.Text
-        }
-    |]
-
-declareFields [d|
-    data SlackLocalFile = SlackLocalFile
-        { slackLocalFileName     :: L.Text
-        , slackLocalFileFileType :: Maybe L.Text
-        , slackLocalFileTitle    :: Maybe L.Text
-        , slackLocalFileComment  :: Maybe L.Text
-        , slackLocalFileContent  :: FileContent
-        }
-    |]
 
 instance FromJSON (SlackRemoteFile a) where
     parseJSON = withObject "file must be object" $ \o -> SlackRemoteFile

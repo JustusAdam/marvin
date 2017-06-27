@@ -7,7 +7,6 @@ import           Control.Arrow                   ((&&&))
 import           Control.Concurrent.Async.Lifted (async, link)
 import           Control.Concurrent.Chan.Lifted  (Chan, newChan, readChan, writeChan)
 import           Control.Concurrent.MVar.Lifted  (modifyMVar, modifyMVar_, newMVar, readMVar)
-import           Control.Lens                    hiding ((.=))
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -20,6 +19,7 @@ import qualified Data.HashMap.Strict             as HM
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import qualified Data.Text.Lazy.Encoding         as L
+import           Lens.Micro.Platform             hiding ((.=))
 import           Marvin.Adapter                  hiding (mkAdapterId)
 import           Marvin.Adapter.Slack.Types
 import           Marvin.Interpolate.All

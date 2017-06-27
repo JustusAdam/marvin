@@ -20,7 +20,6 @@ import           Control.Concurrent.Async.Lifted (async, link)
 import           Control.Concurrent.Chan.Lifted
 import           Control.Concurrent.MVar.Lifted
 import           Control.Exception.Lifted
-import           Control.Lens                    hiding ((.=))
 import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.IO.Class
@@ -31,6 +30,7 @@ import qualified Data.ByteString.Lazy.Char8      as BS
 import           Data.IORef.Lifted
 import           Data.Maybe                      (fromMaybe)
 import qualified Data.Text                       as T
+import           Lens.Micro.Platform             hiding ((.=))
 import           Marvin.Adapter
 import           Marvin.Adapter.Slack.Common
 import           Marvin.Adapter.Slack.Types
@@ -67,7 +67,7 @@ runConnectionLoop eventChan connectionTracker = do
                 logDebugN $(isT "connecting to socket '#{uri}'")
                 logFn <- askLoggerIO
 
-                (liftIO $ runSecureClient host port path_ $ \conn -> flip runLoggingT logFn $ do
+                liftIO $ runSecureClient host port path_ $ \conn -> flip runLoggingT logFn $ do
                     logInfoN "Connection established"
                     d <- liftIO $ receiveData conn
                     case eitherDecode d >>= parseEither helloParser of
@@ -77,7 +77,7 @@ runConnectionLoop eventChan connectionTracker = do
                     putMVar connectionTracker conn
                     forever $ do
                         data_ <- liftIO $ receiveData conn
-                        writeChan messageChan data_)
+                        writeChan messageChan data_
                 `catch` \e -> do
                     void $ takeMVar connectionTracker
                     logErrorN $(isT "#{e :: ConnectionException}")

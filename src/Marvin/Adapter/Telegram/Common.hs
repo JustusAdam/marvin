@@ -5,7 +5,7 @@ module Marvin.Adapter.Telegram.Common where
 import           Control.Applicative
 import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
-import           Control.Lens
+import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -16,13 +16,12 @@ import           Data.Foldable                   (asum)
 import           Data.Maybe
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
+import           Lens.Micro.Platform
 import           Marvin.Adapter                  hiding (mkAdapterId)
 import           Marvin.Interpolate.All
 import           Marvin.Types
 import           Network.Wreq
 import           Util
-
-import           Control.Exception.Lifted
 
 data APIResponse a
     = Success { description :: Maybe T.Text, result :: a }
@@ -49,50 +48,62 @@ data ChatType
 class HasId_ s a | s -> a where id_ :: Lens' s a
 
 -- | A user object as contained in the telegram update objects
-declareFields [d|
-    data TelegramUser = TelegramUser
-        { telegramUserId_       :: Integer
-        , telegramUserFirstName :: Maybe L.Text
-        , telegramUserLastName  :: Maybe L.Text
-        , telegramUserUsername  :: L.Text
+data TelegramUser = TelegramUser
+    { telegramUserId_       :: Integer
+    , telegramUserFirstName :: Maybe L.Text
+    , telegramUserLastName  :: Maybe L.Text
+    , telegramUserUsername  :: L.Text
+    }
+
+data TelegramRemoteFileStruct
+    = RemoteAudio
+        { telegramRemoteFileStructDuration  :: Integer
+        , telegramRemoteFileStructPerformer :: Maybe L.Text
+        , telegramRemoteFileStructTitle     :: Maybe L.Text
         }
-    |]
-
-declareFields [d|
-    data TelegramFileStruct
-        = TelegramAudio
-            { telegramFileStructDuration :: Integer
-            , telegramFileStructPerformer :: Maybe L.Text
-            , telegramFileStructTitle :: Maybe L.Text
-            }
-        | TelegramDocument
-        | TelegramSticker 
-            { telegramFileStructWidth :: Integer
-            , telegramFileStructHeight :: Integer
-            , telegramFileStructEmoji :: Maybe L.Text
-            }
-        | TelegramVideo
-            { telegramFileStructWidth :: Integer
-            , telegramFileStructHeight :: Integer
-            , telegramFileStructDuration :: Integer
-            }
-        | TelegramVoice 
-            { telegramFileStructDuration :: Integer
-            }
-    |]
-
-
-declareFields [d|
-    data TelegramFile a = TelegramFile
-        { telegramFileFile :: TelegramFileStruct
-        , telegramFileSize :: Integer
-        , telegramFileFid  :: T.Text
-        , telegramFileName :: Maybe L.Text
+    | RemoteDocument
+    | RemoteSticker
+        { telegramRemoteFileStructWidth  :: Integer
+        , telegramRemoteFileStructHeight :: Integer
+        , telegramRemoteFileStructEmoji  :: Maybe L.Text
         }
-    |]
+    | RemoteVideo
+        { telegramRemoteFileStructWidth    :: Integer
+        , telegramRemoteFileStructHeight   :: Integer
+        , telegramRemoteFileStructDuration :: Integer
+        }
+    | RemoteVoice
+        { telegramRemoteFileStructDuration :: Integer
+        }
 
-instance HasUrl (TelegramFile a) (Maybe L.Text) where url = lens (const Nothing) const
-instance HasCreationDate (TelegramFile a) (TimeStamp a) where creationDate = lens (const undefined) const
+
+data TelegramRemoteFile a = TelegramRemoteFile
+    { telegramRemoteFileStruct   :: TelegramRemoteFileStruct
+    , telegramRemoteFileSize     :: Integer
+    , telegramRemoteFileFid      :: T.Text
+    , telegramRemoteFileFileType :: Maybe L.Text
+    , telegramRemoteFileName     :: Maybe L.Text
+    }
+
+data TelegramLocalFileStruct
+    = LocalPhoto
+
+
+data TelegramLocalFile = TelegramLocalFile
+    { telegramLocalFileStruct   :: TelegramLocalFileStruct
+    , telegramLocalFileContent  :: FileContent
+    , telegramLocalFileName     :: L.Text
+    , telegramLocalFileFileType :: Maybe L.Text
+    }
+
+makeFields ''TelegramUser
+makeFields ''TelegramRemoteFileStruct
+makeFields ''TelegramRemoteFile
+makeFields ''TelegramLocalFileStruct
+makeFields ''TelegramLocalFile
+
+instance HasUrl (TelegramRemoteFile a) (Maybe L.Text) where url = lens (const Nothing) const
+instance HasCreationDate (TelegramRemoteFile a) (TimeStamp a) where creationDate = lens (const undefined) const
 
 
 instance HasName TelegramUser (Maybe L.Text) where
@@ -108,15 +119,14 @@ instance HasName TelegramUser (Maybe L.Text) where
 
 
 -- | A telegram chat object as contained in telegram updates
-declareFields [d|
-    data TelegramChat = TelegramChat
-        { telegramChatId_       :: Integer
-        , telegramChatType_     :: ChatType
-        , telegramChatUsername  :: Maybe L.Text
-        , telegramChatFirstName :: Maybe L.Text
-        , telegramChatLastName  :: Maybe L.Text
-        }
-    |]
+data TelegramChat = TelegramChat
+    { telegramChatId_       :: Integer
+    , telegramChatType_     :: ChatType
+    , telegramChatUsername  :: Maybe L.Text
+    , telegramChatFirstName :: Maybe L.Text
+    , telegramChatLastName  :: Maybe L.Text
+    }
+makeFields ''TelegramChat
 
 instance HasName TelegramChat L.Text where
     name = lens
@@ -149,35 +159,35 @@ instance FromJSON TelegramChat where
             <*> o .:? "first_name"
             <*> o .:? "last_name"
 
-parseFileHelper :: (Object -> Parser TelegramFileStruct) -> Value -> Parser (Object, TelegramFileStruct)
+parseFileHelper :: (Object -> Parser TelegramRemoteFileStruct) -> Value -> Parser (Object, TelegramRemoteFileStruct)
 parseFileHelper f = withObject "expected object" $ \o -> (o, ) <$> f o
 
-parseTelegramAudio :: Object -> Parser TelegramFileStruct
+parseTelegramAudio :: Object -> Parser TelegramRemoteFileStruct
 parseTelegramAudio o =
-    TelegramAudio
+    RemoteAudio
         <$> o .: "duration"
         <*> o .:? "performer"
         <*> o .:? "title"
 
-parseTelegramDocument :: Object -> Parser TelegramFileStruct
-parseTelegramDocument = const (return TelegramDocument)
+parseTelegramDocument :: Object -> Parser TelegramRemoteFileStruct
+parseTelegramDocument = const (return RemoteDocument)
 
-parseTelegramSticker :: Object -> Parser TelegramFileStruct
+parseTelegramSticker :: Object -> Parser TelegramRemoteFileStruct
 parseTelegramSticker o =
-    TelegramSticker
+    RemoteSticker
         <$> o .: "width"
         <*> o .: "height"
         <*> o .:? "emoji"
 
-parseTelegramVideo :: Object -> Parser TelegramFileStruct
+parseTelegramVideo :: Object -> Parser TelegramRemoteFileStruct
 parseTelegramVideo o =
-    TelegramVideo
+    RemoteVideo
         <$> o .: "width"
         <*> o .: "height"
         <*> o .: "duration"
 
-parseTelegramVoice :: Object -> Parser TelegramFileStruct
-parseTelegramVoice o = TelegramVoice <$> o .: "duration"
+parseTelegramVoice :: Object -> Parser TelegramRemoteFileStruct
+parseTelegramVoice o = RemoteVoice <$> o .: "duration"
 
 
 instance FromJSON (TelegramUpdate any) where
@@ -185,30 +195,28 @@ instance FromJSON (TelegramUpdate any) where
       where
         inner o = msum [isMessage, isPost, isDocument, isUnhandeled]
           where
-            isMessage = do
-                msg <- o .: "message" >>= msgParser
-                return $ Ev msg
+            isMessage = Ev <$> (o .: "message" >>= msgParser)
             isPost = Ev <$> (o .: "channel_post" >>= msgParser)
             isUnhandeled = return Unhandeled
             isDocument = do
-                (o', struct) <- msum 
+                (o', struct) <- msum
                     [ o .: "audio" >>= parseFileHelper parseTelegramAudio
                     , o .: "document" >>= parseFileHelper parseTelegramDocument
                     , o .: "sticker" >>= parseFileHelper parseTelegramSticker
                     , o .: "video" >>= parseFileHelper parseTelegramVideo
                     , o .: "voice" >>= parseFileHelper parseTelegramVoice
                     ]
-                file <- TelegramFile struct 
+                file <- TelegramRemoteFile struct
                     <$> o' .:? "file_size" .!= (-1)
-                    <*> o' .: "file_id"
-                    <*> o' .: "file_name"
-                ev <- FileSharedEvent 
+                    <*> o' .:  "file_id"
+                    <*> o' .:  "file_name"
+                    <*> o' .:? "mime_type"
+                ev <- FileSharedEvent
                     <$> o .: "from"
                     <*> o .: "chat"
                     <*> pure file
                     <*> (o .: "date" >>= timestampFromNumber)
                 pure $ Ev ev
-
 
 
 telegramSupportedUpdates :: [T.Text]
@@ -325,4 +333,5 @@ instance MkTelegram a => IsAdapter (TelegramAdapter a) where
     messageChannel = messageChannelImpl
 
 instance HasFiles (TelegramAdapter a) where
-    type RemoteFile (TelegramAdapter a) = TelegramFile (TelegramAdapter a)
+    type RemoteFile (TelegramAdapter a) = TelegramRemoteFile (TelegramAdapter a)
+    type LocalFile (TelegramAdapter a) = TelegramLocalFile

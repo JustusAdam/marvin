@@ -1,6 +1,6 @@
 module Marvin.Internal.LensClasses where
 
-import           Control.Lens
+import           Lens.Micro.Platform
 
 -- | Used to contrain 'Marvin.LocalFile' and make the content available to handler functions.
 class HasContent s a | s -> a where content :: Lens' s a

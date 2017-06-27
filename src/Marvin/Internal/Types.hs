@@ -4,7 +4,6 @@ module Marvin.Internal.Types where
 
 
 import           Control.DeepSeq
-import           Control.Lens
 import           Control.Monad.Base
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -21,6 +20,7 @@ import qualified Data.Text.Lazy              as L
 import           Data.Time.Clock
 import           Data.Vector                 (Vector)
 import           GHC.Generics
+import           Lens.Micro.Platform
 import           Marvin.Internal.LensClasses
 import           Marvin.Interpolate.All
 import qualified Marvin.Util.Config          as C
@@ -39,12 +39,12 @@ type Message = L.Text
 newtype TimeStamp a = TimeStamp { toUTCTime :: UTCTime } deriving (Show, Eq, Ord)
 
 
-declareFields [d|
-    data AdapterMEnv a = AdapterMEnv
-        { adapterMEnvConfig  :: C.Config
-        , adapterMEnvAdapter :: a
-        }
-    |]
+data AdapterMEnv a = AdapterMEnv
+    { adapterMEnvConfig  :: C.Config
+    , adapterMEnvAdapter :: a
+    }
+
+makeFields ''AdapterMEnv
 
 
 -- | Representation for the types of events which can occur
@@ -139,32 +139,30 @@ newtype AdapterId a = AdapterId { unwrapAdapterId :: T.Text } deriving (Show, Eq
 
 
 -- | Read only data available to a handler when the bot reacts to an event.
-declareFields [d|
-    data BotActionState a d = BotActionState
-        { botActionStateScriptId :: ScriptId
-        , botActionStateConfig   :: C.Config
-        , botActionStateAdapter  :: a
-        , botActionStatePayload  :: d
-        }
-    |]
+data BotActionState a d = BotActionState
+    { botActionStateScriptId :: ScriptId
+    , botActionStateConfig   :: C.Config
+    , botActionStateAdapter  :: a
+    , botActionStatePayload  :: d
+    }
 
 
-declareFields [d|
-    data Handlers a = Handlers
-        { handlersResponds      :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
-        , handlersHears         :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
-        , handlersCustoms       :: Vector (Event a -> Maybe (RunnerM ()))
-        , handlersJoins         :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
-        , handlersLeaves        :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
-        , handlersTopicChange   :: Vector ((User' a, Channel' a, Topic, TimeStamp a) -> RunnerM ())
-        , handlersFileShares    :: Vector ((User' a, Channel' a, RemoteFile' a, TimeStamp a) -> RunnerM ())
-        , handlersJoinsIn       :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
-        , handlersLeavesFrom    :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
-        , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, Topic, TimeStamp a) -> RunnerM ()))
-        , handlersFileSharesIn  :: HM.HashMap L.Text (Vector ((User' a, Channel' a, RemoteFile' a, TimeStamp a) -> RunnerM ()))
-        } deriving Generic
-    |]
+data Handlers a = Handlers
+    { handlersResponds      :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
+    , handlersHears         :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
+    , handlersCustoms       :: Vector (Event a -> Maybe (RunnerM ()))
+    , handlersJoins         :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
+    , handlersLeaves        :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
+    , handlersTopicChange   :: Vector ((User' a, Channel' a, Topic, TimeStamp a) -> RunnerM ())
+    , handlersFileShares    :: Vector ((User' a, Channel' a, RemoteFile' a, TimeStamp a) -> RunnerM ())
+    , handlersJoinsIn       :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
+    , handlersLeavesFrom    :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
+    , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, Topic, TimeStamp a) -> RunnerM ()))
+    , handlersFileSharesIn  :: HM.HashMap L.Text (Vector ((User' a, Channel' a, RemoteFile' a, TimeStamp a) -> RunnerM ()))
+    } deriving Generic
 
+makeFields ''BotActionState
+makeFields ''Handlers
 
 instance NFData (Handlers a)
 
@@ -192,14 +190,14 @@ newtype BotReacting a d r = BotReacting { runReaction :: ReaderT (BotActionState
 -- | An abstract type describing a marvin script using @a@ as adapter.
 --
 -- This is basically a collection of event handlers.
-declareFields [d|
-    data Script a = Script
-        { scriptActions   :: Handlers a
-        , scriptScriptId  :: ScriptId
-        , scriptConfig    :: C.Config
-        , scriptAdapter   :: a
-        }
-    |]
+data Script a = Script
+    { scriptActions  :: Handlers a
+    , scriptScriptId :: ScriptId
+    , scriptConfig   :: C.Config
+    , scriptAdapter  :: a
+    }
+
+makeFields ''Script
 
 
 -- | A monad for gradually defining a 'Script' using 'Marvin.respond' and 'Marvin.hear' as well as any 'IO' action.

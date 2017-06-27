@@ -25,7 +25,6 @@ import           Control.Concurrent.Async.Lifted (async, link, mapConcurrently_,
 import           Control.Concurrent.Chan.Lifted
 import           Control.DeepSeq
 import           Control.Exception.Lifted
-import           Control.Lens                    hiding (cons)
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import qualified Data.Configurator               as Cfg
@@ -35,6 +34,7 @@ import           Data.Monoid                     ((<>))
 import qualified Data.Text.Lazy                  as L
 import           Data.Vector                     (Vector)
 import qualified Data.Vector                     as V
+import           Lens.Micro.Platform             hiding (cons)
 import           Marvin.Internal.LensClasses
 import           Marvin.Internal.Types
 import           Marvin.Internal.Values

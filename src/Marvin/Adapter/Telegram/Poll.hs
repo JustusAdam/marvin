@@ -25,11 +25,11 @@ module Marvin.Adapter.Telegram.Poll
 
 import           Control.Concurrent.Chan.Lifted
 import           Control.Concurrent.Lifted
-import           Control.Lens
 import           Control.Monad
 import           Control.Monad.Logger
 import           Data.Aeson                     hiding (Error, Success)
 import           Data.IORef.Lifted
+import           Lens.Micro.Platform
 import           Marvin.Adapter
 import           Marvin.Adapter.Telegram.Common
 import           Marvin.Interpolate.Text

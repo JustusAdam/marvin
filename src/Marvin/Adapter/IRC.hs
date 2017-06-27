@@ -19,7 +19,6 @@ module Marvin.Adapter.IRC
 import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
 import           Control.Exception.Lifted
-import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -30,6 +29,7 @@ import           Data.Monoid                     ((<>))
 import qualified Data.Text.Encoding              as T
 import qualified Data.Text.Lazy                  as L
 import           Data.Time.Clock                 (getCurrentTime)
+import           Lens.Micro.Platform
 import           Marvin.Adapter
 import           Marvin.Interpolate.All
 import           Marvin.Types                    as MT

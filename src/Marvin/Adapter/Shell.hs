@@ -14,7 +14,6 @@ module Marvin.Adapter.Shell (ShellAdapter) where
 
 import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
-import           Control.Lens
 import           Control.Monad
 import           Control.Monad.IO.Class
 import qualified Data.ByteString.Lazy            as B
@@ -24,6 +23,7 @@ import qualified Data.Text.Lazy                  as L
 import qualified Data.Text.Lazy.Encoding         as L
 import qualified Data.Text.Lazy.IO               as L
 import           Data.Time.Clock                 (getCurrentTime)
+import           Lens.Micro.Platform
 import           Marvin.Adapter
 import           Marvin.Interpolate.String
 import           Marvin.Interpolate.Text.Lazy
@@ -36,12 +36,28 @@ import           Util
 
 
 -- | Adapter for a shell prompt
-declareFields [d|
-    data ShellAdapter = ShellAdapter
-        { shellAdapterOutput :: Chan L.Text
-        -- , shellAdapterFiles :: IORef (HashMap L.Text ByteString)
-        }
-    |]
+data ShellAdapter = ShellAdapter
+    { shellAdapterOutput :: Chan L.Text
+    -- , shellAdapterFiles :: IORef (HashMap L.Text ByteString)
+    }
+data RFile = RFile
+    { rFileName         :: Maybe L.Text
+    , rFileFileType     :: Maybe L.Text
+    , rFileSize         :: Integer
+    , rFileCreationDate :: TimeStamp ShellAdapter
+    , rFileContent      :: FileContent
+    , rFileUrl          :: Maybe L.Text
+    }
+data LFile = LFile
+    { lFileName         :: L.Text
+    , lFileFileType     :: Maybe L.Text
+    , lFileCreationDate :: TimeStamp ShellAdapter
+    , lFileContent      :: FileContent
+    }
+
+makeFields ''ShellAdapter
+makeFields ''RFile
+makeFields ''LFile
 
 
 help :: L.Text
@@ -57,24 +73,6 @@ help = L.unlines
     , ":file <channel> <path> ~ share file with <path> to <channel>"
     , ":file <user> <channel> <path> ~ share file with <path> to <channel>"
     ]
-
-
-declareFields [d|
-    data RFile = RFile
-        { rFileName         :: Maybe L.Text
-        , rFileFileType     :: Maybe L.Text
-        , rFileSize         :: Integer
-        , rFileCreationDate :: TimeStamp ShellAdapter
-        , rFileContent      :: FileContent
-        , rFileUrl          :: Maybe L.Text
-        }
-    data LFile = LFile
-        { lFileName         :: L.Text
-        , lFileFileType     :: Maybe L.Text
-        , lFileCreationDate :: TimeStamp ShellAdapter
-        , lFileContent      :: FileContent
-        }
-    |]
 
 
 rFileFromLFile :: LFile -> AdapterM ShellAdapter RFile

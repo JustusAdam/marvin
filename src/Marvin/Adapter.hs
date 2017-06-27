@@ -22,10 +22,10 @@ module Marvin.Adapter
     , HasAdapter(adapter), HasConfig(config)
     ) where
 
-import           Control.Lens
 import           Control.Monad.IO.Class
 import           Data.Maybe                  (fromMaybe)
 import qualified Data.Text.Lazy              as L
+import           Lens.Micro.Platform
 import           Marvin.Internal.LensClasses
 import           Marvin.Internal.Types
 import           Marvin.Internal.Values

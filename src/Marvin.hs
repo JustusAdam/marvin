@@ -48,7 +48,6 @@ module Marvin
     ) where
 
 
-import           Control.Lens
 import           Control.Monad.Except
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Control.Monad.Logger
@@ -63,6 +62,7 @@ import qualified Data.Text                   as T
 import qualified Data.Text.Lazy              as L
 import           Data.Time.Clock
 import qualified Data.Vector                 as V
+import           Lens.Micro.Platform
 import           Marvin.Adapter              (HasFiles(LocalFile, RemoteFile), IsAdapter)
 import qualified Marvin.Adapter              as A
 import           Marvin.Internal
