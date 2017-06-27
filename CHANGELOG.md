@@ -12,6 +12,9 @@
 - Initializer no longer overwrites files
 - Preprocessor now uses the new external-scripts.json spec from issue #8
 - Added some generic handlers for file down/upload and version
+- Configuration is now abstract and based on a typeclass
+    - Added lower level run functions so the user can specify logging and config implementation
+- Switched to hpack for package management
 
 # 0.2.3 - 05.03.2017
 
