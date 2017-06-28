@@ -29,11 +29,14 @@ import           Network.Wreq
 import           Util
 
 
-messageParser :: Value -> Parser (SlackUserId, SlackChannelId, UserInfo -> LimitedChannelInfo -> Event (SlackAdapter a))
+messageParser :: Value -> Parser (InternalType a)
 messageParser = withObject "expected object" $ \o -> do
     messageContent <- o .: "text"
     ts <- o .: "ts" >>= timestampFromNumber
-    (,,\u c -> MessageEvent u c messageContent ts) <$> o .: "user" <*> o .: "channel"
+    SlackEvent
+        <$> o .: "user"
+        <*> o .: "channel"
+        <*> pure (\u c -> MessageEvent u c messageContent ts)
 
 
 flip2_2 :: (a -> b -> c -> d -> e) -> c -> d -> a -> b -> e
@@ -76,7 +79,7 @@ eventParser v@(Object o) = isErrParser <|> isOkParser <|> hasTypeParser
             _                   -> return $ Unhandeled t
     messageTypeEvent = do
         subt <- o .:? "subtype"
-        SlackEvent <$> case (subt :: Maybe T.Text) of
+        case (subt :: Maybe T.Text) of
             Just str ->
                 case str of
                     "channel_join" -> cJoin
@@ -94,7 +97,7 @@ eventParser v@(Object o) = isErrParser <|> isOkParser <|> hasTypeParser
         channel = o .: "channel"
         ts = o .: "ts" >>= timestampFromNumber
         msgEv = messageParser v
-        wrapEv f = (,,) <$> o .: "user" <*> channel <*> f
+        wrapEv f = SlackEvent <$> o .: "user" <*> channel <*> f
         cJoin = wrapEv $ flip2_1 ChannelJoinEvent <$> ts
         cLeave = wrapEv $ flip2_1 ChannelLeaveEvent <$> ts
 eventParser _ = fail "expected object"
@@ -110,7 +113,7 @@ stripWhiteSpaceMay t =
 runHandlerLoop :: MkSlack a => Chan (InternalType a) -> EventConsumer (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
 runHandlerLoop evChan handler =
     forever $ readChan evChan >>= \case
-        SlackEvent (uid, cid, f) -> do
+        SlackEvent uid cid f -> do
             uinfo <- getUserInfo uid
             lci <- getChannelInfo cid
 

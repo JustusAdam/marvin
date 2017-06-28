@@ -81,7 +81,7 @@ data SlackAdapter a = SlackAdapter
 
 
 data InternalType a
-    = SlackEvent (SlackUserId, SlackChannelId, UserInfo -> LimitedChannelInfo -> Event (SlackAdapter a))
+    = SlackEvent SlackUserId SlackChannelId (UserInfo -> LimitedChannelInfo -> Event (SlackAdapter a))
     | Error
         { code :: Int
         , msg  :: String

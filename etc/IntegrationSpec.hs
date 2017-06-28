@@ -58,8 +58,7 @@ getResolver = fromMaybe "lts" <$> lookupEnv "STACK_RESOLVER"
 prepareBuilder :: FilePath -> IO (String -> [String] -> IO (), IO ())
 prepareBuilder dir =
     lookupEnv "BUILD" >>= \case
-        Just "cabal" -> do
-            callProcess "hpack" []
+        Just "cabal" ->
             return
                 ( callProcess
                 , callProcess "cabal" ["build"])
