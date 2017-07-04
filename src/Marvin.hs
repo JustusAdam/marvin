@@ -376,7 +376,7 @@ getTimeStamp = view (payload . getLens)
 
 -- | Get the username of a registered user.
 --
--- This function is deprecated as of version 0.3 and will be removed in version 1.0 use the lens 'username' instead.
+-- This function is deprecated as of version 0.3 and will be removed in version 1.0. Use the lens 'username' instead.
 getUsername :: MonadAdapter m
             => User (AdapterT m)
             -> m L.Text
@@ -386,7 +386,7 @@ getUsername u = pure $ u^.username
 
 -- | Get the human readable name of a channel.
 --
--- This function is deprecated as of Version 0.3 and will be removed in version 1.0 use the lens 'name' instead.
+-- This function is deprecated as of Version 0.3 and will be removed in version 1.0. Use the lens 'name' instead.
 getChannelName :: MonadAdapter m
                => Channel (AdapterT m) -> m L.Text
 getChannelName c = pure $ c^.name
@@ -403,9 +403,7 @@ getRemoteFile = (unwrapFile' :: RemoteFile' a -> RemoteFile a) <$> view (payload
 --
 -- The 'HasConfigAccess' Constraint means this function can be used both during script definition and when a handler is run.
 getConfigVal :: (C.Configured a, HasConfigAccess m) => C.Name -> m (Maybe a)
-getConfigVal key = do
-    cfg <- getConfig
-    C.lookup cfg key
+getConfigVal key = (`C.lookup` key) =<< getConfig
 
 
 -- | Get a value out of the config and fail with an error if the specified key is not found.

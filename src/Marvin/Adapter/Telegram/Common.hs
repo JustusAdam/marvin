@@ -11,16 +11,19 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson                      hiding (Error, Success)
 import           Data.Aeson.Types                (Parser, parseEither)
+import qualified Data.ByteString.Lazy            as BS
 import           Data.Char                       (isSpace)
 import           Data.Foldable                   (asum)
 import           Data.Maybe
 import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
+import           Data.Traversable                (for)
 import           Lens.Micro.Platform
 import           Marvin.Adapter                  hiding (mkAdapterId)
 import           Marvin.Interpolate.All
 import           Marvin.Types
 import           Network.Wreq
+import           Network.Wreq.Types
 import           Util
 
 data APIResponse a
@@ -31,6 +34,12 @@ data APIResponse a
 -- | The telegram adapter type for a particular update type. Either 'Push' or 'Poll'
 data TelegramAdapter updateType = TelegramAdapter
 
+
+newtype TelegramFileId = TelegramFileId { unwrapFileId :: T.Text } deriving Eq
+
+
+instance FromJSON TelegramFileId where parseJSON = withText "expected string" (pure . TelegramFileId)
+instance ToJSON TelegramFileId where toJSON = String . unwrapFileId
 
 data TelegramUpdate any
     = Ev (Event (TelegramAdapter any))
@@ -80,20 +89,34 @@ data TelegramRemoteFileStruct
 data TelegramRemoteFile a = TelegramRemoteFile
     { telegramRemoteFileStruct   :: TelegramRemoteFileStruct
     , telegramRemoteFileSize     :: Integer
-    , telegramRemoteFileFid      :: T.Text
+    , telegramRemoteFileFid      :: TelegramFileId
     , telegramRemoteFileFileType :: Maybe L.Text
     , telegramRemoteFileName     :: Maybe L.Text
     }
 
 data TelegramLocalFileStruct
     = LocalPhoto
+    | LocalAudio
+        { telegramLocalFileStructDuration  :: Maybe Int
+        , telegramLocalFileStructPerformer :: Maybe L.Text
+        -- , telegramLocalFileStructShowTitle :: Maybe L.Text
+        }
+    | LocalDocument
+    | LocalVideo
+        { telegramLocalFileStructDuration :: Maybe Int
+        , telegramLocalFileStructWidth    :: Maybe Int
+        , telegramLocalFileStructHeight   :: Maybe Int
+        }
 
 
 data TelegramLocalFile = TelegramLocalFile
-    { telegramLocalFileStruct   :: TelegramLocalFileStruct
-    , telegramLocalFileContent  :: FileContent
-    , telegramLocalFileName     :: L.Text
-    , telegramLocalFileFileType :: Maybe L.Text
+    { telegramLocalFileStruct              :: TelegramLocalFileStruct
+    , telegramLocalFileContent             :: FileContent
+    , telegramLocalFileName                :: L.Text
+    , telegramLocalFileFileType            :: Maybe L.Text
+    , telegramLocalFileDisableNotification :: Maybe Bool
+    , telegramLocalFileFromRef             :: Maybe TelegramFileId
+    , telegramLocalFileCaption             :: Maybe L.Text
     }
 
 makeFields ''TelegramUser
@@ -190,7 +213,23 @@ parseTelegramVoice :: Object -> Parser TelegramRemoteFileStruct
 parseTelegramVoice o = RemoteVoice <$> o .: "duration"
 
 
-instance FromJSON (TelegramUpdate any) where
+parseTelegramFile :: Object -> Parser (TelegramRemoteFile a)
+parseTelegramFile o = do
+    (o', struct) <- msum
+        [ o .: "audio" >>= parseFileHelper parseTelegramAudio
+        , o .: "document" >>= parseFileHelper parseTelegramDocument
+        , o .: "sticker" >>= parseFileHelper parseTelegramSticker
+        , o .: "video" >>= parseFileHelper parseTelegramVideo
+        , o .: "voice" >>= parseFileHelper parseTelegramVoice
+        ]
+    TelegramRemoteFile struct
+        <$> o' .:? "file_size" .!= (-1)
+        <*> o' .:  "file_id"
+        <*> o' .:  "file_name"
+        <*> o' .:? "mime_type"
+
+
+instance MkTelegram a => FromJSON (TelegramUpdate a) where
     parseJSON = withObject "expected object" inner
       where
         inner o = msum [isMessage, isPost, isDocument, isUnhandeled]
@@ -199,18 +238,7 @@ instance FromJSON (TelegramUpdate any) where
             isPost = Ev <$> (o .: "channel_post" >>= msgParser)
             isUnhandeled = return Unhandeled
             isDocument = do
-                (o', struct) <- msum
-                    [ o .: "audio" >>= parseFileHelper parseTelegramAudio
-                    , o .: "document" >>= parseFileHelper parseTelegramDocument
-                    , o .: "sticker" >>= parseFileHelper parseTelegramSticker
-                    , o .: "video" >>= parseFileHelper parseTelegramVideo
-                    , o .: "voice" >>= parseFileHelper parseTelegramVoice
-                    ]
-                file <- TelegramRemoteFile struct
-                    <$> o' .:? "file_size" .!= (-1)
-                    <*> o' .:  "file_id"
-                    <*> o' .:  "file_name"
-                    <*> o' .:? "mime_type"
+                file <- parseTelegramFile o
                 ev <- FileSharedEvent
                     <$> o .: "from"
                     <*> o .: "chat"
@@ -244,18 +272,18 @@ apiResponseParser innerParser = withObject "expected object" $ \o -> do
         else Error <$> o .: "error_code" <*> o .: "description"
 
 
-execAPIMethod :: MkTelegram b
+execAPIMethod :: (MkTelegram b, Postable p)
               => (Value -> Parser a)
               -> String
-              -> [FormParam]
+              -> p
               -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
 execAPIMethod = execAPIMethodWith defaults
 
-execAPIMethodWith :: MkTelegram b
+execAPIMethodWith :: (MkTelegram b, Postable p)
                   => Options
                   -> (Value -> Parser a)
                   -> String
-                  -> [FormParam]
+                  -> p
                   -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
 execAPIMethodWith opts innerParser methodName fparams = do
     token <- requireFromAdapterConfig "token"
@@ -266,6 +294,7 @@ execAPIMethodWith opts innerParser methodName fparams = do
                                                 then -- TODO only catch appropriate exceptions
                                                     return $ Left $ displayException (e :: SomeException)
                                                 else retry (succ n) a
+
 
 getChannelNameImpl :: TelegramChat -> AdapterM (TelegramAdapter a) L.Text
 getChannelNameImpl c = return $ fromMaybe "<unnamed>" $
@@ -287,7 +316,7 @@ stripWhiteSpaceMay t =
         Just (c, _) | isSpace c -> Just $ L.stripStart t
         _           -> Nothing
 
-runnerImpl :: forall a. MkTelegram a => EventConsumer (TelegramAdapter a) -> AdapterM (TelegramAdapter a) ()
+runnerImpl :: MkTelegram a => EventConsumer (TelegramAdapter a) -> AdapterM (TelegramAdapter a) ()
 runnerImpl handler = do
     msgChan <- newChan
     let eventGetter = mkEventGetter msgChan
@@ -312,6 +341,59 @@ runnerImpl handler = do
             Unhandeled -> logDebugN $(isT "Unhadeled event.")
 
 
+toFtype :: TelegramLocalFileStruct -> (String, T.Text)
+toFtype LocalPhoto   = ("Photo", "photo")
+toFtype LocalAudio{} = ("Audio", "audio")
+toFtype LocalDocument = ("Document", "document")
+toFtype LocalVideo{} = ("Video", "video")
+
+
+partShow :: Show a => T.Text -> a -> Part
+partShow name = partString name . show
+
+mkStructParts :: TelegramLocalFile -> [Maybe Part]
+mkStructParts f =
+    case f^.struct of
+        s@(LocalAudio duration performer) ->
+            [ partText "performer" . L.toStrict <$> performer
+            , partShow "duration" <$> duration
+            , Just ("title" `partText` L.toStrict (f^.name)) -- perhaps make this optional
+            ]
+        s@(LocalVideo duration width height) ->
+            [ partShow "duration" <$> duration
+            , partShow "width" <$> width
+            , partShow "height" <$> height
+            ]
+        _ -> []
+
+
+shareFileImpl :: MkTelegram a => TelegramLocalFile -> [TelegramChat] -> AdapterM (TelegramAdapter a) (Either L.Text (TelegramRemoteFile (TelegramAdapter a)))
+shareFileImpl localFile targets = do
+    contentPart <- case localFile^.fromRef of
+        Just (TelegramFileId fid) -> return $ propName `partText` fid
+        Nothing ->
+            (propName `partLBS`) <$> case localFile^.content of
+                                        FileInMemory bs -> return bs
+                                        FileOnDisk path -> liftIO $ BS.readFile path
+    fmap (handleRes <=< headRes) $ for targets $ \chan ->
+        execAPIMethod parser ("send" ++ ftype) $ catMaybes $
+            [ Just $ "chat_id" `partString` show (chan ^. id_)
+            , Just contentPart
+            , partText "caption" . L.toStrict <$> localFile^.caption
+            , partText "diable_notofication" . boolToText <$> localFile^.disableNotification
+            ] ++ structParts
+  where
+    parser = withObject "expected object" parseTelegramFile
+    (ftype, propName) = toFtype (localFile^.struct)
+    structParts = mkStructParts localFile
+    boolToText True = "true"
+    boolToText _    = "false"
+    headRes [] = Left "No targets specified"
+    headRes (x:_) = mapLeft L.pack x
+    handleRes Success{result=a} = pure a
+    handleRes Error{errDescription=d} = Left $ L.fromStrict d
+
+
 -- | Class to enable polymorphism over update mechanics for 'TelegramAdapter'
 class MkTelegram a where
     mkEventGetter :: Chan (TelegramUpdate a) -> AdapterM (TelegramAdapter a) ()
@@ -332,6 +414,7 @@ instance MkTelegram a => IsAdapter (TelegramAdapter a) where
         return Nothing
     messageChannel = messageChannelImpl
 
-instance HasFiles (TelegramAdapter a) where
+instance MkTelegram a => HasFiles (TelegramAdapter a) where
     type RemoteFile (TelegramAdapter a) = TelegramRemoteFile (TelegramAdapter a)
     type LocalFile (TelegramAdapter a) = TelegramLocalFile
+    shareFile = shareFileImpl
