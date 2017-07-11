@@ -13,11 +13,14 @@ Portability : POSIX
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Run
-    ( runMarvin, ScriptInit, IsAdapter
-    , requireFromAppConfig, lookupFromAppConfig, defaultConfigName
+    (
+    -- * Simple and default ways to run marvin
+      runMarvin
+    -- * Useful types  
+    , ScriptInit, IsAdapter
     -- * Rolling your own
     , runMarvinWithConfig, parseMarvinCmdArgs, marvinCmdArgsParser
-    , setLoggingLevelIn, runStderrLoggingT, getLoggingLevel, CmdOptions, configPath, verbose, debug
+    , setLoggingLevelIn, runStderrLoggingT, getLoggingLevel, CmdOptions, configPath, verbose, debug, requireFromAppConfig, lookupFromAppConfig, defaultConfigName
     ) where
 
 
@@ -86,7 +89,7 @@ runWAda :: a -> C.Config -> AdapterM a r -> RunnerM r
 runWAda ada cfg ac = runReaderT (runAdapterAction ac) (AdapterMEnv cfg ada)
 
 -- TODO add timeouts for handlers
-runHandlers :: forall a. IsAdapter a => Handlers a -> Chan (Event a) -> RunnerM ()
+runHandlers :: IsAdapter a => Handlers a -> Chan (Event a) -> RunnerM ()
 runHandlers handlers eventChan = forever $ readChan eventChan >>= void . async . genericHandler
   where
     genericHandler ev = do
@@ -101,22 +104,10 @@ runHandlers handlers eventChan = forever $ readChan eventChan >>= void . async .
     handler (TopicChangeEvent user chan topic ts) = changeHandlerHelper topicsV topicsInV (User' user, , topic, ts) chan
     handler (FileSharedEvent user chan file ts) = changeHandlerHelper fileSharesV fileSharesInV (User' user, , File' file, ts) chan
 
-    changeHandlerHelper :: Vector (d -> RunnerM ())
-                        -> HM.HashMap L.Text (Vector (d -> RunnerM ()))
-                        -> (Channel' a -> d)
-                        -> Channel a
-                        -> RunnerM ()
     changeHandlerHelper wildcards specifics other chan =
         mapConcurrently_ ($ other (Channel' chan)) $ wildcards <> applicables
       where applicables = fromMaybe mempty $ specifics^?ix (chan ^.name)
 
-
-    handleMessageLike :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
-                      -> User a
-                      -> Channel a
-                      -> Message
-                      -> TimeStamp a
-                      -> RunnerM ()
     handleMessageLike v user chan msg ts = mapConcurrently_ id $ doIfMatch v
       where
         doIfMatch = vcatMaybes . fmap select
@@ -180,6 +171,7 @@ marvinCmdArgsParser = info
             )
 
 
+-- | get the chosen logging level considering both the command line options as well as the configuration
 getLoggingLevel :: MonadIO m => Config -> CmdOptions -> m LogLevel
 getLoggingLevel cfg args = do
     loggingLevelFromCfg <- liftIO $ fmap unwrapLogLevel' <$> C.lookup cfg $(isT "#{applicationScriptId}.logging")

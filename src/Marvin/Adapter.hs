@@ -45,57 +45,57 @@ import           Marvin.Interpolate.Text
 import qualified Marvin.Util.Config          as C
 
 
--- Obtain the application config structure
+-- | Obtain the application config structure
 getAppConfig :: AdapterM a C.Config
 getAppConfig = AdapterM $
     C.subconfig $(isT "#{applicationScriptId}") =<< view config
 
 
--- Get a value from the application config. 
+-- | Get a value from the application config. 
 -- Returns 'Nothing' if the value does not exist or cannot be converted to @a@.
 lookupFromAppConfig :: C.Configured v => C.Name -> AdapterM a (Maybe v)
 lookupFromAppConfig n = getAppConfig >>= liftIO . flip C.lookup n
 
 
--- Get a value from the application config. 
+-- | Get a value from the application config. 
 -- Throws an error if the value does not exist or cannot be converted to @a@.
 requireFromAppConfig :: C.Configured v => C.Name -> AdapterM a v
 requireFromAppConfig n = getAppConfig >>= liftIO . flip C.require n
 
 
--- convenience function to get the name of the bot from the config
+-- | Convenience function to get the name of the bot from the config
 getBotname :: AdapterM a L.Text
 getBotname = fromMaybe defaultBotName <$> lookupFromAppConfig "name"
 
 
--- Obtain the configuration structure for this adapter
+-- | Obtain the configuration structure for this adapter
 getAdapterConfig :: forall a. IsAdapter a => AdapterM a C.Config
 getAdapterConfig = AdapterM $
     C.subconfig $(isT "#{adapterConfigKey}.#{adapterId :: AdapterId a}") =<< view config
 
 
--- Get a value from the adapter config. 
+-- | Get a value from the adapter config. 
 -- Returns 'Nothing' if the value does not exist or cannot be converted to @a@.
 lookupFromAdapterConfig :: (IsAdapter a, C.Configured v) => C.Name -> AdapterM a (Maybe v)
 lookupFromAdapterConfig n = getAdapterConfig >>= liftIO . flip C.lookup n
 
 
--- Get a value from the adapter config. 
+-- | Get a value from the adapter config. 
 -- Throws an error if the value does not exist or cannot be converted to @a@.
 requireFromAdapterConfig :: (IsAdapter a, C.Configured v) => C.Name -> AdapterM a v
 requireFromAdapterConfig n = getAdapterConfig >>= liftIO . flip C.require n
 
 
--- Get the adapter from inside the adapter monad.
+-- | Get the adapter from inside the adapter monad.
 getAdapter :: AdapterM a a
 getAdapter = AdapterM $ view adapter
 
 
--- Convenience function to obtain an 'AdapterId' from the adapter (this frees you from using @ScopedTypeVariables@)
+-- | Convenience function to obtain an 'AdapterId' from the adapter (this frees you from using @ScopedTypeVariables@)
 getAdapterId :: IsAdapter a => a -> AdapterId a
 getAdapterId _ = adapterId
 
 
--- Convenience function to obtain an 'AdapterId' from the adapter monad (this frees you from using @ScopedTypeVariables@)
+-- | Convenience function to obtain an 'AdapterId' from the adapter monad (this frees you from using @ScopedTypeVariables@)
 getAdapterIdM :: IsAdapter a => AdapterM a (AdapterId a)
 getAdapterIdM = return adapterId

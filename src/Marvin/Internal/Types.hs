@@ -60,6 +60,7 @@ data Event a
 -- | Basic monad which most internal actions run in
 type RunnerM = LoggingT IO
 
+-- | Handles a single event using a certain adapter
 type EventConsumer a = Event a -> AdapterM a ()
 
 -- | Basic functionality required of any adapter
@@ -96,6 +97,7 @@ newtype AdapterM a r = AdapterM { runAdapterAction :: ReaderT (AdapterMEnv a) Ru
     deriving (MonadIO, Monad, Applicative, Functor, MonadLogger, MonadLoggerIO, MonadBase IO, MonadReader (AdapterMEnv a))
 
 
+-- | Content of a file. Can be preloaded in memory or be a persistent file on disc.
 data FileContent = FileOnDisk FilePath | FileInMemory ByteString
 
 
@@ -149,6 +151,7 @@ data BotActionState a d = BotActionState
     }
 
 
+-- | Accumulator and sorting for all kinds of handlers
 data Handlers a = Handlers
     { handlersResponds      :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
     , handlersHears         :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
@@ -310,6 +313,7 @@ instance ShowT (AdapterId a) where showT = unwrapAdapterId
 type LoggingFn = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 
 
+-- | Common base verification function for 'ScriptId' and 'AdapterId'
 verifyIdString :: String -> (T.Text -> a) -> T.Text -> Either String a
 verifyIdString thingToVerify _ "" = Left $(isS "#{thingToVerify} must not be empty")
 verifyIdString thingToVerify f s
