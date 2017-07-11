@@ -418,3 +418,18 @@ instance MkTelegram a => HasFiles (TelegramAdapter a) where
     type RemoteFile (TelegramAdapter a) = TelegramRemoteFile (TelegramAdapter a)
     type LocalFile (TelegramAdapter a) = TelegramLocalFile
     shareFile = shareFileImpl
+    readFileBytes remoteFile = do
+        res <- execAPIMethod (withObject "expected object" (.: "file_path")) "getFile" ["file_id" := unwrapFileId (remoteFile^.fid)]
+        case res of
+            Left err -> logErrorN $(isT "Error when downloading file: #{err}") >> return Nothing
+            Right Error{errDescription=desc} -> logErrorN $(isT "Error when downloading file: #{desc}") >> return Nothing
+            Right Success{result=Nothing} -> logErrorN $(isT "Fetched file had no filepath") >> return Nothing
+            Right Success{result=Just fp} -> do
+                token <- requireFromAdapterConfig "token"
+                fres <- liftIO $ get $(is "https://api.telegram.org/bot#{token}/#{fp}")
+                case fres ^. responseStatus . statusCode of
+                    200 -> return $ Just $ fres ^. responseBody
+                    code -> do 
+                        logErrorN $(isT "Non 200 Response when downloading file: #{code} - #{fres^.responseStatus.statusMessage}")
+                        return Nothing
+    newLocalFile fname content = pure $ TelegramLocalFile LocalDocument content fname Nothing Nothing Nothing Nothing

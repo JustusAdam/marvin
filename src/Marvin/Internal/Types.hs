@@ -17,6 +17,7 @@ import           Data.Monoid
 import           Data.String
 import qualified Data.Text                   as T
 import qualified Data.Text.Lazy              as L
+import qualified Data.Text.Lazy.Encoding     as L
 import           Data.Time.Clock
 import           Data.Vector                 (Vector)
 import           GHC.Generics
@@ -113,6 +114,7 @@ class ( HasName (RemoteFile a) (Maybe L.Text)
     -- | Resolve the name of the file
     newLocalFile :: L.Text -> FileContent -> AdapterM a (LocalFile a)
     readTextFile :: RemoteFile a -> AdapterM a (Maybe L.Text)
+    readTextFile = fmap (fmap L.decodeUtf8) . readFileBytes
     readFileBytes :: RemoteFile a -> AdapterM a (Maybe ByteString)
     shareFile :: LocalFile a -> [Channel a] -> AdapterM a (Either L.Text (RemoteFile a))
     -- Add a method for resolving a file

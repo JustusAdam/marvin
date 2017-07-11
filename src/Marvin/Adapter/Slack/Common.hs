@@ -330,7 +330,6 @@ instance MkSlack a => HasFiles (SlackAdapter a) where
     type RemoteFile (SlackAdapter a) = SlackRemoteFile a
     type LocalFile (SlackAdapter a) = SlackLocalFile
 
-    readTextFile = fmap (fmap L.decodeUtf8) . readFileBytes
     readFileBytes file = do
         token <- requireFromAdapterConfig "token"
         r <- liftIO $ getWith (defaults & header "Authorization" .~ ["Bearer " `mappend` B.toStrict (L.encodeUtf8 token)]) (L.unpack $ file^.privateUrl)
