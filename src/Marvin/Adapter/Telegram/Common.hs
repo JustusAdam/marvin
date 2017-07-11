@@ -342,10 +342,10 @@ runnerImpl handler = do
 
 
 toFtype :: TelegramLocalFileStruct -> (String, T.Text)
-toFtype LocalPhoto   = ("Photo", "photo")
-toFtype LocalAudio{} = ("Audio", "audio")
+toFtype LocalPhoto    = ("Photo", "photo")
+toFtype LocalAudio{}  = ("Audio", "audio")
 toFtype LocalDocument = ("Document", "document")
-toFtype LocalVideo{} = ("Video", "video")
+toFtype LocalVideo{}  = ("Video", "video")
 
 
 partShow :: Show a => T.Text -> a -> Part
@@ -388,9 +388,9 @@ shareFileImpl localFile targets = do
     structParts = mkStructParts localFile
     boolToText True = "true"
     boolToText _    = "false"
-    headRes [] = Left "No targets specified"
+    headRes []    = Left "No targets specified"
     headRes (x:_) = mapLeft L.pack x
-    handleRes Success{result=a} = pure a
+    handleRes Success{result=a}       = pure a
     handleRes Error{errDescription=d} = Left $ L.fromStrict d
 
 
@@ -429,7 +429,7 @@ instance MkTelegram a => HasFiles (TelegramAdapter a) where
                 fres <- liftIO $ get $(is "https://api.telegram.org/bot#{token}/#{fp}")
                 case fres ^. responseStatus . statusCode of
                     200 -> return $ Just $ fres ^. responseBody
-                    code -> do 
+                    code -> do
                         logErrorN $(isT "Non 200 Response when downloading file: #{code} - #{fres^.responseStatus.statusMessage}")
                         return Nothing
     newLocalFile fname content = pure $ TelegramLocalFile LocalDocument content fname Nothing Nothing Nothing Nothing
