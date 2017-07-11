@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Adapter.Slack.Common where
 
 
@@ -55,7 +54,7 @@ eventParser v@(Object o) = isErrParser <|> isOkParser <|> hasTypeParser
         flip (withObject "expected object") e $ \eo ->
             Error <$> eo .: "code" <*> eo .: "msg"
     isOkParser = do
-        ok :: Bool <- o .: "ok"
+        ok <- o .: "ok"
         msg <- o .: "text"
         if ok then return $ OkResponseEvent msg else fail "expected ok response"
     hasTypeParser = do

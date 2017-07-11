@@ -1,5 +1,3 @@
-{-# LANGUAGE ExplicitForAll      #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Adapter.Telegram.Common where
 
 import           Control.Applicative
@@ -254,7 +252,7 @@ telegramSupportedUpdates =
     ]
 
 
-msgParser ::  Value -> Parser (Event (TelegramAdapter a))
+msgParser :: Value -> Parser (Event (TelegramAdapter a))
 msgParser = withObject "expected message object" $ \o ->
     MessageEvent
         <$> o .: "from"
