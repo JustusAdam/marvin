@@ -1,4 +1,4 @@
-module Marvin.Adapter.Telegram.Common where
+module Marvin.Adapter.Telegram.Internal.Common where
 
 import           Control.Applicative
 import           Control.Concurrent.Async.Lifted

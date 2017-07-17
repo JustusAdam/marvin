@@ -56,12 +56,14 @@ library:
   - Marvin.Adapter.IRC
   - Marvin.Adapter.Slack.RTM
   - Marvin.Adapter.Slack.EventsAPI
+  - Marvin.Adapter.Slack.Internal
   - Marvin.Adapter.Telegram.Push
   - Marvin.Adapter.Telegram.Poll
+  - Marvin.Adapter.Telegram.Internal
   other-modules:
-  - Marvin.Adapter.Slack.Common
-  - Marvin.Adapter.Slack.Types
-  - Marvin.Adapter.Telegram.Common
+  - Marvin.Adapter.Slack.Internal.Common
+  - Marvin.Adapter.Slack.Internal.Types
+  - Marvin.Adapter.Telegram.Internal.Common
   - Marvin.Internal
   - Marvin.Internal.LensClasses
   - Marvin.Internal.Types

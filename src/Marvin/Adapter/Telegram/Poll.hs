@@ -22,7 +22,7 @@ module Marvin.Adapter.Telegram.Poll
     , TelegramFileId(..)
     , TelegramRemoteFile(..), TelegramRemoteFileStruct(..)
     , TelegramLocalFile(..), TelegramLocalFileStruct(..)
-    , HasLastName(lastName), HasId_(id_), HasFirstName(firstName), HasType_(type_)
+    , HasLastName(lastName), HasId_(id_), HasFirstName(firstName), HasType_(type_), HasStruct(struct)
     ) where
 
 
@@ -31,19 +31,19 @@ import           Control.Concurrent.Chan.Lifted
 import           Control.Concurrent.Lifted
 import           Control.Monad
 import           Control.Monad.Logger
-import           Data.Aeson                     hiding (Error, Success)
+import           Data.Aeson                              hiding (Error, Success)
 import           Data.IORef.Lifted
 import           Lens.Micro.Platform
 import           Marvin.Adapter
-import           Marvin.Adapter.Telegram.Common
+import           Marvin.Adapter.Telegram.Internal.Common
 import           Marvin.Internal.LensClasses
 import           Marvin.Interpolate.Text
-import           Network.HTTP.Client            (managerResponseTimeout)
-import           Network.HTTP.Client.TLS        (tlsManagerSettings)
+import           Network.HTTP.Client                     (managerResponseTimeout)
+import           Network.HTTP.Client.TLS                 (tlsManagerSettings)
 import           Network.Wreq
 
 #if MIN_VERSION_http_client(0,5,0)
-import           Network.HTTP.Client            (responseTimeoutMicro)
+import           Network.HTTP.Client                     (responseTimeoutMicro)
 #else
 responseTimeoutMicro = Just
 #endif

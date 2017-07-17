@@ -18,7 +18,7 @@ module Marvin.Adapter.Slack.RTM
     ) where
 
 
-import           Control.Concurrent.Async.Lifted (async, link)
+import           Control.Concurrent.Async.Lifted      (async, link)
 import           Control.Concurrent.Chan.Lifted
 import           Control.Concurrent.MVar.Lifted
 import           Control.Exception.Lifted
@@ -26,21 +26,21 @@ import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Data.Aeson                      hiding (Error)
-import           Data.Aeson.Types                hiding (Error)
-import qualified Data.ByteString.Lazy.Char8      as BS
+import           Data.Aeson                           hiding (Error)
+import           Data.Aeson.Types                     hiding (Error)
+import qualified Data.ByteString.Lazy.Char8           as BS
 import           Data.IORef.Lifted
-import           Data.Maybe                      (fromMaybe)
-import qualified Data.Text                       as T
-import           Lens.Micro.Platform             hiding ((.=))
+import           Data.Maybe                           (fromMaybe)
+import qualified Data.Text                            as T
+import           Lens.Micro.Platform                  hiding ((.=))
 import           Marvin.Adapter
-import           Marvin.Adapter.Slack.Common
-import           Marvin.Adapter.Slack.Types
+import           Marvin.Adapter.Slack.Internal.Common
+import           Marvin.Adapter.Slack.Internal.Types
 import           Marvin.Interpolate.Text
 import           Network.URI
 import           Network.WebSockets
 import           Network.Wreq
-import           Text.Read                       (readMaybe)
+import           Text.Read                            (readMaybe)
 import           Wuss
 
 

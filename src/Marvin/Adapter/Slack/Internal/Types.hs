@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Marvin.Adapter.Slack.Types where
+module Marvin.Adapter.Slack.Internal.Types where
 
 import           Control.Concurrent.Chan.Lifted (Chan)
 import           Control.Concurrent.MVar.Lifted (MVar)

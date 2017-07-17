@@ -11,7 +11,7 @@ See http://marvin.readthedocs.io/en/latest/adapters.html#events-api for document
 -}
 module Marvin.Adapter.Slack.EventsAPI
     ( SlackAdapter, EventsAPI
-    , SlackUserId(..), SlackChannelId(..)
+    , SlackUserId, SlackChannelId
     , MkSlack
     , SlackRemoteFile(..), SlackLocalFile(..)
     , HasTitle(..), HasPublicPermalink(..), HasEditable(..), HasPublic(..), HasUser(..), HasPrivateUrl(..), HasComment(..)
@@ -25,14 +25,14 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson
 import           Data.Aeson.Types
-import           Data.Maybe                      (fromMaybe)
-import qualified Data.Text                       as T
-import qualified Data.Text.Lazy                  as L
-import qualified Data.Text.Lazy.Encoding         as L
+import           Data.Maybe                           (fromMaybe)
+import qualified Data.Text                            as T
+import qualified Data.Text.Lazy                       as L
+import qualified Data.Text.Lazy.Encoding              as L
 import           Lens.Micro.Platform
 import           Marvin.Adapter
-import           Marvin.Adapter.Slack.Common
-import           Marvin.Adapter.Slack.Types
+import           Marvin.Adapter.Slack.Internal.Common
+import           Marvin.Adapter.Slack.Internal.Types
 import           Marvin.Interpolate.All
 import           Network.HTTP.Types
 import           Network.Wai

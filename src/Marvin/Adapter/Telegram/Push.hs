@@ -22,7 +22,7 @@ module Marvin.Adapter.Telegram.Push
     , TelegramFileId(..)
     , TelegramRemoteFile(..), TelegramRemoteFileStruct(..)
     , TelegramLocalFile(..), TelegramLocalFileStruct(..)
-    , HasLastName(lastName), HasId_(id_), HasFirstName(firstName), HasType_(type_)
+    , HasLastName(lastName), HasId_(id_), HasFirstName(firstName), HasType_(type_), HasStruct(struct)
     ) where
 
 
@@ -31,11 +31,11 @@ import           Control.Concurrent.Chan.Lifted
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Data.Aeson                      hiding (Error, Success)
-import           Data.Maybe                      (fromMaybe)
-import qualified Data.Text                       as T
+import           Data.Aeson                              hiding (Error, Success)
+import           Data.Maybe                              (fromMaybe)
+import qualified Data.Text                               as T
 import           Marvin.Adapter
-import           Marvin.Adapter.Telegram.Common
+import           Marvin.Adapter.Telegram.Internal.Common
 import           Marvin.Interpolate.All
 import           Marvin.Types
 import           Network.HTTP.Types

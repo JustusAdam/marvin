@@ -1,29 +1,29 @@
-module Marvin.Adapter.Slack.Common where
+module Marvin.Adapter.Slack.Internal.Common where
 
 
-import           Control.Applicative             ((<|>))
-import           Control.Arrow                   ((&&&))
-import           Control.Concurrent.Async.Lifted (async, link)
-import           Control.Concurrent.Chan.Lifted  (Chan, newChan, readChan, writeChan)
-import           Control.Concurrent.MVar.Lifted  (modifyMVar, modifyMVar_, newMVar, readMVar)
+import           Control.Applicative                 ((<|>))
+import           Control.Arrow                       ((&&&))
+import           Control.Concurrent.Async.Lifted     (async, link)
+import           Control.Concurrent.Chan.Lifted      (Chan, newChan, readChan, writeChan)
+import           Control.Concurrent.MVar.Lifted      (modifyMVar, modifyMVar_, newMVar, readMVar)
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Data.Aeson                      hiding (Error)
-import           Data.Aeson.Types                hiding (Error)
-import qualified Data.ByteString.Lazy            as B
-import           Data.Char                       (isSpace)
-import           Data.Foldable                   (asum)
-import qualified Data.HashMap.Strict             as HM
-import qualified Data.Text                       as T
-import qualified Data.Text.Lazy                  as L
-import qualified Data.Text.Lazy.Encoding         as L
-import           Lens.Micro.Platform             hiding ((.=))
-import           Marvin.Adapter                  hiding (mkAdapterId)
-import           Marvin.Adapter.Slack.Types
+import           Data.Aeson                          hiding (Error)
+import           Data.Aeson.Types                    hiding (Error)
+import qualified Data.ByteString.Lazy                as B
+import           Data.Char                           (isSpace)
+import           Data.Foldable                       (asum)
+import qualified Data.HashMap.Strict                 as HM
+import qualified Data.Text                           as T
+import qualified Data.Text.Lazy                      as L
+import qualified Data.Text.Lazy.Encoding             as L
+import           Lens.Micro.Platform                 hiding ((.=))
+import           Marvin.Adapter                      hiding (mkAdapterId)
+import           Marvin.Adapter.Slack.Internal.Types
 import           Marvin.Interpolate.All
 import           Marvin.Types
-import           Network.HTTP.Types.Status       (ok200)
+import           Network.HTTP.Types.Status           (ok200)
 import           Network.Wreq
 import           Util
 
