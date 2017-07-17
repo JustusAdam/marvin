@@ -11,8 +11,10 @@ See http://marvin.readthedocs.io/en/latest/adapters.html#real-time-messaging-api
 -}
 module Marvin.Adapter.Slack.RTM
     ( SlackAdapter, RTM
-    , SlackUserId, SlackChannelId
+    , SlackUserId(..), SlackChannelId(..)
     , MkSlack
+    , SlackRemoteFile(..), SlackLocalFile(..)
+    , HasTitle(..), HasPublicPermalink(..), HasEditable(..), HasPublic(..), HasUser(..), HasPrivateUrl(..), HasComment(..)
     ) where
 
 

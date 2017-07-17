@@ -19,6 +19,10 @@ module Marvin.Adapter.Telegram.Poll
     , TelegramChat(..), ChatType(..)
     , TelegramUser(..)
     , MkTelegram
+    , TelegramFileId(..)
+    , TelegramRemoteFile(..), TelegramRemoteFileStruct(..)
+    , TelegramLocalFile(..), TelegramLocalFileStruct(..)
+    , HasLastName(lastName), HasId_(id_), HasFirstName(firstName), HasType_(type_)
     ) where
 
 
@@ -32,6 +36,7 @@ import           Data.IORef.Lifted
 import           Lens.Micro.Platform
 import           Marvin.Adapter
 import           Marvin.Adapter.Telegram.Common
+import           Marvin.Internal.LensClasses
 import           Marvin.Interpolate.Text
 import           Network.HTTP.Client            (managerResponseTimeout)
 import           Network.HTTP.Client.TLS        (tlsManagerSettings)

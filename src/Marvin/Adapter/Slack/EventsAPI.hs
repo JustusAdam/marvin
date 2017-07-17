@@ -11,8 +11,10 @@ See http://marvin.readthedocs.io/en/latest/adapters.html#events-api for document
 -}
 module Marvin.Adapter.Slack.EventsAPI
     ( SlackAdapter, EventsAPI
-    , SlackUserId, SlackChannelId
+    , SlackUserId(..), SlackChannelId(..)
     , MkSlack
+    , SlackRemoteFile(..), SlackLocalFile(..)
+    , HasTitle(..), HasPublicPermalink(..), HasEditable(..), HasPublic(..), HasUser(..), HasPrivateUrl(..), HasComment(..)
     ) where
 
 

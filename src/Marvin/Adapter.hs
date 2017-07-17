@@ -10,8 +10,8 @@ Portability : POSIX
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Marvin.Adapter
-    ( 
-    -- * Types  
+    (
+    -- * Types
       EventConsumer
     , IsAdapter(..), AdapterId, mkAdapterId, unwrapAdapterId
     , AdapterM
@@ -23,9 +23,9 @@ module Marvin.Adapter
     , lookupFromAdapterConfig, requireFromAdapterConfig, getAdapterConfig
     -- ** For the application
     -- | usually adapter should not have to retrieve values from the application config
-    -- therefore use this functionality with caution. 
+    -- therefore use this functionality with caution.
     -- The structure of the application config is not guaranteed to remain consistent across versions.
-    -- 
+    --
     -- Prefer using helper functions such as 'getBotname' which will remain stable across versions.
     , lookupFromAppConfig, requireFromAppConfig, getAppConfig, getBotname
     -- * Misc
@@ -51,13 +51,13 @@ getAppConfig = AdapterM $
     C.subconfig $(isT "#{applicationScriptId}") =<< view config
 
 
--- | Get a value from the application config. 
+-- | Get a value from the application config.
 -- Returns 'Nothing' if the value does not exist or cannot be converted to @a@.
 lookupFromAppConfig :: C.Configured v => C.Name -> AdapterM a (Maybe v)
 lookupFromAppConfig n = getAppConfig >>= liftIO . flip C.lookup n
 
 
--- | Get a value from the application config. 
+-- | Get a value from the application config.
 -- Throws an error if the value does not exist or cannot be converted to @a@.
 requireFromAppConfig :: C.Configured v => C.Name -> AdapterM a v
 requireFromAppConfig n = getAppConfig >>= liftIO . flip C.require n
@@ -74,13 +74,13 @@ getAdapterConfig = AdapterM $
     C.subconfig $(isT "#{adapterConfigKey}.#{adapterId :: AdapterId a}") =<< view config
 
 
--- | Get a value from the adapter config. 
+-- | Get a value from the adapter config.
 -- Returns 'Nothing' if the value does not exist or cannot be converted to @a@.
 lookupFromAdapterConfig :: (IsAdapter a, C.Configured v) => C.Name -> AdapterM a (Maybe v)
 lookupFromAdapterConfig n = getAdapterConfig >>= liftIO . flip C.lookup n
 
 
--- | Get a value from the adapter config. 
+-- | Get a value from the adapter config.
 -- Throws an error if the value does not exist or cannot be converted to @a@.
 requireFromAdapterConfig :: (IsAdapter a, C.Configured v) => C.Name -> AdapterM a v
 requireFromAdapterConfig n = getAdapterConfig >>= liftIO . flip C.require n

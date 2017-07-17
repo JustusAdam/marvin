@@ -19,7 +19,10 @@ module Marvin.Adapter.Telegram.Push
     , TelegramChat(..), ChatType(..)
     , TelegramUser(..)
     , MkTelegram
-    , HasUsername(username), HasLastName(lastName), HasId_(id_), HasFirstName(firstName), HasType_(type_)
+    , TelegramFileId(..)
+    , TelegramRemoteFile(..), TelegramRemoteFileStruct(..)
+    , TelegramLocalFile(..), TelegramLocalFileStruct(..)
+    , HasLastName(lastName), HasId_(id_), HasFirstName(firstName), HasType_(type_)
     ) where
 
 

@@ -16,7 +16,7 @@ module Marvin.Run
     (
     -- * Simple and default ways to run marvin
       runMarvin
-    -- * Useful types  
+    -- * Useful types
     , ScriptInit, IsAdapter
     -- * Rolling your own
     , runMarvinWithConfig, parseMarvinCmdArgs, marvinCmdArgsParser

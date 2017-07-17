@@ -1,7 +1,10 @@
 # 0.3 - not yet released
 
 - Added optional support for recieving remote files and uploading local files.
-- Added files support to the Shell and Slack adapter
+- Added files support to the adapters
+    - Shell
+    - Slack
+    - Telegram
 - Changed bot runner in IsAdapter to be simpler to implement.
 - Changed the IsAdapter API.
     - The new API is lens based. Adapter dependend types are constrained via the requirement for certain lens class instances.
@@ -15,6 +18,7 @@
 - Configuration is now abstract and based on a typeclass
     - Added lower level run functions so the user can specify logging and config implementation
 - Switched to hpack for package management
+- Exporting internal data constructors for adapters per request from [@jchildren](https://github.com/jchildren) in [#21](https://github.com/JustusAdam/marvin/issues/21)
 
 # 0.2.3 - 05.03.2017
 

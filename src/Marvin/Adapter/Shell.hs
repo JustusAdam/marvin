@@ -9,7 +9,12 @@ Portability : POSIX
 
 See http://marvin.readthedocs.io/en/latest/adapters.html#shell for documentation of this adapter.
 -}
-module Marvin.Adapter.Shell (ShellAdapter) where
+module Marvin.Adapter.Shell 
+    ( ShellAdapter
+    , SimpleWrappedUsername(..)
+    , SimpleWrappedChannelName(..)
+    , RFile(..), LFile(..)
+    ) where
 
 
 import           Control.Concurrent.Async.Lifted

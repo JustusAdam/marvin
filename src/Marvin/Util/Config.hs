@@ -40,7 +40,7 @@ instance IsConfig Config where
 data Config = forall c. IsConfig c => Config c
 
 
--- | Obtain a value from a config. 
+-- | Obtain a value from a config.
 -- Throws an error if the value is not present or cannot be converted to @v@.
 require :: (C.Configured v, MonadIO m, IsConfig c) => c -> Name -> m v
 require cfg name = liftIO $ fromMaybe (error $(isS "Lookup error, key #{name} does not exist")) <$> lookup cfg name

@@ -12,7 +12,7 @@ See https://marvin.readthedocs.io/en/latest/adapters.html#irc for documentation 
 {-# LANGUAGE Rank2Types   #-}
 {-# LANGUAGE ViewPatterns #-}
 module Marvin.Adapter.IRC
-    ( IRCAdapter, IRCChannel
+    ( IRCAdapter, IRCChannel(..)
     ) where
 
 
