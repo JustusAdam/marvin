@@ -17,9 +17,9 @@ See http://marvin.readthedocs.io/en/latest/adapters.html#push for documentation 
 module Marvin.Adapter.Telegram.Push
     ( TelegramAdapter, Push
     , TelegramChat(..), ChatType(..)
-    , TelegramUser(..)
+    , TelegramUser
     , MkTelegram
-    , TelegramFileId(..)
+    , TelegramFileId
     , TelegramRemoteFile(..), TelegramRemoteFileStruct(..)
     , TelegramLocalFile(..), TelegramLocalFileStruct(..)
     , HasLastName(lastName), HasId_(id_), HasFirstName(firstName), HasType_(type_), HasStruct(struct)

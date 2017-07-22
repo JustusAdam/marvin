@@ -17,12 +17,13 @@ See http://marvin.readthedocs.io/en/latest/adapters.html#poll for documentation 
 module Marvin.Adapter.Telegram.Poll
     ( TelegramAdapter, Poll
     , TelegramChat(..), ChatType(..)
-    , TelegramUser(..)
+    , TelegramUser
     , MkTelegram
-    , TelegramFileId(..)
-    , TelegramRemoteFile(..), TelegramRemoteFileStruct(..)
-    , TelegramLocalFile(..), TelegramLocalFileStruct(..)
-    , HasLastName(lastName), HasId_(id_), HasFirstName(firstName), HasType_(type_), HasStruct(struct)
+    , TelegramFileId
+    , TelegramRemoteFile, TelegramRemoteFileStruct
+    , TelegramLocalFile, TelegramLocalFileStruct
+    , HasLastName(lastName), HasId_(id_)
+    , HasFirstName(firstName), HasType_(type_), HasStruct(struct)
     ) where
 
 

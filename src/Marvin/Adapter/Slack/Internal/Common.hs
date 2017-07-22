@@ -102,11 +102,11 @@ eventParser v@(Object o) = isErrParser <|> isOkParser <|> hasTypeParser
 eventParser _ = fail "expected object"
 
 
-stripWhiteSpaceMay :: L.Text -> Maybe L.Text
-stripWhiteSpaceMay t =
+startsWith :: (Char -> Bool) -> L.Text -> Bool
+startsWith f t =
     case L.uncons t of
-        Just (c, _) | isSpace c -> Just $ L.stripStart t
-        _           -> Nothing
+        Just (c, _) -> f c
+        _           -> False
 
 
 runHandlerLoop :: MkSlack a => Chan (InternalType a) -> EventConsumer (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
@@ -121,8 +121,17 @@ runHandlerLoop evChan handler =
 
                     botname <- L.toLower <$> getBotname
                     let strippedMsg = L.stripStart m
-                    let lmsg = L.toLower strippedMsg
-                    handler $ case asum $ map ((\prefix -> if prefix `L.isPrefixOf` lmsg then Just $ L.drop (L.length prefix) strippedMsg else Nothing) >=> stripWhiteSpaceMay) [botname, L.cons '@' botname, L.cons '/' botname] of
+                        lmsg = L.toLower strippedMsg
+                        match prefix 
+                            | prefix `L.isPrefixOf` lmsg 
+                            && startsWith isSpace short = Just $ L.stripStart short
+                            | otherwise = Nothing
+                          where short = L.drop (L.length prefix) strippedMsg 
+                    handler $ case 
+                                asum $ 
+                                    map match 
+                                    [botname, L.cons '@' botname, L.cons '/' botname] 
+                              of
                         Nothing -> ev
                         Just m' -> CommandEvent u c m' t
 
