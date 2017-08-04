@@ -97,7 +97,7 @@ sizeOfFile :: MonadIO m => FilePath -> m Integer
 sizeOfFile path = liftIO $ withFile path ReadMode hFileSize
 
 
-instance HasFiles ShellAdapter where
+instance SupportsFiles ShellAdapter where
     type RemoteFile ShellAdapter = RFile
     type LocalFile ShellAdapter = LFile
     newLocalFile fname fcontent = do

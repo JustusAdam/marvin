@@ -11,7 +11,7 @@ import           Marvin.Prelude
 import qualified Paths_marvin_integration as P
 
 
-script :: (IsAdapter a, HasFiles a) => ScriptInit a
+script :: (IsAdapter a, SupportsFiles a) => ScriptInit a
 script = defineScript "test" $ do
     hear (r [CaseInsensitive] "^ping$") $ do
         msg <- getMessage

@@ -55,7 +55,7 @@ data Event a
     | ChannelJoinEvent (User a) (Channel a) (TimeStamp a)
     | ChannelLeaveEvent (User a) (Channel a) (TimeStamp a)
     | TopicChangeEvent (User a) (Channel a) Topic (TimeStamp a)
-    | HasFiles a => FileSharedEvent (User a) (Channel a) (RemoteFile a) (TimeStamp a)
+    | SupportsFiles a => FileSharedEvent (User a) (Channel a) (RemoteFile a) (TimeStamp a)
 
 -- | Basic monad which most internal actions run in
 type RunnerM = LoggingT IO
@@ -109,7 +109,7 @@ class ( HasName (RemoteFile a) (Maybe L.Text)
       , HasContent (LocalFile a) FileContent
       , HasName (LocalFile a) L.Text
       , HasFileType (LocalFile a) (Maybe L.Text)
-      ) => HasFiles a where
+      ) => SupportsFiles a where
     -- | Concrete type of an uploaded file
     type RemoteFile a
     type LocalFile a

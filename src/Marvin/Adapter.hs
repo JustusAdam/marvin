@@ -15,7 +15,7 @@ module Marvin.Adapter
       EventConsumer
     , IsAdapter(..), AdapterId, mkAdapterId, unwrapAdapterId
     , AdapterM
-    , HasFiles(..)
+    , SupportsFiles(..)
     , MonadAdapter(..)
     , Event(..)
     -- * Interacting with the config

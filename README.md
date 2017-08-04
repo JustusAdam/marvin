@@ -30,7 +30,7 @@ module MyScript where
 
 import Marvin.Prelude
 
-script :: IsAdapter a => ScriptInit a
+script :: (IsAdapter a, SupportsFiles a) => ScriptInit a
 script = defineScript "my-script" $ do
     hear "sudo (.+)" $ do
         match <- getMatch

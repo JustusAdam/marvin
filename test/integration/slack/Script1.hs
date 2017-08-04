@@ -14,7 +14,7 @@ import qualified Paths_marvin_integration as P
 import           System.Directory
 import           System.FilePath
 
--- Add a test that the HasFiles functionality is available as is to be expected
+-- Add a test that the SupportsFiles functionality is available as is to be expected
 
 script :: ScriptInit (SlackAdapter RTM)
 script = defineScript "test" $ do

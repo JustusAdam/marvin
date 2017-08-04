@@ -40,7 +40,7 @@ module Marvin
     , ScriptId
     , ScriptDefinition
     -- * The adapter
-    , IsAdapter(User, Channel), HasFiles(LocalFile, RemoteFile), MonadAdapter(AdapterT, liftAdapterM)
+    , IsAdapter(User, Channel), SupportsFiles(LocalFile, RemoteFile), MonadAdapter(AdapterT, liftAdapterM)
     -- * Lenses
     , HasUsername(username), HasName(name), HasFirstName(firstName), HasLastName(lastName), HasFileType(fileType), HasUrl(url), HasCreationDate(creationDate), HasSize(size), HasContent(content)
     -- * Advanced actions
@@ -63,7 +63,7 @@ import qualified Data.Text.Lazy              as L
 import           Data.Time.Clock
 import qualified Data.Vector                 as V
 import           Lens.Micro.Platform
-import           Marvin.Adapter              (HasFiles(LocalFile, RemoteFile), IsAdapter)
+import           Marvin.Adapter              (SupportsFiles(LocalFile, RemoteFile), IsAdapter)
 import qualified Marvin.Adapter              as A
 import           Marvin.Internal
 import           Marvin.Internal.LensClasses
@@ -209,7 +209,7 @@ resolveChannel =  liftAdapterM . A.resolveChannel
 
 
 -- | Return the contents of the file as text. If the file is not public, or cannot be interpreted as text returns 'Nothing'.
-readTextFile :: (MonadAdapter m, HasFiles (AdapterT m))
+readTextFile :: (MonadAdapter m, SupportsFiles (AdapterT m))
            => RemoteFile (AdapterT m) -> m (Maybe L.Text)
 readTextFile = liftAdapterM . A.readTextFile
 
@@ -219,7 +219,7 @@ readTextFile = liftAdapterM . A.readTextFile
 -- Uses either the name of the downloaded file as filename or @"unnamed-\<current time\>"@
 --
 -- When successful returns the path of the saved file otherwise an error message.
-saveFile :: (MonadAdapter m, MonadIO m, HasFiles (AdapterT m))
+saveFile :: (MonadAdapter m, MonadIO m, SupportsFiles (AdapterT m))
          => RemoteFile (AdapterT m) -> m (Either L.Text FilePath)
 saveFile = (`saveFileToDir` ".")
 
@@ -229,7 +229,7 @@ saveFile = (`saveFileToDir` ".")
 -- Uses either the name of the downloaded file as filename or @"unnamed-\<current time\>"@
 --
 -- When successful returns the path of the saved file otherwise an error message.
-saveFileToDir :: (MonadAdapter m, MonadIO m, HasFiles (AdapterT m))
+saveFileToDir :: (MonadAdapter m, MonadIO m, SupportsFiles (AdapterT m))
               => RemoteFile (AdapterT m) -> FilePath -> m (Either L.Text FilePath)
 saveFileToDir file dir = do
     fname <- liftIO $
@@ -247,7 +247,7 @@ saveFileToDir file dir = do
 -- Creates intermediate directories if they are missing.
 --
 -- When successful returns the path of the saved file otherwise an error message.
-saveFileTo :: (MonadAdapter m, MonadIO m, HasFiles (AdapterT m))
+saveFileTo :: (MonadAdapter m, MonadIO m, SupportsFiles (AdapterT m))
            => RemoteFile (AdapterT m) -> FilePath -> m (Either L.Text FilePath)
 saveFileTo file path = readFileBytes file >>= \case
     Nothing ->
@@ -260,17 +260,17 @@ saveFileTo file path = readFileBytes file >>= \case
 
 
 -- | Share the file with the provided path to the channel we are currently responding to.
-sendFile :: (IsAdapter a, HasFiles a, Get m (Channel' a)) => FilePath -> BotReacting a m (Either L.Text (RemoteFile a))
+sendFile :: (IsAdapter a, SupportsFiles a, Get m (Channel' a)) => FilePath -> BotReacting a m (Either L.Text (RemoteFile a))
 sendFile path = sendFileTo' path . return =<< getChannel
 
 
 -- | Share the file with the provided path to the channel with the specified name.
-sendFileTo :: (MonadAdapter m, AdapterT m ~ a, HasFiles a, MonadIO m) => FilePath -> L.Text -> m (Either L.Text (RemoteFile a))
+sendFileTo :: (MonadAdapter m, AdapterT m ~ a, SupportsFiles a, MonadIO m) => FilePath -> L.Text -> m (Either L.Text (RemoteFile a))
 sendFileTo path chanName = maybe (return $ Left "Channel does not exist") (sendFileTo' path . return) =<< resolveChannel chanName
 
 
 -- | Share the file with the provided path to the channel.
-sendFileTo' :: (MonadAdapter m, HasFiles a, MonadIO m, AdapterT m ~ a) => FilePath -> [Channel a] -> m (Either L.Text (RemoteFile a))
+sendFileTo' :: (MonadAdapter m, SupportsFiles a, MonadIO m, AdapterT m ~ a) => FilePath -> [Channel a] -> m (Either L.Text (RemoteFile a))
 sendFileTo' path chans = runExceptT $ do
     e <- liftIO $ doesFileExist path
     when e $ fail "File does not exist"
@@ -280,19 +280,19 @@ sendFileTo' path chans = runExceptT $ do
 
 
 -- | Return the contents of the file as bytes. If the file is not public returns 'Nothing'.
-readFileBytes :: (MonadAdapter m, HasFiles (AdapterT m))
+readFileBytes :: (MonadAdapter m, SupportsFiles (AdapterT m))
            => RemoteFile (AdapterT m) -> m (Maybe ByteString)
 readFileBytes = liftAdapterM . A.readFileBytes
 
 
 -- | Create a new 'LocalFile' object for upload with the specified content.
-newLocalFile :: (MonadAdapter m, HasFiles (AdapterT m))
+newLocalFile :: (MonadAdapter m, SupportsFiles (AdapterT m))
             => L.Text -> FileContent -> m (LocalFile (AdapterT m))
 newLocalFile fname = liftAdapterM . A.newLocalFile fname
 
 
 -- | Share a local file to the supplied list of channels
-shareFile :: (MonadAdapter m, HasFiles a, AdapterT m ~ a)
+shareFile :: (MonadAdapter m, SupportsFiles a, AdapterT m ~ a)
             => LocalFile a -> [Channel a] -> m (Either L.Text (RemoteFile a))
 shareFile f = liftAdapterM . A.shareFile f
 

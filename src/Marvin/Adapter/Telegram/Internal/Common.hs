@@ -412,7 +412,7 @@ instance MkTelegram a => IsAdapter (TelegramAdapter a) where
         return Nothing
     messageChannel = messageChannelImpl
 
-instance MkTelegram a => HasFiles (TelegramAdapter a) where
+instance MkTelegram a => SupportsFiles (TelegramAdapter a) where
     type RemoteFile (TelegramAdapter a) = TelegramRemoteFile (TelegramAdapter a)
     type LocalFile (TelegramAdapter a) = TelegramLocalFile
     shareFile = shareFileImpl

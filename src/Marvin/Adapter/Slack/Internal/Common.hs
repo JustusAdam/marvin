@@ -334,7 +334,7 @@ partLText :: T.Text -> L.Text -> Part
 partLText pName = partText pName . L.toStrict
 
 
-instance MkSlack a => HasFiles (SlackAdapter a) where
+instance MkSlack a => SupportsFiles (SlackAdapter a) where
     type RemoteFile (SlackAdapter a) = SlackRemoteFile a
     type LocalFile (SlackAdapter a) = SlackLocalFile
 
