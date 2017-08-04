@@ -1,19 +1,19 @@
 # 0.3 - not yet released
 
-- Added optional support for recieving remote files and uploading local files.
+- Added optional support for receiving remote files and uploading local files via the `SupportesFiles` typeclass (see issue [#17](https://github.com/JustusAdam/marvin/issues/17))
 - Added files support to the adapters
     - Shell
     - Slack
     - Telegram
-- Changed bot runner in IsAdapter to be simpler to implement.
+- Changed bot runner in `IsAdapter` to be simpler to implement.
 - Changed the IsAdapter API.
     - The new API is lens based. Adapter dependend types are constrained via the requirement for certain lens class instances.
-    - Deprecated getUsername and getChannelName, these are now accessible via the lense class instances.
+    - Deprecated `getUsername` and `getChannelName`, these are now accessible via the lense class instances.
 - Changed Util API
-    - Marvin.Util.HTTP has been removed (was empty) until an API has been found
-    - Marvin.Util.Mutable has been removed as BotReacting now has a `MonadBase` and `MonadBaseControl` instance meaning the functions from `lifted-base` can be used without modification.
-- Initializer no longer overwrites files
-- Preprocessor now uses the new external-scripts.json spec from issue #8
+    - `Marvin.Util.HTTP` has been removed (was empty) until an API has been found
+    - `Marvin.Util.Mutable` has been removed as BotReacting now has a `MonadBase` and `MonadBaseControl` instance meaning the functions from `lifted-base` can be used without modification.
+- Fixed issue [#7](https://github.com/JustusAdam/marvin/issues/7) where initializer overwrites files
+- Preprocessor now uses the new `external-scripts.json` spec from issue [#8](https://github.com/JustusAdam/marvin/issues/8)
 - Added some generic handlers for file down/upload and version
 - Configuration is now abstract and based on a typeclass
     - Added lower level run functions so the user can specify logging and config implementation
@@ -22,7 +22,7 @@
 
 # 0.2.3 - 05.03.2017
 
-- A big thanks to @lubomir for testing the IRC adapter and contributing the following changes
+- A big thanks to [@lubomir](https://github.com/lubomir) for testing the IRC adapter and contributing the following changes
     - Better command recognition in IRC adapter
     - Bot now properly registers in IRC
     - Added config setting to IRC for channels which the bot should join

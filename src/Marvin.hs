@@ -13,6 +13,7 @@ For the proper, verbose documentation see <https://marvin.readthedocs.org/en/lat
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedLists #-}
 module Marvin
     (
     -- * Reacting
@@ -123,7 +124,7 @@ exit ac = ScriptDefinition $ do
 
 
 alterHelper :: a -> Maybe (V.Vector a) -> Maybe (V.Vector a)
-alterHelper v = return . maybe (return v) (V.cons v)
+alterHelper v = return . maybe [v] (V.cons v)
 
 
 -- | This handler runs whenever a user enters __the specified channel__.
@@ -192,7 +193,7 @@ fileSharedIn !chanName ac = ScriptDefinition $ do
 customTrigger :: (Event a -> Maybe d) -> BotReacting a d () -> ScriptDefinition a ()
 customTrigger tr ac = ScriptDefinition $ do
     pac <- prepareAction (Nothing :: Maybe T.Text) ac
-    actions . customs %= V.cons (maybe Nothing (return . pac) . tr)
+    actions . customs %= V.cons (maybe Nothing (Just . pac) . tr)
 
 
 -- | Send a message to the channel the triggering message came from.
