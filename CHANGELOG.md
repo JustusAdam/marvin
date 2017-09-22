@@ -1,6 +1,6 @@
-# 0.3 - not yet released
+# 0.3.0 - not yet released
 
-- Added optional support for receiving remote files and uploading local files via the `SupportesFiles` typeclass (see issue [#17](https://github.com/JustusAdam/marvin/issues/17))
+- Added optional support for receiving remote files and uploading local files via the `SupportsFiles` typeclass (see issue [#17](https://github.com/JustusAdam/marvin/issues/17) and [#14](https://github.com/JustusAdam/marvin/issues/14)
 - Added files support to the adapters
     - Shell
     - Slack

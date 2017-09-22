@@ -323,11 +323,11 @@ verifyIdString thingToVerify f s
 
 
 instance IsString ScriptId where
-    fromString = either error id . verifyIdString "script id" ScriptId . fromString
+    fromString = either error id . mkScriptId . fromString
 
 
 instance IsString (AdapterId a) where
-    fromString = either error id . verifyIdString "adapter id" AdapterId . fromString
+    fromString = either error id . mkAdapterId . fromString
 
 
 -- | Attempt to create a script id from 'Text'

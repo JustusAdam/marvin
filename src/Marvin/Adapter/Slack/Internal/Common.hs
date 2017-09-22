@@ -79,19 +79,13 @@ eventParser v@(Object o) = isErrParser <|> isOkParser <|> hasTypeParser
     messageTypeEvent = do
         subt <- o .:? "subtype"
         case (subt :: Maybe T.Text) of
-            Just str ->
-                case str of
-                    "channel_join" -> cJoin
-                    "group_join" -> cJoin
-                    "channel_leave" -> cLeave
-                    "group_leave" -> cLeave
-                    "channel_topic" ->
-                        wrapEv $ flip2_2 TopicChangeEvent <$> o .: "topic" <*> ts
-                    "file_share" ->
-                        wrapEv $ flip2_2 FileSharedEvent <$> o .: "file" <*> ts
-                    _ -> msgEv
-
-            _ -> msgEv
+            Just "channel_join"  -> cJoin
+            Just "group_join"    -> cJoin
+            Just "channel_leave" -> cLeave
+            Just "group_leave"   -> cLeave
+            Just "channel_topic" -> wrapEv $ flip2_2 TopicChangeEvent <$> o .: "topic" <*> ts
+            Just "file_share"    -> wrapEv $ flip2_2 FileSharedEvent <$> o .: "file" <*> ts
+            _                    -> msgEv
       where
         channel = o .: "channel"
         ts = o .: "ts" >>= timestampFromNumber
@@ -122,15 +116,15 @@ runHandlerLoop evChan handler =
                     botname <- L.toLower <$> getBotname
                     let strippedMsg = L.stripStart m
                         lmsg = L.toLower strippedMsg
-                        match prefix 
-                            | prefix `L.isPrefixOf` lmsg 
+                        match prefix
+                            | prefix `L.isPrefixOf` lmsg
                             && startsWith isSpace short = Just $ L.stripStart short
                             | otherwise = Nothing
-                          where short = L.drop (L.length prefix) strippedMsg 
-                    handler $ case 
-                                asum $ 
-                                    map match 
-                                    [botname, L.cons '@' botname, L.cons '/' botname] 
+                          where short = L.drop (L.length prefix) strippedMsg
+                    handler $ case
+                                asum $
+                                    map match
+                                    [botname, L.cons '@' botname, L.cons '/' botname]
                               of
                         Nothing -> ev
                         Just m' -> CommandEvent u c m' t

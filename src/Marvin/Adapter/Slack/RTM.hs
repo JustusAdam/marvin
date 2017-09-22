@@ -62,7 +62,9 @@ runConnectionLoop eventChan connectionTracker = do
         logDebugN "initializing socket"
         r <- liftIO $ post "https://slack.com/api/rtm.start" [ "token" := (token :: T.Text) ]
         case eitherDecode (r^.responseBody) of
-            Left err -> logErrorN $(isT "Error decoding rtm json #{err}")
+            Left err -> do
+                logErrorN $(isT "Error decoding rtm json #{err}")
+                logDebugN $(isT "#{r^.responseBody}")
             Right js -> do
                 port <- case uriPort authority_ of
                             v@(':':rest_) -> maybe (portOnErr v) return $ readMaybe rest_
@@ -128,4 +130,3 @@ instance MkSlack RTM where
         a <- async $ runConnectionLoop inChan connTracker
         link a
         senderLoop connTracker
-

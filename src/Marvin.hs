@@ -12,8 +12,8 @@ For the proper, verbose documentation see <https://marvin.readthedocs.org/en/lat
 -}
 {-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE ExplicitForAll      #-}
+{-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedLists #-}
 module Marvin
     (
     -- * Reacting
@@ -64,7 +64,7 @@ import qualified Data.Text.Lazy              as L
 import           Data.Time.Clock
 import qualified Data.Vector                 as V
 import           Lens.Micro.Platform
-import           Marvin.Adapter              (SupportsFiles(LocalFile, RemoteFile), IsAdapter)
+import           Marvin.Adapter              (IsAdapter, SupportsFiles(LocalFile, RemoteFile))
 import qualified Marvin.Adapter              as A
 import           Marvin.Internal
 import           Marvin.Internal.LensClasses

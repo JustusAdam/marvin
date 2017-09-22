@@ -16,7 +16,7 @@ No part of the API exposed here is to be consideres stable and may change unexpe
 module Marvin.Adapter.Slack.Internal
     ( SlackUserId(..), SlackChannelId(..)
     , MkSlack(..), SlackAdapter(..), InternalType(..)
-    , LimitedChannelInfo(..), ChannelCache(..), UserCache(..) 
+    , LimitedChannelInfo(..), ChannelCache(..), UserCache(..)
     , UserInfo(..)
     , HasTopic(..), HasIdValue(..), HasNameResolver(..), HasInfoCache(..), HasCreated(..)
     ) where
