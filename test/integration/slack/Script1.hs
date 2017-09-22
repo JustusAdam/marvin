@@ -36,7 +36,7 @@ script = defineScript "test" $ do
 
     topicIn "testing" $ do
         t <- getTopic
-        messageChannel "#random" $(isL "The new topic in testing is \"#{t}\"")
+        messageChannel "random" $(isL "The new topic in testing is \"#{t}\"")
     enterIn "random" $ do
         u <- getUser
         send $(isL "#{u^.username} just entered random")
