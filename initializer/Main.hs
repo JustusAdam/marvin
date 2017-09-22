@@ -18,7 +18,8 @@ import           System.IO
 import           Text.Mustache.Compile
 import           Text.Mustache.Render
 import           Text.Mustache.Types
-
+import qualified Text.PrettyPrint.ANSI.Leijen as PP
+import qualified Data.Char as Char
 
 data Opts = Opts
     { botname :: String
@@ -57,6 +58,21 @@ adType =
     ]
 
 
+itemize :: [PP.Doc] -> PP.Doc
+itemize = PP.vsep . map ("-" PP.<+>)
+
+
+autoText :: String -> PP.Doc
+autoText = PP.fillSep . map PP.text . go id
+  where
+    go f l =
+        let (prefix, rest) = break Char.isSpace l
+        in case rest of
+                _:r -> go (f . (prefix :)) r
+                _ -> f [prefix]
+
+
+
 main :: IO ()
 main = do
     Opts{..} <- execParser infoParser
@@ -87,13 +103,32 @@ main = do
   where
     infoParser = info
         (helper <*> optsParser)
-        (fullDesc <> header "marvin-init ~ make a new marvin project")
+        (  fullDesc
+        <> header "marvin-init ~ scaffolding for a new marvin project"
+        <> (progDescDoc . Just)
+            (      PP.text "Generate the files necessary to get started with a new marvin project."
+            PP.<$> PP.text "This utility will generate:"
+            PP.<$> (PP.indent 2 . itemize . map autoText)
+                [ "A marvin configuration file (config.cfg)"
+                , "A main file that automatically imports scripts using the preprocessor `marvin-pp`"
+                , "A simple script to get started"
+                , "A package.yaml file and a <bot>.cabal file to manage your dependencies"
+                ]
+            PP.<$> autoText "This program will"
+                   PP.</> (PP.bold "not") PP.</>
+                   autoText "overwrite an existing file. Therefore if you already have a file \
+                       \with the same name as one of the generated ones that file will not get \
+                       \generated!"
+            )
+        )
     optsParser = Opts
-        <$> argument str (metavar "BOTNAME")
+        <$> argument str
+            (  metavar "BOTNAME"
+            <> help "A name for your bot"
+            )
         <*> strOption
             (  long "adapter"
             <> short 'a'
             <> metavar "ID"
             <> value "slack-rtm"
             <> help "id of the adapter to use" )
-

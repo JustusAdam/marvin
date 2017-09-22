@@ -138,6 +138,7 @@ executables:
     - filepath >=1.4
     - optparse-applicative >=0.11 && <1
     - text >=1.0
+    - ansi-wl-pprint == 0.6.*
 tests:
   marvin-unit-tests:
     main: Spec.hs
