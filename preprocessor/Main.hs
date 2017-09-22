@@ -83,7 +83,17 @@ main = do
   where
     infoParser = info
         (helper <*> optsParser)
-        (fullDesc <> header "marvin-pp ~ the marvin preprocessor")
+        (  fullDesc
+        <> header "marvin-pp ~ the marvin preprocessor"
+        <> progDesc
+            "Generates a main module for a marvin project.\n\
+            \Ignores original module contents. \
+            \And thus also the input path argument. \
+            \Automatically imports local scripts and scripts from external-scripts.json. \
+            \Ignores scripts beginning with '_'. \
+            \Configuration is either read from command line arguments or the config file \
+            \(if provided)."
+        )
     optsParser = Opts
         <$> optional
             (strOption
@@ -92,10 +102,20 @@ main = do
                 <> metavar "ID"
                 <> help "adapter to use"
                 <> showDefault
+                <> completeWith (map fst adapters)
             )
-        <*> argument str (metavar "NAME")
-        <*> argument str (metavar "PATH")
-        <*> argument str (metavar "PATH")
+        <*> argument str
+            (  metavar "NAME"
+            <> help "Name of the source file"
+            )
+        <*> argument str
+            (  metavar "PATH"
+            <> help "Path to the input file"
+            )
+        <*> argument str
+            (  metavar "PATH"
+            <> help "Path to the output file"
+            )
         <*> strOption
             (  long "external-scripts"
             <> short 's'
