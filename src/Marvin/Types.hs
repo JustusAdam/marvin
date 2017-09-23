@@ -18,7 +18,9 @@ module Marvin.Types
     , Event(..), RunnerM
     , BotActionState
     , HasScriptId(scriptId), HasAdapter(adapter), HasPayload(payload)
-    , HasActions(actions), HasUsername(username), HasName(name), HasFirstName(firstName), HasLastName(lastName), HasFileType(fileType), HasUrl(url), HasCreationDate(creationDate), HasSize(size), HasContent(content)
+    , HasActions(actions), HasUsername(username), HasName(name), HasFirstName(firstName)
+    , HasLastName(lastName), HasFileType(fileType), HasUrl(url), HasCreationDate(creationDate)
+    , HasSize(size), HasContent(content)
     ) where
 
 

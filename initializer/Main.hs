@@ -2,13 +2,14 @@
 {-# LANGUAGE RecordWildCards #-}
 module Main where
 
-import           Control.Arrow         (second, (***))
+import           Control.Arrow                (second, (***))
 import           Control.Monad
-import           Data.Foldable         (for_)
-import           Data.Maybe            (isJust)
-import           Data.Monoid           ((<>))
-import qualified Data.Text             as T
-import qualified Data.Text.IO          as T
+import qualified Data.Char                    as Char
+import           Data.Foldable                (for_)
+import           Data.Maybe                   (isJust)
+import           Data.Monoid                  ((<>))
+import qualified Data.Text                    as T
+import qualified Data.Text.IO                 as T
 import           Options.Applicative
 import           Paths_marvin
 import           Prelude
@@ -19,7 +20,6 @@ import           Text.Mustache.Compile
 import           Text.Mustache.Render
 import           Text.Mustache.Types
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
-import qualified Data.Char as Char
 
 data Opts = Opts
     { botname :: String
@@ -69,7 +69,7 @@ autoText = PP.fillSep . map PP.text . go id
         let (prefix, rest) = break Char.isSpace l
         in case rest of
                 _:r -> go (f . (prefix :)) r
-                _ -> f [prefix]
+                _   -> f [prefix]
 
 
 
