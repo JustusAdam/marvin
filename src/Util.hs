@@ -64,3 +64,7 @@ mapLeft f = either (Left . f) Right
 
 mapRight :: (b -> c) -> Either a b -> Either a c
 mapRight = fmap
+
+
+ifM :: Monad m => m Bool -> m a -> m a -> m a
+ifM cond then_ else_ = cond >>= \c -> if c then then_ else else_

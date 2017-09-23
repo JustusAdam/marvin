@@ -7,8 +7,8 @@ import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Data.Aeson                      hiding (Error, Success)
-import           Data.Aeson.Types                (Parser, parseEither)
+import           Data.Aeson                      as A hiding (Error, Success)
+import           Data.Aeson.Types                as A (Parser, parseEither)
 import qualified Data.ByteString.Lazy            as BS
 import           Data.Char                       (isSpace)
 import           Data.Foldable                   (asum)
@@ -20,8 +20,8 @@ import           Lens.Micro.Platform
 import           Marvin.Adapter                  hiding (mkAdapterId)
 import           Marvin.Interpolate.All
 import           Marvin.Types
-import           Network.Wreq
-import           Network.Wreq.Types
+import           Network.Wreq                    as Wreq
+import           Network.Wreq.Types              as Wreq
 import           Util
 
 data APIResponse a
@@ -276,7 +276,7 @@ execAPIMethod :: (MkTelegram b, Postable p)
 execAPIMethod = execAPIMethodWith defaults
 
 execAPIMethodWith :: (MkTelegram b, Postable p)
-                  => Options
+                  => Wreq.Options
                   -> (Value -> Parser a)
                   -> String
                   -> p

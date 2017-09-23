@@ -216,9 +216,5 @@ lciParser = withObject "expected object" $ \o ->
   --                   (fail "Expected one of: [is_channel, is_group, is_im] to be true.")
 
 
-ifM :: Monad m => m Bool -> m a -> m a -> m a
-ifM cond then_ else_ = cond >>= \c -> if c then then_ else else_
-
-
 lciListParser :: Value -> Parser [LimitedChannelInfo]
 lciListParser = withArray "array" $ fmap toList . mapM lciParser
