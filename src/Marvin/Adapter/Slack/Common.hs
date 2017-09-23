@@ -195,6 +195,7 @@ refreshSingleChannelInfo chan = do
 
 
 resolveChannelImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe SlackChannelId)
+resolveChannelImpl "" = return Nothing
 resolveChannelImpl name' = do
     adapter <- getAdapter
     modifyMVar (channelCache adapter) $ \cc ->
@@ -299,4 +300,3 @@ instance MkSlack a => IsAdapter (SlackAdapter a) where
     getChannelName = getChannelNameImpl
     resolveChannel = resolveChannelImpl
     resolveUser = resolveUserImpl
-

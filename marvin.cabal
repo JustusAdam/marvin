@@ -1,8 +1,8 @@
 name:                marvin
-version:             0.2.3
+version:             0.2.4
 synopsis:            A framework for modular, portable chat bots.
-description:         A framework for writing portable chat bots. Inspired by hubot. 
-                     . 
+description:         A framework for writing portable chat bots. Inspired by hubot.
+                     .
                      The best way to get started with this library is with the documentation on readthedocs: <https://marvin.readthedocs.io>
 homepage:            https://marvin.readthedocs.io
 bug-reports:         https://github.com/JustusAdam/marvin/issues

@@ -142,9 +142,8 @@ lciParser :: Value -> Parser LimitedChannelInfo
 lciParser = withObject "expected object" $ \o ->
     LimitedChannelInfo
         <$> o .: "id"
-        <*> o .: "name"
-        <*> (o .: "topic" >>= withObject "object" (.: "value"))
+        <*> o .:? "name" .!= ""
+        <*> (o .:? "topic" >>= maybe (return "") (withObject "object" (.: "value")))
 
 lciListParser :: Value -> Parser [LimitedChannelInfo]
 lciListParser = withArray "array" $ fmap toList . mapM lciParser
-
