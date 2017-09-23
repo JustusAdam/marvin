@@ -149,10 +149,8 @@ data TelegramChat = TelegramChat
     }
 makeFields ''TelegramChat
 
-instance HasName TelegramChat L.Text where
-    name = lens
-        (\c -> fromMaybe "" $ c^.username)
-        (\c n -> c&username.~(case n of "" -> Nothing;a->Just a))
+instance HasName TelegramChat (Maybe L.Text) where
+    name = username
 
 instance FromJSON ChatType where
     parseJSON = withText "expected string" $

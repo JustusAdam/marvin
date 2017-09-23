@@ -45,7 +45,7 @@ data IRCChannel
     = RealChannel { chanName :: L.Text }
     | Direct      { chanName :: L.Text }
 
-instance HasName IRCChannel L.Text where name = lens chanName (\a b -> a {chanName = b})
+instance HasName IRCChannel (Maybe L.Text) where name = lens (Just . chanName) (\a -> maybe a (\b -> a { chanName = b }))
 
 
 data IRCAdapter = IRCAdapter

@@ -106,7 +106,7 @@ runHandlers handlers eventChan = forever $ readChan eventChan >>= void . async .
 
     changeHandlerHelper wildcards specifics other chan =
         mapConcurrently_ ($ other (Channel' chan)) $ wildcards <> applicables
-      where applicables = fromMaybe mempty $ specifics^?ix (chan ^.name)
+      where applicables = fromMaybe mempty $ (chan^.name) >>= \n -> specifics^?ix n
 
     handleMessageLike v user chan msg ts = mapConcurrently_ id $ doIfMatch v
       where
@@ -212,5 +212,3 @@ runMarvinWithConfig cfg s' = do
 
   where
     adapterPrefix = $(isT "adapter.#{adapterId :: AdapterId a}")
-
-

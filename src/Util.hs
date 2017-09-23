@@ -55,7 +55,7 @@ newtype SimpleWrappedChannelName = SimpleWrappedChannelName { unwrapChannelName 
 instance IsString SimpleWrappedChannelName where fromString = SimpleWrappedChannelName . fromString
 instance Show SimpleWrappedChannelName where show = L.unpack . unwrapChannelName
 
-instance HasName SimpleWrappedChannelName L.Text where name = lens unwrapChannelName (const SimpleWrappedChannelName)
+instance HasName SimpleWrappedChannelName (Maybe L.Text) where name = lens (Just . unwrapChannelName) (\a -> maybe a SimpleWrappedChannelName)
 
 
 mapLeft :: (a -> c) -> Either a b -> Either c b

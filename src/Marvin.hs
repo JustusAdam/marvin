@@ -390,7 +390,7 @@ getUsername u = pure $ u^.username
 -- This function is deprecated as of Version 0.3 and will be removed in version 1.0. Use the lens 'name' instead.
 getChannelName :: MonadAdapter m
                => Channel (AdapterT m) -> m L.Text
-getChannelName c = pure $ c^.name
+getChannelName c = pure $ fromMaybe "" $ c^.name
 {-# DEPRECATED getChannelName "Will be remove in version 1.0, use the lens 'name' instead." #-}
 
 -- | Get the stored information about a remote file.

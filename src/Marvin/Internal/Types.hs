@@ -68,7 +68,7 @@ class ( HasUsername (User a) L.Text
       , HasName (User a) (Maybe L.Text)
       , HasFirstName (User a) (Maybe L.Text)
       , HasLastName (User a) (Maybe L.Text)
-      , HasName (Channel a) L.Text
+      , HasName (Channel a) (Maybe L.Text)
       ) => IsAdapter a where
     -- | Concrete, adapter specific representation of a user. Could be an id string or a full object for instance
     type User a
@@ -351,4 +351,3 @@ instance C.Configured LogLevel' where
             _         -> Nothing
       where ll = return . LogLevel'
     convert _            = Nothing
-

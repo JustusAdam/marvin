@@ -19,6 +19,8 @@
     - Added lower level run functions so the user can specify logging and config implementation
 - Switched to hpack for package management
 - Exporting internal data constructors for adapters per request from [@jchildren](https://github.com/jchildren) in [#21](https://github.com/JustusAdam/marvin/issues/21)
+- Changed Adapter API, channel names are now optional
+- Changed slack channel implementation, channel topic is now optional
 
 # 0.2.3 - 05.03.2017
 

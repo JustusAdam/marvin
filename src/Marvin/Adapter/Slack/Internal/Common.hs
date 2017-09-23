@@ -5,16 +5,21 @@ import           Control.Applicative                 ((<|>))
 import           Control.Arrow                       ((&&&))
 import           Control.Concurrent.Async.Lifted     (async, link)
 import           Control.Concurrent.Chan.Lifted      (Chan, newChan, readChan, writeChan)
-import           Control.Concurrent.MVar.Lifted      (modifyMVar, modifyMVar_, newMVar, readMVar)
+import           Control.Concurrent.MVar.Lifted      (modifyMVar, modifyMVar_, newMVar, readMVar, MVar)
+import Control.Monad.Base (MonadBase)
 import           Control.Monad
+import           Control.Monad.Except
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Trans
+import Control.Exception.Lifted
 import           Data.Aeson                          hiding (Error)
 import           Data.Aeson.Types                    hiding (Error)
 import qualified Data.ByteString.Lazy                as B
 import           Data.Char                           (isSpace)
 import           Data.Foldable                       (asum)
 import qualified Data.HashMap.Strict                 as HM
+import           Data.Maybe
 import qualified Data.Text                           as T
 import qualified Data.Text.Lazy                      as L
 import qualified Data.Text.Lazy.Encoding             as L
@@ -97,30 +102,39 @@ eventParser _ = fail "expected object"
 
 
 startsWith :: (Char -> Bool) -> L.Text -> Bool
-startsWith f t =
-    case L.uncons t of
-        Just (c, _) -> f c
-        _           -> False
+startsWith f = maybe False (f . fst) . L.uncons
 
 
-runHandlerLoop :: MkSlack a => Chan (InternalType a) -> EventConsumer (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
+runHandlerLoop :: MkSlack a
+               => Chan (InternalType a)
+               -> EventConsumer (SlackAdapter a)
+               -> AdapterM (SlackAdapter a) ()
 runHandlerLoop evChan handler =
-    forever $ readChan evChan >>= \case
-        SlackEvent uid cid f -> do
-            uinfo <- getUserInfo uid
-            lci <- getChannelInfo cid
+    forever $ do
+        ac <- try $ readChan evChan >>= prepareAction
 
-            case f uinfo lci of
-                ev@(MessageEvent u c m t) -> do
+        case ac of
+            Left e -> logDebugN $(isT "Uncaught exception when preparing handler: #{e :: SomeException}")
+            Right Nothing -> return ()
+            Right (Just h) -> h `catch` \e ->
+                logErrorN $(isT "Uncaught exception when executing handler: #{e :: SomeException}")
+  where
+    prepareAction (SlackEvent uid cid f) = do
+        uinfo <- getUserInfo uid
+        lci <- getChannelInfo cid
 
-                    botname <- L.toLower <$> getBotname
-                    let strippedMsg = L.stripStart m
-                        lmsg = L.toLower strippedMsg
-                        match prefix
-                            | prefix `L.isPrefixOf` lmsg
-                            && startsWith isSpace short = Just $ L.stripStart short
-                            | otherwise = Nothing
-                          where short = L.drop (L.length prefix) strippedMsg
+        case f uinfo lci of
+            ev@(MessageEvent u c m t) -> do
+
+                botname <- L.toLower <$> getBotname
+                let strippedMsg = L.stripStart m
+                    lmsg = L.toLower strippedMsg
+                    match prefix
+                        | prefix `L.isPrefixOf` lmsg
+                        && startsWith isSpace short = Just $ L.stripStart short
+                        | otherwise = Nothing
+                      where short = L.drop (L.length prefix) strippedMsg
+                return $ Just $
                     handler $ case
                                 asum $
                                     map match
@@ -129,22 +143,23 @@ runHandlerLoop evChan handler =
                         Nothing -> ev
                         Just m' -> CommandEvent u c m' t
 
-                ev -> handler ev
-        Unhandeled type_ ->
-            logDebugN $(isT "Unhandeled event type #{type_} payload")
-        Error code msg ->
-            logErrorN $(isT "Error from remote code: #{code} msg: #{msg}")
-        Ignored -> return ()
-        OkResponseEvent msg_ ->
-            logDebugN $(isT "Message successfully sent: #{msg_}")
-        ChannelArchiveStatusChange _ _ ->
-            -- TODO implement once we track the archiving status
-            return ()
-        ChannelCreated info ->
-            putChannel info
-        ChannelDeleted chan -> deleteChannel chan
-        ChannelRename info -> renameChannel info
-        UserChange ui -> void $ refreshSingleUserInfo (ui^.idValue)
+            ev -> return $ Just $ handler ev
+    prepareAction ev = do
+        case ev of
+            Unhandeled type_ -> logDebugN $(isT "Unhandeled event type #{type_} payload")
+            Error code msg -> logErrorN $(isT "Error from remote code: #{code} msg: #{msg}")
+            Ignored -> return ()
+            OkResponseEvent msg_ -> logDebugN $(isT "Message successfully sent: #{msg_}")
+            ChannelArchiveStatusChange _ _ ->
+                -- TODO implement once we track the archiving status
+                return ()
+            ChannelCreated info -> putChannel info
+            ChannelDeleted chan -> do
+                info <- deleteChannel chan
+                logDebugN $(isT "Deleted channel #{info} as result of an event")
+            ChannelRename info -> renameChannel info
+            UserChange ui -> void $ refreshSingleUserInfo (ui^.idValue)
+        return Nothing
 
 
 runnerImpl :: MkSlack a => EventConsumer (SlackAdapter a) -> AdapterM (SlackAdapter a) ()
@@ -155,22 +170,36 @@ runnerImpl handler = do
     runHandlerLoop messageChan handler
 
 
-execAPIMethod :: MkSlack a => (Object -> Parser v) -> String -> [FormParam] -> AdapterM (SlackAdapter a) (Either L.Text v)
+execAPIMethod :: MkSlack a
+              => (Object -> Parser v)
+              -> String
+              -> [FormParam]
+              -> AdapterM (SlackAdapter a) (Either L.Text v)
 execAPIMethod innerParser method fparams = do
     token <- requireFromAdapterConfig "token"
     response <- liftIO $ post $(isS "https://slack.com/api/#{method}") (("token" := (token :: T.Text)):fparams)
-    if response^.responseStatus == ok200
-        then return $ mapLeft L.pack $ eitherDecode (response^.responseBody) >>= join . parseEither (apiResponseParser innerParser)
-        else return $ Left $(isL "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
+    return $
+        if response^.responseStatus == ok200 then
+            mapLeft L.pack $ eitherDecode (response^.responseBody)
+                                >>= join . parseEither (apiResponseParser innerParser)
+        else
+            Left $(isL "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
 
 
-execAPIMethodPart :: MkSlack a => (Object -> Parser v) -> String -> [Part] -> AdapterM (SlackAdapter a) (Either L.Text v)
+execAPIMethodPart :: MkSlack a
+                  => (Object -> Parser v)
+                  -> String
+                  -> [Part]
+                  -> AdapterM (SlackAdapter a) (Either L.Text v)
 execAPIMethodPart innerParser method formParts = do
     token <- requireFromAdapterConfig "token"
     response <- liftIO $ post $(isS "https://slack.com/api/#{method}") (partText "token" token:formParts)
-    if response^.responseStatus == ok200
-        then return $ mapLeft L.pack $ eitherDecode (response^.responseBody) >>= join . parseEither (apiResponseParser innerParser)
-        else return $ Left $(isL "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
+    return $
+        if response^.responseStatus == ok200 then
+            mapLeft L.pack $ eitherDecode (response^.responseBody)
+                                >>= join . parseEither (apiResponseParser innerParser)
+        else
+            Left $(isL "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
 
 
 messageChannelImpl :: SlackChannelId -> L.Text -> AdapterM (SlackAdapter a) ()
@@ -191,7 +220,7 @@ getChannelInfo cid = do
     cacheVar <- view $ adapter.channelCache
     cc <- readMVar cacheVar
     case cc ^? infoCache. ix cid of
-        Nothing   -> refreshSingleChannelInfo cid
+        Nothing   -> maybe (error $(isS "Channel #{cid} does not exist")) return =<< refreshSingleChannelInfo cid
         Just info -> return info
 
 
@@ -206,24 +235,55 @@ refreshSingleUserInfo userid@(SlackUserId user_) = do
 
 
 refreshChannels :: MkSlack a => AdapterM (SlackAdapter a) (Either L.Text ChannelCache)
-refreshChannels =
-    execAPIMethod (\o -> o .: "channels" >>= lciListParser) "channels.list" [] >>= \case
-        Left err -> return $ Left $(isL "Error when getting channel data: #{err}")
-        Right v -> do
-            let cmap = HM.fromList $ map ((^. idValue) &&& id) v
-                nmap = HM.fromList $ map ((^. name) &&& id) v
-                cache = ChannelCache cmap nmap
-            return $ Right cache
+refreshChannels = runExceptT $ do
+    chans <- fetchAccum Nothing
+    let cmap = HM.fromList $ map ((^. idValue) &&& id) chans
+        nmap = HM.fromList $ mapMaybe (\chan -> (,chan) <$> (chan ^. name)) chans
+        cache = ChannelCache cmap nmap
+    return cache
+  where
+    fetchAccum cursor =
+        lift (execAPIMethod (\o -> (,) <$> (o .: "channels" >>= lciListParser)
+                                       <*> getCursor o)
+                "conversations.list"
+                params)
+                >>= \case
+            Left err -> throwError $(isL "Error when getting channel data: #{err}")
+            Right (v, Nothing) -> return v
+            Right (v, Just cursor') -> (v ++) <$> fetchAccum (Just cursor')
+      where
+        params = maybe id ((:) . ("cursor":=)) (cursor :: Maybe T.Text)
+            [ "exclude_archived" := ("true" :: T.Text)
+            , "types" := ("public_channel,private_channel,im" :: T.Text)
+            ]
+    getCursor o = o .:? "response_metadata" >>= maybe (pure Nothing) (.:? "next_cursor")
 
 
-refreshSingleChannelInfo :: MkSlack a => SlackChannelId -> AdapterM (SlackAdapter a) LimitedChannelInfo
-refreshSingleChannelInfo chan@(SlackChannelId sid) =
-    execAPIMethod (\o -> o .: "channel" >>= lciParser) "channels.info" ["channel" := sid] >>= \case
-        Left err -> error $(isS "Error when getting channel data: #{err}")
+updateChannelCache :: LimitedChannelInfo -> AdapterM (SlackAdapter a) ()
+updateChannelCache newVal = do
+    cacheVar <- view $ adapter . channelCache
+    let chan = newVal ^. idValue
+    modifyMVar_ cacheVar $ pure . \caches ->
+        let oldName = join $ caches ^? infoCache . ix chan . name in
+        caches & maybe id (\name' -> nameResolver . at name' .~ Nothing) oldName
+               & infoCache . at chan .~ Just newVal
+               & maybe id (\name' -> nameResolver . at name' .~ Just newVal) (newVal^.name)
+
+
+refreshSingleChannelInfo :: MkSlack a => SlackChannelId
+                         -> AdapterM (SlackAdapter a) (Maybe LimitedChannelInfo)
+refreshSingleChannelInfo chan@(SlackChannelId sid) = do
+    execAPIMethod (\o -> o .: "channel" >>= lciParser) "conversations.info" ["channel" := sid] >>= \case
+        Left err -> do
+            oldInfo <- deleteChannel chan
+            logDebugN $(isT "Failed to get channel data for #{sid}. \
+                            \Error: #{err}. \
+                            \Current cached version is #{oldInfo}. \
+                            \Deleting cached version!")
+            return Nothing
         Right v -> do
-            cache <- view $ adapter . channelCache
-            modifyMVar_ cache (return . (infoCache . at chan .~ Just v))
-            return v
+            updateChannelCache v
+            return $ Just v
 
 
 resolveChannelImpl :: MkSlack a => L.Text -> AdapterM (SlackAdapter a) (Maybe LimitedChannelInfo)
@@ -259,49 +319,30 @@ resolveUserImpl uname = view (adapter.userInfoCache) >>= flip modifyMVar modifie
             Just found -> return (uc, Just found)
 
 
-getChannelNameImpl :: MkSlack a => SlackChannelId -> AdapterM (SlackAdapter a) L.Text
-getChannelNameImpl channel = view (adapter.channelCache) >>= readMVar >>= modifier
-  where
-    modifier cc =
-        case cc ^? infoCache . ix channel of
-            Nothing    -> (^.name) <$> refreshSingleChannelInfo channel
-            Just found -> return $ found ^. name
-
-
-
 putChannel :: LimitedChannelInfo -> AdapterM (SlackAdapter a) ()
-putChannel  channelInfo@(LimitedChannelInfo chanId chanName _) =
+putChannel  channelInfo =
     view (adapter.channelCache) >>= flip modifyMVar_ (pure . modifier)
   where
     modifier =
-        (infoCache . at chanId .~ Just channelInfo)
-        . (nameResolver . at chanName .~ Just channelInfo)
+        (infoCache . at (channelInfo^.idValue) .~ Just channelInfo)
+        . maybe id (\name' -> nameResolver . at name' .~ Just channelInfo) (channelInfo^.name)
 
 
-deleteChannel :: SlackChannelId -> AdapterM (SlackAdapter a) ()
-deleteChannel channel = view (adapter.channelCache) >>= flip modifyMVar_ (pure . modifier)
+deleteChannel :: SlackChannelId -> AdapterM (SlackAdapter a) (Maybe LimitedChannelInfo)
+deleteChannel channel = view (adapter.channelCache) >>= flip modifyMVar (pure . modifier)
   where
     modifier cache =
         case cache ^? infoCache . ix channel of
-            Nothing -> cache
-            Just (LimitedChannelInfo _ chanName _) ->
-                cache
+            Nothing -> (cache, Nothing)
+            Just oldChan ->
+                (cache
                     & infoCache . at channel .~ Nothing
-                    & nameResolver . at chanName .~ Nothing
+                    & maybe id (\name' -> nameResolver . at name' .~ Nothing) (oldChan^.name)
+                , Just oldChan)
 
 
 renameChannel :: LimitedChannelInfo -> AdapterM (SlackAdapter a) ()
-renameChannel channelInfo@(LimitedChannelInfo cid chanName _) =
-    view (adapter.channelCache) >>= flip modifyMVar_ (pure . modifier)
-  where
-    modifier cache = case cache ^? infoCache . ix cid of
-        Just (LimitedChannelInfo _ oldName _) | oldName /= chanName ->
-            inserted & nameResolver . at oldName .~ Nothing
-        _ -> inserted
-      where
-        inserted = cache
-                    & infoCache . at cid .~ Just channelInfo
-                    & nameResolver . at chanName .~ Just channelInfo
+renameChannel channelInfo = updateChannelCache channelInfo
 
 
 -- | Class to enable polymorphism for 'SlackAdapter' over the method used for retrieving updates. ('RTM' or 'EventsAPI')
@@ -334,12 +375,14 @@ instance MkSlack a => SupportsFiles (SlackAdapter a) where
 
     readFileBytes file = do
         token <- requireFromAdapterConfig "token"
-        r <- liftIO $ getWith (defaults & header "Authorization" .~ ["Bearer " `mappend` B.toStrict (L.encodeUtf8 token)]) (L.unpack $ file^.privateUrl)
-        if r^.responseStatus == ok200
-            then return $ Just $ r^.responseBody
-            else do
-                logErrorN $(isT "Unexpected status from server: #{r^.responseStatus.statusMessage}")
-                return Nothing
+        r <- liftIO $ getWith (defaults & header "Authorization" .~
+                                ["Bearer " `mappend` B.toStrict (L.encodeUtf8 token)])
+                              (L.unpack $ file^.privateUrl)
+        if r^.responseStatus == ok200 then
+            return $ Just $ r^.responseBody
+        else do
+            logErrorN $(isT "Unexpected status from server: #{r^.responseStatus.statusMessage}")
+            return Nothing
     shareFile file channels =
         execAPIMethodPart (.: "file") "files.upload" $
             [ partLText "filename" $ file^.name
@@ -350,10 +393,12 @@ instance MkSlack a => SupportsFiles (SlackAdapter a) where
             ++ maybe [] (pure . partLText "title") (file^.title)
             ++ case channels of
                     [] -> []
-                    a -> [partText "channels" $ T.intercalate "," $ map (unwrapSlackChannelId . (^.idValue)) a]
+                    a -> [ partText "channels"
+                             $ T.intercalate ","
+                             $ map (unwrapSlackChannelId . (^.idValue)) a
+                         ]
       where
         contentpart = case file^.content of
                 FileOnDisk p       -> partFile "file" p
                 FileInMemory bytes -> partLBS "file" bytes
     newLocalFile fname = return . SlackLocalFile fname Nothing Nothing Nothing
-
