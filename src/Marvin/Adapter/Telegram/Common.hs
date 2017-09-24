@@ -22,7 +22,7 @@ import qualified Data.Text                       as T
 import qualified Data.Text.Lazy                  as L
 import           Marvin.Adapter                  hiding (mkAdapterId)
 import           Marvin.Interpolate.All
-import           Network.Wreq
+import           Network.Wreq as Wreq
 import           Util
 
 import           Control.Exception.Lifted
@@ -143,7 +143,7 @@ apiResponseParser innerParser = withObject "expected object" $ \o -> do
 execAPIMethod :: MkTelegram b => (Value -> Parser a) -> String -> [FormParam] -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
 execAPIMethod = execAPIMethodWith defaults
 
-execAPIMethodWith :: MkTelegram b => Options -> (Value -> Parser a) -> String -> [FormParam] -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
+execAPIMethodWith :: MkTelegram b => Wreq.Options -> (Value -> Parser a) -> String -> [FormParam] -> AdapterM (TelegramAdapter b) (Either String (APIResponse a))
 execAPIMethodWith opts innerParser methodName params = do
     token <- requireFromAdapterConfig "token"
     res <- retry 3 (liftIO (postWith opts $(isS "https://api.telegram.org/bot#{token :: String}/#{methodName}") params))

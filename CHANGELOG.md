@@ -1,3 +1,7 @@
+# 0.2.4 - 24.09.2017
+
+- Compatibility changes for aeson >= 1.2
+
 # 0.2.4 - 23.09.2017
 
 - Fixed an old bug when getting information about unnamed channels

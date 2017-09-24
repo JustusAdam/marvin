@@ -1,5 +1,5 @@
 name:                marvin
-version:             0.2.4
+version:             0.2.5
 synopsis:            A framework for modular, portable chat bots.
 description:         A framework for writing portable chat bots. Inspired by hubot.
                      .
@@ -50,7 +50,7 @@ library
                      , Marvin.Adapter.Telegram.Common
   build-depends:       base >= 4.7 && < 5
                      , wreq >= 0.4 && < 0.6
-                     , aeson >= 0.11 && < 1.2
+                     , aeson >= 0.11 && < 1.3
                      , mtl >= 2.2 && < 3
                      , lens >= 4 && < 5
                      , text-icu >= 0.6 && < 0.8
@@ -108,7 +108,7 @@ executable marvin-pp
                      , optparse-applicative >= 0.11 && < 1
                      , bytestring >= 0.10
                      , text >= 1.0
-                     , aeson >= 0.11 && < 1.2
+                     , aeson >= 0.11 && < 1.3
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings
                      , TypeFamilies
