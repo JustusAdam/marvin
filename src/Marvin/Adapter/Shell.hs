@@ -41,10 +41,8 @@ import           Util
 
 
 -- | Adapter for a shell prompt
-data ShellAdapter = ShellAdapter
-    { shellAdapterOutput :: Chan L.Text
+data ShellAdapter = ShellAdapter (Chan L.Text)
     -- , shellAdapterFiles :: IORef (HashMap L.Text ByteString)
-    }
 data RFile = RFile
     { rFileName         :: Maybe L.Text
     , rFileFileType     :: Maybe L.Text
@@ -60,7 +58,9 @@ data LFile = LFile
     , lFileContent      :: FileContent
     }
 
-makeFields ''ShellAdapter
+output :: Lens' ShellAdapter (Chan L.Text)
+output f (ShellAdapter ch) = ShellAdapter <$> f ch
+
 makeFields ''RFile
 makeFields ''LFile
 

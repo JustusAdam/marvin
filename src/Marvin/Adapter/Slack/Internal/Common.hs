@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Marvin.Adapter.Slack.Internal.Common where
 
 
@@ -5,14 +6,11 @@ import           Control.Applicative                 ((<|>))
 import           Control.Arrow                       ((&&&))
 import           Control.Concurrent.Async.Lifted     (async, link)
 import           Control.Concurrent.Chan.Lifted      (Chan, newChan, readChan, writeChan)
-import           Control.Concurrent.MVar.Lifted      (modifyMVar, modifyMVar_, newMVar, readMVar, MVar)
-import Control.Monad.Base (MonadBase)
+import           Control.Concurrent.MVar.Lifted      (modifyMVar, modifyMVar_, newMVar, readMVar)
+import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.Except
-import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Trans
-import Control.Exception.Lifted
 import           Data.Aeson                          hiding (Error)
 import           Data.Aeson.Types                    hiding (Error)
 import qualified Data.ByteString.Lazy                as B
@@ -159,6 +157,7 @@ runHandlerLoop evChan handler =
                 logDebugN $(isT "Deleted channel #{info} as result of an event")
             ChannelRename info -> renameChannel info
             UserChange ui -> void $ refreshSingleUserInfo (ui^.idValue)
+            SlackEvent{} -> error "impossible"
         return Nothing
 
 
@@ -246,13 +245,13 @@ refreshChannels = runExceptT $ do
         lift (execAPIMethod (\o -> (,) <$> (o .: "channels" >>= lciListParser)
                                        <*> getCursor o)
                 "conversations.list"
-                params)
+                params')
                 >>= \case
             Left err -> throwError $(isL "Error when getting channel data: #{err}")
-            Right (v, Nothing) -> return v
+            Right (v, Nothing) -> pure v
             Right (v, Just cursor') -> (v ++) <$> fetchAccum (Just cursor')
       where
-        params = maybe id ((:) . ("cursor":=)) (cursor :: Maybe T.Text)
+        params' = maybe id ((:) . ("cursor":=)) (cursor :: Maybe T.Text)
             [ "exclude_archived" := ("true" :: T.Text)
             , "types" := ("public_channel,private_channel,im" :: T.Text)
             ]

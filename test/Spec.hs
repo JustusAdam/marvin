@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedLists    #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 import           Data.Aeson
 import           Data.Foldable   (fold)
 import           Data.List       (intersperse)

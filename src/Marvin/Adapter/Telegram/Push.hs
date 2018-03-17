@@ -28,7 +28,6 @@ module Marvin.Adapter.Telegram.Push
 
 import           Control.Concurrent.Async.Lifted
 import           Control.Concurrent.Chan.Lifted
-import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson                              hiding (Error, Success)

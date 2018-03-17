@@ -31,13 +31,11 @@ import           Control.Exception.Lifted
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import qualified Data.Configurator               as Cfg
-import qualified Data.HashMap.Strict             as HM
 import           Data.Maybe                      (catMaybes, fromJust, fromMaybe, isJust)
 import           Data.Monoid                     ((<>))
-import qualified Data.Text.Lazy                  as L
 import           Data.Vector                     (Vector)
 import qualified Data.Vector                     as V
-import           Lens.Micro.Platform             hiding (cons)
+import           Lens.Micro.Platform
 import           Marvin.Internal.LensClasses
 import           Marvin.Internal.Types
 import           Marvin.Internal.Values
@@ -118,7 +116,7 @@ runHandlers handlers eventChan = forever $ readChan eventChan >>= void . async .
     Handlers respondsV hearsV customsV joinsV leavesV topicsV fileSharesV joinsInV leavesFromV topicsInV fileSharesInV = handlers
 
 
-initHandlers :: IsAdapter a => [ScriptInit a] -> Config -> a -> RunnerM (Handlers a)
+initHandlers :: [ScriptInit a] -> Config -> a -> RunnerM (Handlers a)
 initHandlers inits botConfig ada = do
     logInfoNS logSource "Initializing scripts"
     !handlers <- force . foldMap (^.actions) . catMaybes <$> mapM (\(ScriptInit (sid, s)) -> catch (Just <$> s ada botConfig) (onInitExcept sid)) inits

@@ -211,14 +211,14 @@ parseTelegramVoice o = RemoteVoice <$> o .: "duration"
 
 parseTelegramFile :: Object -> Parser (TelegramRemoteFile a)
 parseTelegramFile o = do
-    (o', struct) <- msum
+    (o', mediaStruct) <- msum
         [ o .: "audio" >>= parseFileHelper parseTelegramAudio
         , o .: "document" >>= parseFileHelper parseTelegramDocument
         , o .: "sticker" >>= parseFileHelper parseTelegramSticker
         , o .: "video" >>= parseFileHelper parseTelegramVideo
         , o .: "voice" >>= parseFileHelper parseTelegramVoice
         ]
-    TelegramRemoteFile struct
+    TelegramRemoteFile mediaStruct
         <$> o' .:? "file_size" .!= (-1)
         <*> o' .:  "file_id"
         <*> o' .:  "file_name"
@@ -345,20 +345,20 @@ toFtype LocalVideo{}  = ("Video", "video")
 
 
 partShow :: Show a => T.Text -> a -> Part
-partShow name = partString name . show
+partShow name' = partString name' . show
 
 mkStructParts :: TelegramLocalFile -> [Maybe Part]
 mkStructParts f =
     case f^.struct of
-        s@(LocalAudio duration performer) ->
-            [ partText "performer" . L.toStrict <$> performer
-            , partShow "duration" <$> duration
+        LocalAudio duration' performer' ->
+            [ partText "performer" . L.toStrict <$> performer'
+            , partShow "duration" <$> duration'
             , Just ("title" `partText` L.toStrict (f^.name)) -- perhaps make this optional
             ]
-        s@(LocalVideo duration width height) ->
-            [ partShow "duration" <$> duration
-            , partShow "width" <$> width
-            , partShow "height" <$> height
+        LocalVideo duration' width' height' ->
+            [ partShow "duration" <$> duration'
+            , partShow "width" <$> width'
+            , partShow "height" <$> height'
             ]
         _ -> []
 
@@ -366,7 +366,7 @@ mkStructParts f =
 shareFileImpl :: MkTelegram a => TelegramLocalFile -> [TelegramChat] -> AdapterM (TelegramAdapter a) (Either L.Text (TelegramRemoteFile (TelegramAdapter a)))
 shareFileImpl localFile targets = do
     contentPart <- case localFile^.fromRef of
-        Just (TelegramFileId fid) -> return $ propName `partText` fid
+        Just (TelegramFileId fid') -> return $ propName `partText` fid'
         Nothing ->
             (propName `partLBS`) <$> case localFile^.content of
                                         FileInMemory bs -> return bs
@@ -428,4 +428,4 @@ instance MkTelegram a => SupportsFiles (TelegramAdapter a) where
                     code -> do
                         logErrorN $(isT "Non 200 Response when downloading file: #{code} - #{fres^.responseStatus.statusMessage}")
                         return Nothing
-    newLocalFile fname content = pure $ TelegramLocalFile LocalDocument content fname Nothing Nothing Nothing Nothing
+    newLocalFile fname content' = pure $ TelegramLocalFile LocalDocument content' fname Nothing Nothing Nothing Nothing

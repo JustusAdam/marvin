@@ -114,8 +114,7 @@ processor inChan handler = do
 --
 --  * "marvin: hello" returns (CommandEvent, "hello")
 --  * "hey everyone"  returns (MessageEvent, "hey everyone")
-isMention :: IsAdapter a
-          => L.Text     -- ^Bot name
+isMention :: L.Text     -- ^Bot name
           -> L.Text     -- ^Target of message
           -> L.Text     -- ^The actual message text
           -> (User a -> Channel a -> L.Text -> TimeStamp a -> MT.Event a, L.Text)

@@ -2,5 +2,5 @@ flags: {}
 extra-package-dbs: []
 packages:
 - .
-extra-deps: []
-resolver: lts-9.5
+extra-deps: [aeson-1.3.0.0, conduit-1.3.0.1]
+resolver: lts-11.0

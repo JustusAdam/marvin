@@ -24,7 +24,6 @@ import           Control.Concurrent.MVar.Lifted
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.Except
-import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Aeson                           hiding (Error)
 import           Data.Aeson.Types                     hiding (Error)
@@ -110,13 +109,13 @@ senderLoop connectionTracker = do
                 , "text" .= msg
                 ]
 
-            try =
+            tryConn =
                 withMVar connectionTracker (liftIO . flip sendTextData encoded)
                 `catch` \e -> do
                     logErrorN $(isT "#{e :: ConnectionException}")
                     throwError ()
 
-        either (const $ logErrorN "Connection error, quitting retry.") return =<< runExceptT (msum (replicate 3 try))
+        either (const $ logErrorN "Connection error, quitting retry.") return =<< runExceptT (msum (replicate 3 tryConn))
 
 
 -- | Recieve events by opening a websocket to the Real Time Messaging API

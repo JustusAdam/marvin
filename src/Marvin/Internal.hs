@@ -17,7 +17,7 @@ import qualified Marvin.Util.Config       as C
 import           Util
 
 
-getSubConfFor :: (HasConfigAccess m, MonadIO m) => ScriptId -> m C.Config
+getSubConfFor :: HasConfigAccess m => ScriptId -> m C.Config
 getSubConfFor (ScriptId name) = C.subconfig $(isT "#{scriptConfigKey}.#{name}") =<< getConfigInternal
 
 

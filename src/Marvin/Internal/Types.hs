@@ -1,7 +1,9 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Marvin.Internal.Types where
 
+#define HAS_SEMIGROUP MIN_VERSION_base(4,9,0)
 
 import           Control.DeepSeq
 import           Control.Monad.Base
@@ -13,7 +15,6 @@ import           Control.Monad.Trans.Control
 import           Data.ByteString.Lazy        (ByteString)
 import           Data.Char                   (isAlphaNum, isLetter)
 import qualified Data.HashMap.Strict         as HM
-import           Data.Monoid
 import           Data.String
 import qualified Data.Text                   as T
 import qualified Data.Text.Lazy              as L
@@ -26,6 +27,12 @@ import           Marvin.Internal.LensClasses
 import           Marvin.Interpolate.All
 import qualified Marvin.Util.Config          as C
 import           Marvin.Util.Regex
+
+#if HAS_SEMIGROUP
+import           Data.Semigroup              as S
+#else
+import           Data.Monoid
+#endif
 
 -- | The topic in a channel
 type Topic = L.Text
@@ -172,12 +179,21 @@ makeFields ''Handlers
 instance NFData (Handlers a)
 
 
+
 instance Monoid (Handlers a) where
     mempty = Handlers mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
-    mappend (Handlers r1 h1 c1 j1 l1 t1 fs1 ji1 li1 ti1 fsi1)
-            (Handlers r2 h2 c2 j2 l2 t2 fs2 ji2 li2 ti2 fsi2)
-        = Handlers (r1 <> r2) (h1 <> h2) (c1 <> c2) (j1 <> j2) (l1 <> l2) (t1 <> t2) (fs1 <> fs2) (HM.unionWith mappend ji1 ji2) (HM.unionWith mappend li1 li2) (HM.unionWith mappend ti1 ti2) (HM.unionWith mappend fsi1 fsi2)
 
+#if HAS_SEMIGROUP
+    mappend = (<>)
+
+instance Semigroup (Handlers a) where
+
+  Handlers r1 h1 c1 j1 l1 t1 fs1 ji1 li1 ti1 fsi1
+    <> Handlers r2 h2 c2 j2 l2 t2 fs2 ji2 li2 ti2 fsi2
+    = Handlers (r1 <> r2) (h1 <> h2) (c1 <> c2) (j1 <> j2) (l1 <> l2) (t1 <> t2) (fs1 <> fs2)
+    (HM.unionWith (<>) ji1 ji2) (HM.unionWith (<>) li1 li2) (HM.unionWith (<>) ti1 ti2) (HM.unionWith (<>) fsi1 fsi2)
+
+#endif
 
 
 -- | Context for reacting in the bot. Allows use of functions like 'Marvin.send', 'Marvin.reply' and 'Marvin.messageChannel', arbitrary 'IO' actions using 'liftIO' and logging via the 'MonadLogger' typeclass.
@@ -315,11 +331,12 @@ type LoggingFn = Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 
 -- | Common base verification function for 'ScriptId' and 'AdapterId'
 verifyIdString :: String -> (T.Text -> a) -> T.Text -> Either String a
-verifyIdString thingToVerify _ "" = Left $(isS "#{thingToVerify} must not be empty")
-verifyIdString thingToVerify f s
-    | isLetter x && T.all (\c -> isAlphaNum c || c == '-' || c == '_' ) xs = Right $ f s
-    | otherwise = Left $(isS "first character of #{thingToVerify} must be a letter, all other characters can be alphanumeric, '-' or '_'")
-  where Just (x, xs) = T.uncons s
+verifyIdString thingToVerify f s =
+  case T.uncons s of
+    Nothing -> Left $(isS "#{thingToVerify} must not be empty")
+    Just (x, xs)
+      | isLetter x && T.all (\c -> isAlphaNum c || c == '-' || c == '_' ) xs -> Right $ f s
+      | otherwise -> Left $(isS "first character of #{thingToVerify} must be a letter, all other characters can be alphanumeric, '-' or '_'")
 
 
 instance IsString ScriptId where
