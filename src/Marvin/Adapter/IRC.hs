@@ -53,14 +53,14 @@ data IRCAdapter = IRCAdapter
     }
 
 
-producer :: Chan MarvinIRCMsg -> Producer IO IrcMessage
+producer :: Chan MarvinIRCMsg -> ConduitM i (IRC.Message ByteString) IO b
 producer chan = forever $ do
-    msg <- readChan chan
+    msg <- liftIO $ readChan chan
     yield $ T.encodeUtf8 . L.toStrict <$> msg
 
 
 consumer :: Chan i -> ConduitM i o IO ()
-consumer = awaitForever . writeChan
+consumer chan = awaitForever (liftIO . writeChan chan)
 
 
 -- NOTE: Maybe we can add some verification of how the server was coping with a message of ours.
