@@ -37,6 +37,18 @@ matrix:
     compiler: ": #stack 8.0.2"
     addons: {apt: {packages: [libgmp-dev]}}
 
+  - env: BUILD=stack STACK_RESOLVER="lts-9" STACK_YAML="etc/travis/lts-8-stack.yaml"
+    compiler: ": #stack 8.0.2"
+    addons: {apt: {packages: [libgmp-dev]}}
+
+  - env: BUILD=stack STACK_RESOLVER="lts-10" STACK_YAML="etc/travis/lts-8-stack.yaml"
+    compiler: ": #stack 8.2.2"
+    addons: {apt: {packages: [libgmp-dev]}}
+
+  - env: BUILD=stack STACK_RESOLVER="lts-11" STACK_YAML="etc/travis/lts-8-stack.yaml"
+    compiler: ": #stack 8.2.2"
+    addons: {apt: {packages: [libgmp-dev]}}
+    
   - env: BUILD=stack STACK_RESOLVER="nightly" STACK_YAML="etc/travis/new-stack.yaml"
     compiler: ": #stack nightly"
     addons: {apt: {packages: [libgmp-dev]}}
@@ -60,6 +72,7 @@ matrix:
 
   allow_failures:
   - env: BUILD=cabal GHCVER=head  CABALVER=head HAPPYVER=1.19.5 ALEXVER=3.1.7
+  - env: BUILD=stack STACK_RESOLVER="nightly" STACK_YAML="etc/travis/new-stack.yaml"
   # Travis builds on OSX are not cached right now
   # As a result they frequently take longer than the allowed buid tie and fail
   # Therefore we have to mark all osx builds as failures until caching is enabled

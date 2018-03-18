@@ -190,8 +190,8 @@ instance Semigroup (Handlers a) where
 
   Handlers r1 h1 c1 j1 l1 t1 fs1 ji1 li1 ti1 fsi1
     <> Handlers r2 h2 c2 j2 l2 t2 fs2 ji2 li2 ti2 fsi2
-    = Handlers (r1 <> r2) (h1 <> h2) (c1 <> c2) (j1 <> j2) (l1 <> l2) (t1 <> t2) (fs1 <> fs2)
-    (HM.unionWith (<>) ji1 ji2) (HM.unionWith (<>) li1 li2) (HM.unionWith (<>) ti1 ti2) (HM.unionWith (<>) fsi1 fsi2)
+    = Handlers (r1 `mappend` r2) (h1 `mappend` h2) (c1 `mappend` c2) (j1 `mappend` j2) (l1 `mappend` l2) (t1 `mappend` t2) (fs1 `mappend` fs2)
+    (HM.unionWith mappend ji1 ji2) (HM.unionWith mappend li1 li2) (HM.unionWith mappend ti1 ti2) (HM.unionWith mappend fsi1 fsi2)
 
 #endif
 
