@@ -73,9 +73,14 @@ There's a [slack channel][slack-channel] where you can ask questions or play aro
 
 It's currently invite-only, so [send me an email](mailto:dev@justus.science) if you would like to join.
 
-## Contributing
+## Status of the project
 
-Any kind of contribution is very welcome.
+I try to respond to issues and I am happy to review and merge pull requests. I have some more features planned but I don't yet know when I'll get the time to implement them.
+
+**Maintenance Level**: Happy to merge
+**Accepting maintainers**: Yes
+
+For information on the meaning of this see [commercialhaskell guide to OSS maintenance](https://github.com/commercialhaskell/commercialhaskell/blob/master/guide/open-source-maintenance.md) 
 
 ### Issues and errors
 
