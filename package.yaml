@@ -107,7 +107,7 @@ library:
   - monad-control >=1 && <2
   - deepseq >=1 && <2
   - http-types >=0.8 && <1.0
-  - http-client >=0.4 && <0.6
+  - http-client >=0.4 && <0.7
   - http-client-tls >=0.2 && <0.4
   - optparse-applicative >=0.11 && <1
   - transformers >=0.4
