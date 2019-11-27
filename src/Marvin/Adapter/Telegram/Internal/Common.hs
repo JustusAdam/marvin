@@ -426,6 +426,6 @@ instance MkTelegram a => SupportsFiles (TelegramAdapter a) where
                 case fres ^. responseStatus . statusCode of
                     200 -> return $ Just $ fres ^. responseBody
                     code -> do
-                        logErrorN $(isT "Non 200 Response when downloading file: #{code} - #{fres^.responseStatus.statusMessage}")
+                        logErrorN $(isT "Non 200 Response when downloading file: #{code} - #{view (responseStatus.statusMessage) fres}")
                         return Nothing
     newLocalFile fname content' = pure $ TelegramLocalFile LocalDocument content' fname Nothing Nothing Nothing Nothing
