@@ -182,7 +182,7 @@ execAPIMethod innerParser method fparams = do
             mapLeft L.pack $ eitherDecode (response^.responseBody)
                                 >>= join . parseEither (apiResponseParser innerParser)
         else
-            Left $(isL "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
+            Left $(isL "Recieved unexpected response from server: #{view (responseStatus.statusMessage) response}")
 
 
 execAPIMethodPart :: MkSlack a
@@ -198,7 +198,7 @@ execAPIMethodPart innerParser method formParts = do
             mapLeft L.pack $ eitherDecode (response^.responseBody)
                                 >>= join . parseEither (apiResponseParser innerParser)
         else
-            Left $(isL "Recieved unexpected response from server: #{response^.responseStatus.statusMessage}")
+            Left $(isL "Recieved unexpected response from server: #{view (responseStatus.statusMessage) response}")
 
 
 messageChannelImpl :: SlackChannelId -> L.Text -> AdapterM (SlackAdapter a) ()
@@ -380,7 +380,7 @@ instance MkSlack a => SupportsFiles (SlackAdapter a) where
         if r^.responseStatus == ok200 then
             return $ Just $ r^.responseBody
         else do
-            logErrorN $(isT "Unexpected status from server: #{r^.responseStatus.statusMessage}")
+            logErrorN $(isT "Unexpected status from server: #{view (responseStatus.statusMessage) r}")
             return Nothing
     shareFile file channels =
         execAPIMethodPart (.: "file") "files.upload" $
