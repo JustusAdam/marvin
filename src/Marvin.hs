@@ -14,6 +14,7 @@ For the proper, verbose documentation see <https://marvin.readthedocs.org/en/lat
 {-# LANGUAGE ExplicitForAll      #-}
 {-# LANGUAGE OverloadedLists     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedLabels #-}
 module Marvin
     (
     -- * Reacting
@@ -63,6 +64,7 @@ import qualified Data.Text                   as T
 import qualified Data.Text.Lazy              as L
 import           Data.Time.Clock
 import qualified Data.Vector                 as V
+import           Labels
 import           Lens.Micro.Platform
 import           Marvin.Adapter              (IsAdapter, SupportsFiles(LocalFile, RemoteFile))
 import qualified Marvin.Adapter              as A
@@ -91,7 +93,7 @@ prepareAction trigger reac = do
 -- | Whenever any message matches the provided regex this handler gets run.
 --
 -- Equivalent to "robot.hear" in hubot
-hear :: Regex -> BotReacting a (User' a, Channel' a, Match, Message, TimeStamp a) () -> ScriptDefinition a ()
+hear :: Regex -> BotReacting a (MatchedMessageData a) () -> ScriptDefinition a ()
 hear !regex ac = ScriptDefinition $ do
     pac <- prepareAction (Just regex) ac
     actions . hears %= V.cons (regex, pac)
@@ -99,7 +101,7 @@ hear !regex ac = ScriptDefinition $ do
 -- | Runs the handler only if the bot was directly addressed.
 --
 -- Equivalent to "robot.respond" in hubot
-respond :: Regex -> BotReacting a (User' a, Channel' a, Match, Message, TimeStamp a) () -> ScriptDefinition a ()
+respond :: Regex -> BotReacting a (MatchedMessageData a) () -> ScriptDefinition a ()
 respond !regex ac = ScriptDefinition $ do
     pac <- prepareAction (Just regex) ac
     actions . responds %= V.cons (regex, pac)
@@ -108,7 +110,7 @@ respond !regex ac = ScriptDefinition $ do
 -- | This handler runs whenever a user enters __any channel__ (which the bot is subscribed to)
 --
 -- The payload contains the entering user and the channel which was entered.
-enter :: BotReacting a (User' a, Channel' a, TimeStamp a) () -> ScriptDefinition a ()
+enter :: BotReacting a (ChannelChangeData a) () -> ScriptDefinition a ()
 enter ac = ScriptDefinition $ do
     pac <- prepareAction (Just "enter event" :: Maybe T.Text) ac
     actions . joins %= V.cons pac
@@ -117,7 +119,7 @@ enter ac = ScriptDefinition $ do
 -- | This handler runs whenever a user exits __any channel__ (which the bot is subscribed to)
 --
 -- The payload contains the exiting user and the channel which was exited.
-exit :: BotReacting a (User' a, Channel' a, TimeStamp a) () -> ScriptDefinition a ()
+exit :: BotReacting a (ChannelChangeData a) () -> ScriptDefinition a ()
 exit ac = ScriptDefinition $ do
     pac <- prepareAction (Just "exit event" :: Maybe T.Text) ac
     actions . leaves %= V.cons pac
@@ -132,7 +134,7 @@ alterHelper v = return . maybe [v] (V.cons v)
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the entering user.
-enterIn :: L.Text -> BotReacting a (User' a, Channel' a, TimeStamp a) () -> ScriptDefinition a ()
+enterIn :: L.Text -> BotReacting a (ChannelChangeData a) () -> ScriptDefinition a ()
 enterIn !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "enter event in #{chanName}")) ac
     actions . joinsIn %= HM.alter (alterHelper pac) chanName
@@ -143,7 +145,7 @@ enterIn !chanName ac = ScriptDefinition $ do
 -- The argument is the human readable name for the channel.
 --
 -- The payload contains the exting user.
-exitFrom :: L.Text -> BotReacting a (User' a, Channel' a, TimeStamp a) () -> ScriptDefinition a ()
+exitFrom :: L.Text -> BotReacting a (ChannelChangeData a) () -> ScriptDefinition a ()
 exitFrom !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "exit event in #{chanName}")) ac
     actions . leavesFrom %= HM.alter (alterHelper pac) chanName
@@ -152,7 +154,7 @@ exitFrom !chanName ac = ScriptDefinition $ do
 -- | This handler runs when the topic in __any channel__ the bot is subscribed to changes.
 --
 -- The payload contains the new topic and the channel in which it was set.
-topic :: BotReacting a (User' a, Channel' a, Topic, TimeStamp a) () -> ScriptDefinition a ()
+topic :: BotReacting a (TopicChangeData a) () -> ScriptDefinition a ()
 topic ac = ScriptDefinition $ do
     pac <- prepareAction (Just "topic event" :: Maybe T.Text) ac
     actions . topicChange %= V.cons pac
@@ -161,7 +163,7 @@ topic ac = ScriptDefinition $ do
 -- | This handler runs when the topic in __the specified channel__ is changed, provided the bot is subscribed to the channel in question.
 --
 -- The argument is the human readable channel name.
-topicIn :: L.Text -> BotReacting a (User' a, Channel' a, Topic, TimeStamp a) () -> ScriptDefinition a ()
+topicIn :: L.Text -> BotReacting a (TopicChangeData a) () -> ScriptDefinition a ()
 topicIn !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "topic event in #{chanName}")) ac
     actions . topicChangeIn %= HM.alter (alterHelper pac) chanName
@@ -170,7 +172,7 @@ topicIn !chanName ac = ScriptDefinition $ do
 -- | This handler runs when a file is shared in __any channel__ the bot is subscribed to.
 --
 -- The payload contains information about the file and the channel to which it was shared.
-fileShared :: BotReacting a (User' a, Channel' a, RemoteFile' a, TimeStamp a) () -> ScriptDefinition a ()
+fileShared :: BotReacting a (FileSharedData a) () -> ScriptDefinition a ()
 fileShared ac = ScriptDefinition $ do
     pac <- prepareAction (Just "file event" :: Maybe T.Text) ac
     actions . fileShares %= V.cons pac
@@ -179,7 +181,7 @@ fileShared ac = ScriptDefinition $ do
 -- | This handler runs when a file is shared in __the specified channel__ is changed, provided the bot is subscribed to the channel in question.
 --
 -- The argument is the human readable channel name.
-fileSharedIn :: L.Text -> BotReacting a (User' a, Channel' a, RemoteFile' a, TimeStamp a) () -> ScriptDefinition a ()
+fileSharedIn :: L.Text -> BotReacting a (FileSharedData a) () -> ScriptDefinition a ()
 fileSharedIn !chanName ac = ScriptDefinition $ do
     pac <- prepareAction (Just $(isT "file event in #{chanName}")) ac
     actions . fileSharesIn %= HM.alter (alterHelper pac) chanName
@@ -199,7 +201,7 @@ customTrigger tr ac = ScriptDefinition $ do
 -- | Send a message to the channel the triggering message came from.
 --
 -- Equivalent to "robot.send" in hubot
-send :: (IsAdapter a, Get d (Channel' a)) => L.Text -> BotReacting a d ()
+send :: (IsAdapter a, Has "channel" (Channel a) d) => L.Text -> BotReacting a d ()
 send msg = flip messageChannel' msg =<< getChannel
 
 
@@ -261,7 +263,7 @@ saveFileTo file path = readFileBytes file >>= \case
 
 
 -- | Share the file with the provided path to the channel we are currently responding to.
-sendFile :: (IsAdapter a, SupportsFiles a, Get m (Channel' a)) => FilePath -> BotReacting a m (Either L.Text (RemoteFile a))
+sendFile :: (IsAdapter a, SupportsFiles a, Has "channel" (Channel a) d) => FilePath -> BotReacting a d (Either L.Text (RemoteFile a))
 sendFile path = sendFileTo' path . return =<< getChannel
 
 
@@ -274,7 +276,7 @@ sendFileTo path chanName = maybe (return $ Left "Channel does not exist") (sendF
 sendFileTo' :: (MonadAdapter m, SupportsFiles a, MonadIO m, AdapterT m ~ a) => FilePath -> [Channel a] -> m (Either L.Text (RemoteFile a))
 sendFileTo' path chans = runExceptT $ do
     e <- liftIO $ doesFileExist path
-    when e $ fail "File does not exist"
+    when e $ throwError "File does not exist"
     file <- lift $ newLocalFile path' (FileOnDisk path)
     ExceptT $ shareFile file chans
   where path' = L.pack path
@@ -307,7 +309,7 @@ resolveUser = liftAdapterM . A.resolveUser
 -- | Send a message to the channel the original message came from and address the user that sent the original message.
 --
 -- Equivalent to "robot.reply" in hubot
-reply :: (IsAdapter a, Get d (User' a), Get d (Channel' a)) => L.Text -> BotReacting a d ()
+reply :: (IsAdapter a, Has "user" (User a) d, Has "channel" (Channel a) d) => L.Text -> BotReacting a d ()
 reply msg = do
     chan <- getChannel
     user <- (^.username) <$> getUser
@@ -347,33 +349,33 @@ getData = view payload
 -- | Get the results from matching the regular expression.
 --
 -- Equivalent to "msg.match" in hubot.
-getMatch :: Get m Match => BotReacting a m Match
-getMatch = view (payload . getLens)
+getMatch :: Has "match" Match d => BotReacting a d Match
+getMatch = get #match <$> getData
 
 
 -- | Get the message that triggered this action
 -- Includes sender, target channel, as well as the full, untruncated text of the original message
-getMessage :: Get m Message => BotReacting a m Message
-getMessage = view (payload . getLens)
+getMessage :: Has "match" Message d => BotReacting a d Message
+getMessage = get #match <$> getData
 
 
 -- | Get the the new topic.
-getTopic :: Get m Topic => BotReacting a m Topic
-getTopic = view (payload . getLens)
+getTopic :: Has "topic" Topic d => BotReacting a d Topic
+getTopic = get #topic <$> getData
 
 
 -- | Get the stored channel in which something happened.
-getChannel :: forall a m. Get m (Channel' a) => BotReacting a m (Channel a)
-getChannel = (unwrapChannel' :: Channel' a -> Channel a) <$> view (payload . getLens)
+getChannel :: Has "channel" (Channel a) d => BotReacting a d (Channel a)
+getChannel = get #channel <$> getData
 
 
 -- | Get the user which was part of the triggered action.
-getUser :: forall m a. Get m (User' a) => BotReacting a m (User a)
-getUser = (unwrapUser' :: User' a -> User a) <$> view (payload . getLens)
+getUser :: Has "user" (User a) d => BotReacting a d (User a)
+getUser = get #user <$> getData
 
 -- | Get the timestamp for when an event took place
-getTimeStamp :: forall m a. Get m (TimeStamp a) => BotReacting a m (TimeStamp a)
-getTimeStamp = view (payload . getLens)
+getTimeStamp :: Has "timstamp" (TimeStamp a) d => BotReacting a d (TimeStamp a)
+getTimeStamp = get #timstamp <$> getData
 
 -- | Get the username of a registered user.
 --
@@ -394,8 +396,8 @@ getChannelName c = pure $ fromMaybe "" $ c^.name
 {-# DEPRECATED getChannelName "Will be remove in version 1.0, use the lens 'name' instead." #-}
 
 -- | Get the stored information about a remote file.
-getRemoteFile :: forall a m. Get m (RemoteFile' a) => BotReacting a m (RemoteFile a)
-getRemoteFile = (unwrapFile' :: RemoteFile' a -> RemoteFile a) <$> view (payload . getLens)
+getRemoteFile :: Has "file" (RemoteFile a) d => BotReacting a d (RemoteFile a)
+getRemoteFile = get #file <$> getData
 
 
 -- | Get a value out of the config, returns 'Nothing' if the value didn't exist.

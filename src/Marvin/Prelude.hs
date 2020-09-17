@@ -25,6 +25,8 @@ module Marvin.Prelude
     , MonadIO, liftIO
     -- ** Lenses
     , module Lens.Micro.Platform
+    -- ** Overloaded Records
+    , module Labels
     -- ** Useful functions not in the normal Prelude
     , when, unless, for, for_, filterM, fromMaybe
     ) where
@@ -35,6 +37,7 @@ import           Control.Monad.Logger
 import           Data.Foldable                (for_)
 import           Data.Maybe                   (fromMaybe)
 import           Data.Traversable             (for)
+import           Labels                       (Has, get, set, modify)
 import           Lens.Micro.Platform          (at, ix, lens, (&), (.~), (^.), (^?), (^?!))
 import           Marvin
 import           Marvin.Interpolate.String    (isS)

@@ -14,7 +14,7 @@ module Marvin.Types
     , applicationScriptId, IsScript, getScriptId
     , MonadAdapter(AdapterT, liftAdapterM), HasConfigAccess, TimeStamp(..)
     , User'(..), Channel'(..), RemoteFile'(..), FileContent(..)
-    , Get(getLens)
+    , MatchedMessageData, ChannelChangeData, TopicChangeData, FileSharedData
     , Event(..), RunnerM
     , BotActionState
     , HasScriptId(scriptId), HasAdapter(adapter), HasPayload(payload)

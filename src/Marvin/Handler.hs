@@ -22,7 +22,7 @@ import           System.FilePath
 
 
 -- | Sends the name of the bot and the version of the marvin library as a chat message
-echoVersion :: (IsAdapter a, Get d (Channel' a)) => BotReacting a d ()
+echoVersion :: (IsAdapter a, Has "channel" (Channel a) d) => BotReacting a d ()
 echoVersion = do
     botname <- getBotName
     send $(isL "I am #{botname}, a bot built with the marvin library version #{V.showVersion P.version}.")
@@ -31,7 +31,7 @@ echoVersion = do
 -- | Download any shared file which was not shared by the bot itself (@uploader^.username /= botname@)
 --
 -- The boolean decides whether to send a message of success or failure to the originating channel.
-downloadFile :: (IsAdapter a, SupportsFiles a, Get s (RemoteFile' a), Get s (User' a), Get s (Channel' a)) => Bool -> FilePath -> BotReacting a s ()
+downloadFile :: (IsAdapter a, SupportsFiles a, Has "file" (RemoteFile a) d, Has "user" (User a) d, Has "channel" (Channel a) d) => Bool -> FilePath -> BotReacting a d ()
 downloadFile report directory = do
     botname <- getBotName
     uploader <- getUser
@@ -49,7 +49,7 @@ downloadFile report directory = do
 --
 -- The boolean decides whether to send a message of success or failure to the originating channel.
 -- The @Int@ is the index for the filepath in the regex match.
-uploadFile :: (IsAdapter a, SupportsFiles a, Get s Match, Get s (Channel' a)) => Bool -> Int -> BotReacting a s ()
+uploadFile :: (IsAdapter a, SupportsFiles a, Has "match" Match d, Has "channel" (Channel a) d) => Bool -> Int -> BotReacting a d ()
 uploadFile report index = (^?ix index) <$> getMatch >>= \case
     Nothing -> logErrorN "Could not find expected index in match"
     Just rawPath

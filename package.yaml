@@ -49,6 +49,8 @@ library:
   - FunctionalDependencies
   - NamedFieldPuns
   - TypeSynonymInstances
+  - TypeOperators
+  - DataKinds
   exposed-modules:
   - Marvin
   - Marvin.Prelude
@@ -115,6 +117,7 @@ library:
   - irc-conduit >=0.2
   - filepath >=1.4
   - directory >=1.2
+  - labels >= 0.3
 executables:
   marvin-pp:
     main: Main.hs

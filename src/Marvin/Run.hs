@@ -12,6 +12,7 @@ Portability : POSIX
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedLabels #-}
 module Marvin.Run
     (
     -- * Simple and default ways to run marvin
@@ -32,9 +33,9 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader
 import qualified Data.Configurator               as Cfg
 import           Data.Maybe                      (catMaybes, fromJust, fromMaybe, isJust)
-import           Data.Monoid                     ((<>))
 import           Data.Vector                     (Vector)
 import qualified Data.Vector                     as V
+import           Labels
 import           Lens.Micro.Platform
 import           Marvin.Internal.LensClasses
 import           Marvin.Internal.Types
@@ -97,19 +98,19 @@ runHandlers handlers eventChan = forever $ readChan eventChan >>= void . async .
     handler (MessageEvent user chan msg ts) = handleMessage user chan msg ts
     handler (CommandEvent user chan msg ts) = handleCommand user chan msg ts
     -- TODO implement other handlers
-    handler (ChannelJoinEvent user chan ts) = changeHandlerHelper joinsV joinsInV (User' user, , ts) chan
-    handler (ChannelLeaveEvent user chan ts) = changeHandlerHelper leavesV leavesFromV (User' user, , ts) chan
-    handler (TopicChangeEvent user chan topic ts) = changeHandlerHelper topicsV topicsInV (User' user, , topic, ts) chan
-    handler (FileSharedEvent user chan file ts) = changeHandlerHelper fileSharesV fileSharesInV (User' user, , File' file, ts) chan
+    handler (ChannelJoinEvent user chan ts) = changeHandlerHelper joinsV joinsInV (#user := user, , #timestamp := ts) chan
+    handler (ChannelLeaveEvent user chan ts) = changeHandlerHelper leavesV leavesFromV (#user := user, , #timestamp := ts) chan
+    handler (TopicChangeEvent user chan topic ts) = changeHandlerHelper topicsV topicsInV (#user := user, , #timestamp := ts, #topic := topic) chan
+    handler (FileSharedEvent user chan file ts) = changeHandlerHelper fileSharesV fileSharesInV (#user := user, , #timestamp := ts, #file := file) chan
 
     changeHandlerHelper wildcards specifics other chan =
-        mapConcurrently_ ($ other (Channel' chan)) $ wildcards <> applicables
+        mapConcurrently_ ($ other (#channel := chan)) $ wildcards <> applicables
       where applicables = fromMaybe mempty $ (chan^.name) >>= \n -> specifics^?ix n
 
     handleMessageLike v user chan msg ts = mapConcurrently_ id $ doIfMatch v
       where
         doIfMatch = vcatMaybes . fmap select
-        select (trigger, msgHandler) = (\m -> msgHandler (User' user, Channel' chan, m, msg, ts)) <$> match trigger msg
+        select (trigger, msgHandler) = (\m -> msgHandler (#user := user, #channel := chan, #match:= m, #message := msg, #timestamp := ts)) <$> match trigger msg
     handleCommand = handleMessageLike respondsV
     handleMessage = handleMessageLike hearsV
 

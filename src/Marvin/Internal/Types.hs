@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Marvin.Internal.Types where
 
 #define HAS_SEMIGROUP MIN_VERSION_base(4,9,0)
@@ -22,6 +23,7 @@ import qualified Data.Text.Lazy.Encoding     as L
 import           Data.Time.Clock
 import           Data.Vector                 (Vector)
 import           GHC.Generics
+import           Labels
 import           Lens.Micro.Platform
 import           Marvin.Internal.LensClasses
 import           Marvin.Interpolate.All
@@ -158,19 +160,47 @@ data BotActionState a d = BotActionState
     }
 
 
+type MatchedMessageData a = 
+    ( "user" := User a
+    , "channel" := Channel a
+    , "match" := Match
+    , "message" := Message 
+    , "timestamp" := TimeStamp a
+    )
+
+type ChannelChangeData a =
+    ( "user" := User a 
+    , "channel" := Channel a 
+    , "timestamp" := TimeStamp a
+    )
+
+type TopicChangeData a = 
+    ( "user" := User a 
+    , "channel" := Channel a 
+    , "timestamp" := TimeStamp a
+    , "topic" := Topic
+    )
+
+type FileSharedData a =
+    ( "user" := User a 
+    , "channel" := Channel a 
+    , "timestamp" := TimeStamp a
+    , "file" := RemoteFile a
+    )
+
 -- | Accumulator and sorting for all kinds of handlers
 data Handlers a = Handlers
-    { handlersResponds      :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
-    , handlersHears         :: Vector (Regex, (User' a, Channel' a, Match, Message, TimeStamp a) -> RunnerM ())
+    { handlersResponds      :: Vector (Regex, MatchedMessageData a -> RunnerM ())
+    , handlersHears         :: Vector (Regex, MatchedMessageData a -> RunnerM ())
     , handlersCustoms       :: Vector (Event a -> Maybe (RunnerM ()))
-    , handlersJoins         :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
-    , handlersLeaves        :: Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ())
-    , handlersTopicChange   :: Vector ((User' a, Channel' a, Topic, TimeStamp a) -> RunnerM ())
-    , handlersFileShares    :: Vector ((User' a, Channel' a, RemoteFile' a, TimeStamp a) -> RunnerM ())
-    , handlersJoinsIn       :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
-    , handlersLeavesFrom    :: HM.HashMap L.Text (Vector ((User' a, Channel' a, TimeStamp a) -> RunnerM ()))
-    , handlersTopicChangeIn :: HM.HashMap L.Text (Vector ((User' a, Channel' a, Topic, TimeStamp a) -> RunnerM ()))
-    , handlersFileSharesIn  :: HM.HashMap L.Text (Vector ((User' a, Channel' a, RemoteFile' a, TimeStamp a) -> RunnerM ()))
+    , handlersJoins         :: Vector (ChannelChangeData a -> RunnerM ())
+    , handlersLeaves        :: Vector (ChannelChangeData a -> RunnerM ())
+    , handlersTopicChange   :: Vector (TopicChangeData a -> RunnerM ())
+    , handlersFileShares    :: Vector (FileSharedData a -> RunnerM ())
+    , handlersJoinsIn       :: HM.HashMap L.Text (Vector (ChannelChangeData a -> RunnerM ()))
+    , handlersLeavesFrom    :: HM.HashMap L.Text (Vector (ChannelChangeData a -> RunnerM ()))
+    , handlersTopicChangeIn :: HM.HashMap L.Text (Vector (TopicChangeData a -> RunnerM ()))
+    , handlersFileSharesIn  :: HM.HashMap L.Text (Vector (FileSharedData a -> RunnerM ()))
     } deriving Generic
 
 makeFields ''BotActionState
@@ -240,33 +270,6 @@ instance MonadBaseControl IO (BotReacting a d) where
     type StM (BotReacting a d) r = r
     liftBaseWith f = BotReacting $ liftBaseWith $ \q -> f (q . runReaction)
     restoreM = BotReacting . restoreM
-
-
--- | Class which says that there is a way to get to @b@ from this type @a@.
---
--- This typeclass is used to allow handlers with different types of payload to share common
--- accessor functions such as 'Marvin.getUser' and 'Marvin.getMessage'.
---
--- The instances specify for each type of payload which pieces of data can be extracted and how.
-class Get a b where
-    getLens :: Lens' a b
-
-instance Get (a, b) a where getLens = _1
-instance Get (a, b) b where getLens = _2
-
-instance Get (a, b, c) a where getLens = _1
-instance Get (a, b, c) b where getLens = _2
-instance Get (a, b, c) c where getLens = _3
-
-instance Get (a, b, c, d) a where getLens = _1
-instance Get (a, b, c, d) b where getLens = _2
-instance Get (a, b, c, d) c where getLens = _3
-instance Get (a, b, c, d) d where getLens = _4
-
-instance Get (a, b, c, d, e) a where getLens = _1
-instance Get (a, b, c, d, e) b where getLens = _2
-instance Get (a, b, c, d, e) c where getLens = _3
-instance Get (a, b, c, d, e) d where getLens = _4
 
 
 -- | Similar to 'AccessAdapter', this class says there is a 'ScriptId' reachable from the type (usually a monad) @m@.
