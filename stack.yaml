@@ -2,5 +2,6 @@ flags: {}
 extra-package-dbs: []
 packages:
 - .
-extra-deps: []
-resolver: lts-12.26
+extra-deps: 
+  - ../marvin-interpolate
+resolver: lts-16.14

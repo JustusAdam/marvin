@@ -13,14 +13,12 @@ module Marvin.Types
     , ScriptId, mkScriptId, unwrapScriptId
     , applicationScriptId, IsScript, getScriptId
     , MonadAdapter(AdapterT, liftAdapterM), HasConfigAccess, TimeStamp(..)
-    , User'(..), Channel'(..), RemoteFile'(..), FileContent(..)
+    , FileContent(..)
     , MatchedMessageData, ChannelChangeData, TopicChangeData, FileSharedData
     , Event(..), RunnerM
     , BotActionState
     , HasScriptId(scriptId), HasAdapter(adapter), HasPayload(payload)
-    , HasActions(actions), HasUsername(username), HasName(name), HasFirstName(firstName)
-    , HasLastName(lastName), HasFileType(fileType), HasUrl(url), HasCreationDate(creationDate)
-    , HasSize(size), HasContent(content)
+    , HasActions(actions)
     ) where
 
 

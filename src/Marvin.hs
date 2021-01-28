@@ -236,7 +236,7 @@ saveFileToDir :: (MonadAdapter m, MonadIO m, SupportsFiles (AdapterT m))
               => RemoteFile (AdapterT m) -> FilePath -> m (Either L.Text FilePath)
 saveFileToDir file dir = do
     fname <- liftIO $
-        case file^.name of
+        case get #name file of
             Nothing -> do
                 ts <- getCurrentTime
                 return $(isS "unnamed-#{ts}")
@@ -254,7 +254,7 @@ saveFileTo :: (MonadAdapter m, MonadIO m, SupportsFiles (AdapterT m))
            => RemoteFile (AdapterT m) -> FilePath -> m (Either L.Text FilePath)
 saveFileTo file path = readFileBytes file >>= \case
     Nothing ->
-        return $ Left $(isL "#{maybe \"unnamed file\" (\"File \" <>) $ file^.name} could not be downloaded")
+        return $ Left $(isL "#{maybe \"unnamed file\" (\"File \" <>) $ get #name file} could not be downloaded")
     Just text -> do
         liftIO $ do
             createDirectoryIfMissing True $ takeDirectory path
@@ -312,7 +312,7 @@ resolveUser = liftAdapterM . A.resolveUser
 reply :: (IsAdapter a, Has "user" (User a) d, Has "channel" (Channel a) d) => L.Text -> BotReacting a d ()
 reply msg = do
     chan <- getChannel
-    user <- (^.username) <$> getUser
+    user <- get #username <$> getUser
     messageChannel' chan $ user <> " " <> msg
 
 
@@ -383,8 +383,8 @@ getTimeStamp = get #timstamp <$> getData
 getUsername :: MonadAdapter m
             => User (AdapterT m)
             -> m L.Text
-getUsername u = pure $ u^.username
-{-# DEPRECATED getUsername "Will be remove in version 1.0, use the lens 'username' instead." #-}
+getUsername = pure . get #username 
+{-# DEPRECATED getUsername "Will be remove in version 1.0, use the record accessors 'get #username' instead." #-}
 
 
 -- | Get the human readable name of a channel.
@@ -392,8 +392,8 @@ getUsername u = pure $ u^.username
 -- This function is deprecated as of Version 0.3 and will be removed in version 1.0. Use the lens 'name' instead.
 getChannelName :: MonadAdapter m
                => Channel (AdapterT m) -> m L.Text
-getChannelName c = pure $ fromMaybe "" $ c^.name
-{-# DEPRECATED getChannelName "Will be remove in version 1.0, use the lens 'name' instead." #-}
+getChannelName = pure . fromMaybe "" . get #name c
+{-# DEPRECATED getChannelName "Will be remove in version 1.0, use the record accessor 'get #name' instead." #-}
 
 -- | Get the stored information about a remote file.
 getRemoteFile :: Has "file" (RemoteFile a) d => BotReacting a d (RemoteFile a)

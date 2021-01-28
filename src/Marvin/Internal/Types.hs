@@ -73,11 +73,11 @@ type RunnerM = LoggingT IO
 type EventConsumer a = Event a -> AdapterM a ()
 
 -- | Basic functionality required of any adapter
-class ( HasUsername (User a) L.Text
-      , HasName (User a) (Maybe L.Text)
-      , HasFirstName (User a) (Maybe L.Text)
-      , HasLastName (User a) (Maybe L.Text)
-      , HasName (Channel a) (Maybe L.Text)
+class ( Has "username" L.Text (User a) 
+      , Has "name" (Maybe L.Text) (User a)
+      , Has "firstName" (Maybe L.Text) (User a)
+      , Has "lastName" (Maybe L.Text) (User a)
+      , Has "name" (Maybe L.Text) (Channel a)
       ) => IsAdapter a where
     -- | Concrete, adapter specific representation of a user. Could be an id string or a full object for instance
     type User a
@@ -110,14 +110,14 @@ newtype AdapterM a r = AdapterM { runAdapterAction :: ReaderT (AdapterMEnv a) Ru
 data FileContent = FileOnDisk FilePath | FileInMemory ByteString
 
 
-class ( HasName (RemoteFile a) (Maybe L.Text)
-      , HasUrl (RemoteFile a) (Maybe L.Text)
-      , HasFileType (RemoteFile a) (Maybe L.Text)
-      , HasCreationDate (RemoteFile a) (TimeStamp a)
-      , HasSize (RemoteFile a) Integer
-      , HasContent (LocalFile a) FileContent
-      , HasName (LocalFile a) L.Text
-      , HasFileType (LocalFile a) (Maybe L.Text)
+class ( Has "name" (Maybe L.Text) (RemoteFile a)
+      , Has "url" (Maybe L.Text) (RemoteFile a)
+      , Has "fileType" (Maybe L.Text) (RemoteFile a)
+      , Has "creationDate" (TimeStamp a) (RemoteFile a)
+      , Has "size" Integer (RemoteFile a)
+      , Has "content" FileContent (LocalFile a)
+      , Has "name" L.Text (LocalFile a)
+      , Has "fileType" (Maybe L.Text) (LocalFile a)
       ) => SupportsFiles a where
     -- | Concrete type of an uploaded file
     type RemoteFile a
@@ -129,15 +129,6 @@ class ( HasName (RemoteFile a) (Maybe L.Text)
     readFileBytes :: RemoteFile a -> AdapterM a (Maybe ByteString)
     shareFile :: LocalFile a -> [Channel a] -> AdapterM a (Either L.Text (RemoteFile a))
     -- Add a method for resolving a file
-
-
--- | Wrapping type for users. Only used to enable 'Get' typeclass instances.
-newtype User' a = User' { unwrapUser' :: User a }
--- | Wrapping type for channels. Only used to enable 'Get' typeclass instances.
-newtype Channel' a = Channel' { unwrapChannel' :: Channel a }
-
--- | Wrapping type for files. Only used to enable 'Get' typeclass instances.
-newtype RemoteFile' a = File' { unwrapFile' :: RemoteFile a }
 
 -- | A type, basically a String, which identifies a script to the config and the logging facilities.
 --

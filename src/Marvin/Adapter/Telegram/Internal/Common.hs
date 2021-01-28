@@ -54,103 +54,106 @@ data ChatType
 
 class HasId_ s a | s -> a where id_ :: Lens' s a
 
--- | A user object as contained in the telegram update objects
-data TelegramUser = TelegramUser
-    { telegramUserId_       :: Integer
-    , telegramUserFirstName :: Maybe L.Text
-    , telegramUserLastName  :: Maybe L.Text
-    , telegramUserUsername  :: L.Text
-    }
+type TelegramUserRecord =
+    ( "id" := Integer 
+    , "firstName" := Maybe L.Text
+    , "lastName" := Maybe L.Text
+    , "username" := L.Text
+    )
 
-data TelegramRemoteFileStruct
+-- | A user object as contained in the telegram update objects
+newtype TelegramUser = TelegramUser TelegramUserRecord
+
+instance Has a b TelegramUserRecord => Has a b TelegramUser where
+    get l (TelegramUser r) = get l r
+    set l v (TelegramUser r) = TelegramUser $ set l v r
+
+data RemoteFileStruct
     = RemoteAudio
-        { telegramRemoteFileStructDuration  :: Integer
-        , telegramRemoteFileStructPerformer :: Maybe L.Text
-        , telegramRemoteFileStructTitle     :: Maybe L.Text
-        }
+        ( "duration"  := Integer
+        , "performer" := Maybe L.Text
+        , "title"     := Maybe L.Text
+        )
     | RemoteDocument
     | RemoteSticker
-        { telegramRemoteFileStructWidth  :: Integer
-        , telegramRemoteFileStructHeight :: Integer
-        , telegramRemoteFileStructEmoji  :: Maybe L.Text
-        }
+        ( "width"  := Integer
+        , "height" := Integer
+        , "emoji"  := Maybe L.Text
+        )
     | RemoteVideo
-        { telegramRemoteFileStructWidth    :: Integer
-        , telegramRemoteFileStructHeight   :: Integer
-        , telegramRemoteFileStructDuration :: Integer
-        }
+        ( "width"    := Integer
+        , "height"   := Integer
+        , "duration" := Integer
+        )
     | RemoteVoice
-        { telegramRemoteFileStructDuration :: Integer
-        }
+        ( "duration" := Integer
+        )
 
+type RemoteFile a =
+    ( "struct":= RemoteFileStruct
+    , "size"  := Integer
+    , "fid"   := TelegramFileId
+    , "type"  := Maybe L.Text
+    , "name"  := Maybe L.Text
+    )
 
-data TelegramRemoteFile a = TelegramRemoteFile
-    { telegramRemoteFileStruct   :: TelegramRemoteFileStruct
-    , telegramRemoteFileSize     :: Integer
-    , telegramRemoteFileFid      :: TelegramFileId
-    , telegramRemoteFileFileType :: Maybe L.Text
-    , telegramRemoteFileName     :: Maybe L.Text
-    }
-
-data TelegramLocalFileStruct
+data LocalFileStruct
     = LocalPhoto
     | LocalAudio
-        { telegramLocalFileStructDuration  :: Maybe Int
-        , telegramLocalFileStructPerformer :: Maybe L.Text
+        ( "duration"  := Maybe Int
+        , "performer" := Maybe L.Text
         -- , telegramLocalFileStructShowTitle :: Maybe L.Text
-        }
+        )
     | LocalDocument
     | LocalVideo
-        { telegramLocalFileStructDuration :: Maybe Int
-        , telegramLocalFileStructWidth    :: Maybe Int
-        , telegramLocalFileStructHeight   :: Maybe Int
+        ( "duration" := Maybe Int
+        , "width"    := Maybe Int
+        , "height"   := Maybe Int
         }
 
 
-data TelegramLocalFile = TelegramLocalFile
-    { telegramLocalFileStruct              :: TelegramLocalFileStruct
-    , telegramLocalFileContent             :: FileContent
-    , telegramLocalFileName                :: L.Text
-    , telegramLocalFileFileType            :: Maybe L.Text
-    , telegramLocalFileDisableNotification :: Maybe Bool
-    , telegramLocalFileFromRef             :: Maybe TelegramFileId
-    , telegramLocalFileCaption             :: Maybe L.Text
+type LocalFile =
+    ( "struct"              := LocalFileStruct
+    , "content"             := FileContent
+    , "name"                := L.Text
+    , "fileType"            := Maybe L.Text
+    , "disableNotification" := Maybe Bool
+    , "fromRef"             := Maybe TelegramFileId
+    , "caption"             := Maybe L.Text
     }
 
-makeFields ''TelegramUser
-makeFields ''TelegramRemoteFileStruct
-makeFields ''TelegramRemoteFile
-makeFields ''TelegramLocalFileStruct
-makeFields ''TelegramLocalFile
-
-instance HasUrl (TelegramRemoteFile a) (Maybe L.Text) where url = lens (const Nothing) const
-instance HasCreationDate (TelegramRemoteFile a) (TimeStamp a) where creationDate = lens (const undefined) const
+instance Has "url" (Maybe L.Text) (RemoteFile a) where 
+    get _ _ = Nothing
+    set _ _ = id
+instance Has "creationDate" (TimeStamp a) (RemoteFile a) where 
+    get _ _ = Nothing
+    set _ _ = id
 
 
-instance HasName TelegramUser (Maybe L.Text) where
-    name = lens
-        (\u -> (mappend <$> u^.firstName <*> (mappend " " <$> u^.lastName)) <|> u^.firstName <|> u^.lastName)
-        (flip set_)
-      where
-        set_ Nothing = (firstName .~ Nothing) . (lastName .~ Nothing)
-        set_ (Just n) = (firstName .~ Just first) . (lastName .~ if L.null rest then Nothing else Just rest)
+instance Has "name" TelegramUser (Maybe L.Text) where
+    get _ u = (mappend <$> get #firstName u <*> (mappend " " <$> get #lastName u)) <|> get #firstName u <|> get #lastName u
+    set _ = \case 
+        Nothing -> (set #firstName Nothing) . (set #lastName Nothing)
+        (Just n) -> (set firstName $ Just first) . (set #lastName $ if L.null rest then Nothing else Just rest)
           where
             (first, rest') = L.break (== ' ') n
             rest = L.tail rest'
 
 
 -- | A telegram chat object as contained in telegram updates
-data TelegramChat = TelegramChat
-    { telegramChatId_       :: Integer
-    , telegramChatType_     :: ChatType
-    , telegramChatUsername  :: Maybe L.Text
-    , telegramChatFirstName :: Maybe L.Text
-    , telegramChatLastName  :: Maybe L.Text
-    }
-makeFields ''TelegramChat
+type ChatRec =
+    ( "id_"       := Integer
+    , "type_"     := ChatType
+    , "username"  := Maybe L.Text
+    , "firstName" := Maybe L.Text
+    , "lastName"  := Maybe L.Text
+    )
 
-instance HasName TelegramChat (Maybe L.Text) where
-    name = username
+data Chat = Chat ChatRec
+
+instance Has "name" Chat (Maybe L.Text) where
+    get _ = get #username
+    set _ = set #username
 
 instance FromJSON ChatType where
     parseJSON = withText "expected string" $
@@ -163,53 +166,53 @@ instance FromJSON ChatType where
 
 instance FromJSON TelegramUser where
     parseJSON = withObject "user must be object" $ \o ->
-        TelegramUser
-            <$> o .: "id"
+        (,,,)
+            <$> ((#id :=) <$> o .: "id")
             <*> (Just <$> o .: "first_name")
             <*> o .:? "last_name"
             <*> (maybe (o .: "first_name") return =<< o .:? "username")
 
-instance FromJSON TelegramChat where
+instance FromJSON Chat where
     parseJSON = withObject "channel must be object" $ \o ->
-        TelegramChat
+        Chat
             <$> o .: "id"
             <*> o .: "type"
             <*> o .:? "username"
             <*> o .:? "first_name"
             <*> o .:? "last_name"
 
-parseFileHelper :: (Object -> Parser TelegramRemoteFileStruct) -> Value -> Parser (Object, TelegramRemoteFileStruct)
+parseFileHelper :: (Object -> Parser RemoteFileStruct) -> Value -> Parser (Object, RemoteFileStruct)
 parseFileHelper f = withObject "expected object" $ \o -> (o, ) <$> f o
 
-parseTelegramAudio :: Object -> Parser TelegramRemoteFileStruct
+parseTelegramAudio :: Object -> Parser RemoteFileStruct
 parseTelegramAudio o =
     RemoteAudio
         <$> o .: "duration"
         <*> o .:? "performer"
         <*> o .:? "title"
 
-parseTelegramDocument :: Object -> Parser TelegramRemoteFileStruct
+parseTelegramDocument :: Object -> Parser RemoteFileStruct
 parseTelegramDocument = const (return RemoteDocument)
 
-parseTelegramSticker :: Object -> Parser TelegramRemoteFileStruct
+parseTelegramSticker :: Object -> Parser RemoteFileStruct
 parseTelegramSticker o =
     RemoteSticker
         <$> o .: "width"
         <*> o .: "height"
         <*> o .:? "emoji"
 
-parseTelegramVideo :: Object -> Parser TelegramRemoteFileStruct
+parseTelegramVideo :: Object -> Parser RemoteFileStruct
 parseTelegramVideo o =
     RemoteVideo
         <$> o .: "width"
         <*> o .: "height"
         <*> o .: "duration"
 
-parseTelegramVoice :: Object -> Parser TelegramRemoteFileStruct
+parseTelegramVoice :: Object -> Parser RemoteFileStruct
 parseTelegramVoice o = RemoteVoice <$> o .: "duration"
 
 
-parseTelegramFile :: Object -> Parser (TelegramRemoteFile a)
+parseTelegramFile :: Object -> Parser (RemoteFile a)
 parseTelegramFile o = do
     (o', mediaStruct) <- msum
         [ o .: "audio" >>= parseFileHelper parseTelegramAudio
@@ -218,7 +221,7 @@ parseTelegramFile o = do
         , o .: "video" >>= parseFileHelper parseTelegramVideo
         , o .: "voice" >>= parseFileHelper parseTelegramVoice
         ]
-    TelegramRemoteFile mediaStruct
+    RemoteFile mediaStruct
         <$> o' .:? "file_size" .!= (-1)
         <*> o' .:  "file_id"
         <*> o' .:  "file_name"
@@ -292,12 +295,12 @@ execAPIMethodWith opts innerParser methodName fparams = do
                                                 else retry (succ n) a
 
 
-getChannelNameImpl :: TelegramChat -> AdapterM (TelegramAdapter a) L.Text
+getChannelNameImpl :: Chat -> AdapterM (TelegramAdapter a) L.Text
 getChannelNameImpl c = return $ fromMaybe "<unnamed>" $
     c^.username <|> (L.unwords <$> sequence [c^.firstName, c^.lastName]) <|> c^.firstName
 
 
-messageChannelImpl :: MkTelegram a => TelegramChat -> L.Text -> AdapterM (TelegramAdapter a) ()
+messageChannelImpl :: MkTelegram a => Chat -> L.Text -> AdapterM (TelegramAdapter a) ()
 messageChannelImpl chat msg = do
     res <- execAPIMethod msgParser "sendMessage" ["chat_id" := (chat^.id_) , "text" := msg]
     case res of
@@ -337,7 +340,7 @@ runnerImpl handler = do
             Unhandeled -> logDebugN $(isT "Unhadeled event.")
 
 
-toFtype :: TelegramLocalFileStruct -> (String, T.Text)
+toFtype :: LocalFileStruct -> (String, T.Text)
 toFtype LocalPhoto    = ("Photo", "photo")
 toFtype LocalAudio{}  = ("Audio", "audio")
 toFtype LocalDocument = ("Document", "document")
@@ -347,7 +350,7 @@ toFtype LocalVideo{}  = ("Video", "video")
 partShow :: Show a => T.Text -> a -> Part
 partShow name' = partString name' . show
 
-mkStructParts :: TelegramLocalFile -> [Maybe Part]
+mkStructParts :: LocalFile -> [Maybe Part]
 mkStructParts f =
     case f^.struct of
         LocalAudio duration' performer' ->
@@ -363,7 +366,7 @@ mkStructParts f =
         _ -> []
 
 
-shareFileImpl :: MkTelegram a => TelegramLocalFile -> [TelegramChat] -> AdapterM (TelegramAdapter a) (Either L.Text (TelegramRemoteFile (TelegramAdapter a)))
+shareFileImpl :: MkTelegram a => LocalFile -> [Chat] -> AdapterM (TelegramAdapter a) (Either L.Text (RemoteFile (TelegramAdapter a)))
 shareFileImpl localFile targets = do
     contentPart <- case localFile^.fromRef of
         Just (TelegramFileId fid') -> return $ propName `partText` fid'
@@ -398,7 +401,7 @@ class MkTelegram a where
 
 instance MkTelegram a => IsAdapter (TelegramAdapter a) where
     type User (TelegramAdapter a) = TelegramUser
-    type Channel (TelegramAdapter a) = TelegramChat
+    type Channel (TelegramAdapter a) = Chat
     adapterId = mkAdapterId
     initAdapter = return TelegramAdapter
     runAdapter = runnerImpl
@@ -411,8 +414,8 @@ instance MkTelegram a => IsAdapter (TelegramAdapter a) where
     messageChannel = messageChannelImpl
 
 instance MkTelegram a => SupportsFiles (TelegramAdapter a) where
-    type RemoteFile (TelegramAdapter a) = TelegramRemoteFile (TelegramAdapter a)
-    type LocalFile (TelegramAdapter a) = TelegramLocalFile
+    type RemoteFile (TelegramAdapter a) = RemoteFile (TelegramAdapter a)
+    type LocalFile (TelegramAdapter a) = LocalFile
     shareFile = shareFileImpl
     readFileBytes remoteFile = do
         res <- execAPIMethod (withObject "expected object" (.: "file_path")) "getFile" ["file_id" := unwrapFileId (remoteFile^.fid)]
@@ -428,4 +431,4 @@ instance MkTelegram a => SupportsFiles (TelegramAdapter a) where
                     code -> do
                         logErrorN $(isT "Non 200 Response when downloading file: #{code} - #{view (responseStatus.statusMessage) fres}")
                         return Nothing
-    newLocalFile fname content' = pure $ TelegramLocalFile LocalDocument content' fname Nothing Nothing Nothing Nothing
+    newLocalFile fname content' = pure $ LocalFile LocalDocument content' fname Nothing Nothing Nothing Nothing

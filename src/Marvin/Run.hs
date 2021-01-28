@@ -105,7 +105,7 @@ runHandlers handlers eventChan = forever $ readChan eventChan >>= void . async .
 
     changeHandlerHelper wildcards specifics other chan =
         mapConcurrently_ ($ other (#channel := chan)) $ wildcards <> applicables
-      where applicables = fromMaybe mempty $ (chan^.name) >>= \n -> specifics^?ix n
+      where applicables = fromMaybe mempty $ (get #name chan) >>= \n -> specifics^?ix n
 
     handleMessageLike v user chan msg ts = mapConcurrently_ id $ doIfMatch v
       where

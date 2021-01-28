@@ -1,14 +1,16 @@
+{-# LANGUAGE UndecidableInstances #-}
 module Util where
 
 
 import           Control.Monad
 import           Data.Aeson.Types
 import           Data.String                 (IsString(fromString))
+import           Data.Proxy
 import qualified Data.Text                   as T
 import qualified Data.Text.Lazy              as L
 import           Data.Time.Clock.POSIX
-import           Lens.Micro.Platform
-import           Marvin.Internal.LensClasses
+import           Labels
+import           Labels.Internal
 import           Marvin.Internal.Types
 import           Marvin.Interpolate.Text
 import           Text.Read                   (readMaybe)
@@ -44,10 +46,18 @@ newtype SimpleWrappedUsername = SimpleWrappedUsername { unwrapUser :: L.Text } d
 instance IsString SimpleWrappedUsername where fromString = SimpleWrappedUsername . fromString
 instance Show SimpleWrappedUsername where show = L.unpack . unwrapUser
 
-instance HasUsername SimpleWrappedUsername L.Text where username = lens unwrapUser (const SimpleWrappedUsername)
-instance HasFirstName SimpleWrappedUsername (Maybe L.Text) where firstName = lens (const Nothing) const
-instance HasLastName SimpleWrappedUsername (Maybe L.Text) where lastName = lens (const Nothing) const
-instance HasName SimpleWrappedUsername (Maybe L.Text) where name = lens (const Nothing) const
+instance Has "username" L.Text SimpleWrappedUsername where 
+    get _ = unwrapUser
+    set _ = const . SimpleWrappedUsername
+instance Has "firstName" (Maybe L.Text) SimpleWrappedUsername  where 
+    get _ _ = Nothing
+    set _ _ = id
+instance Has "lastName" (Maybe L.Text) SimpleWrappedUsername where 
+    get _ _ = Nothing
+    set _ _ = id
+instance Has "name" (Maybe L.Text) SimpleWrappedUsername where 
+    get _ _ = Nothing
+    set _ _ = id
 
 
 newtype SimpleWrappedChannelName = SimpleWrappedChannelName { unwrapChannelName :: L.Text } deriving Eq
@@ -55,7 +65,9 @@ newtype SimpleWrappedChannelName = SimpleWrappedChannelName { unwrapChannelName 
 instance IsString SimpleWrappedChannelName where fromString = SimpleWrappedChannelName . fromString
 instance Show SimpleWrappedChannelName where show = L.unpack . unwrapChannelName
 
-instance HasName SimpleWrappedChannelName (Maybe L.Text) where name = lens (Just . unwrapChannelName) (\a -> maybe a SimpleWrappedChannelName)
+instance Has "name" (Maybe L.Text) SimpleWrappedChannelName where 
+    get _ = Just . unwrapChannelName
+    set _ v r = maybe r SimpleWrappedChannelName v
 
 
 mapLeft :: (a -> c) -> Either a b -> Either c b
@@ -68,3 +80,12 @@ mapRight = fmap
 
 ifM :: Monad m => m Bool -> m a -> m a -> m a
 ifM cond then_ else_ = cond >>= \c -> if c then then_ else else_
+
+newtype ParseRecordStd a = ParseRecordStd { unwrapParseRecordStd :: a }
+
+instance (Cons label value record, FromJSON value, FromJSON (ParseRecordStd record), a ~ (Consed label value record)) => FromJSON (ParseRecordStd a ) where
+    parseJSON = withObject "" $ \o -> do
+        ParseRecordStd inner <- parseJSON o
+        let labelP = undefined :: Proxy label
+        field <- o .: symbolVal labelP
+        pure $ cons (labelP := field) inner

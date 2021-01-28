@@ -2,25 +2,6 @@ module Marvin.Internal.LensClasses where
 
 import           Lens.Micro.Platform
 
--- | Used to contrain 'Marvin.LocalFile' and make the content available to handler functions.
-class HasContent s a | s -> a where content :: Lens' s a
--- | Used to constrain 'Marvin.RemoteFile' and make a download url available to handler functions.
-class HasUrl s a | s -> a where url :: Lens' s a
--- | Constrains 'Marvin.User' and 'Marvin.Channel' and more to make a name accessible to handler functions.
-class HasName s a | s -> a where name :: Lens' s a
--- | Constrains 'Marvin.User' and make an optional last name available to handler functions.
-class HasLastName s a | s -> a where lastName :: Lens' s a
--- | Constrains 'Marvin.User' and make an optional first name available to handler functions.
-class HasFirstName s a | s -> a where firstName :: Lens' s a
--- | Constrains the 'Marvin.RemoteFiles' and makes a creation date available to handler functions.
-class HasCreationDate s a | s -> a where creationDate :: Lens' s a
--- | Constrains 'Marvin.RemoteFile' to have a size.
-class HasSize s a | s -> a where size :: Lens' s a
--- | Constrains 'Marvin.User' to have a username.
-class HasUsername s a | s -> a where username :: Lens' s a
--- | Constrains files with an optional type
-class HasFileType s a | s -> a where fileType :: Lens' s a
-
 class HasScriptId s a | s -> a where scriptId :: Lens' s a
 class HasConfig s a | s -> a where config :: Lens' s a
 class HasAdapter s a | s -> a where adapter :: Lens' s a
