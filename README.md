@@ -67,15 +67,9 @@ script = defineScript "my-script" $ do
         safeFileToDir file "shared-files"
 ```
 
-## Testing and Talking
-
-There's a [slack channel][slack-channel] where you can ask questions or play around with a [test instance of marvin](https://github.com/JustusAdam/marvin/blob/master/test/integration/slack/Script1.hs).
-
-It's currently invite-only, so [send me an email](mailto:dev@justus.science) if you would like to join.
-
 ## Status of the project
 
-I try to respond to issues and I am happy to review and merge pull requests. I have some more features planned but I don't yet know when I'll get the time to implement them.
+I currently do not actively develop this project. I am happy to merge pull requests but I will likely not have time to work on issues myself. It is also likely that the adapters are not up-to-date with the APIs they are supposed to interact with so be aware. 
 
 **Maintenance Level**: Happy to merge
 
